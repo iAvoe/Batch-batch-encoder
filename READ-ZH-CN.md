@@ -61,18 +61,19 @@
 
 ## ▲怎么用
 
- 1. 解压下载好的压缩包，按大批量或单文件压制需求选.ps1脚本，照序号顺序右键点击"编辑 (PowerShell ISE)"或"用PowerShell打开". 按说明文本的要求照做，输入需要的信息后的得到批处理。
+ 1. 解压下载好的压缩包，按大批量或单文件压制需求，照序号顺序右键点击"编辑"或"用PowerShell打开". 照说明文本的要求输入需要的信息，最后得到批处理。
 ![bbenc-ttl1.png](bbenc-ttl1.png)
 ![bbenc-ttl2.png](bbenc-ttl2.png)
- 2. 集齐一套压制批处理，一个对应（大批量/单文件）的主控批处理后，双击主控批处理运行
+ 2. 集齐压制批处理，与其对应（大批量/单文件）的主控批处理后，双击主控批处理运行即可启动压制任务
 ![bbenc-ttl3.png](bbenc-ttl3.png)
- 3. 运行封装的.ps1脚本，按照提示导入需要封装的源文件，然后继续导入其它要封装的流，最后选择封装格式后即完成
+ 3. 最后, 运行封装用的.ps1脚本，按照提示导入构建一集视频所需的全部流/轨道，选择导出的封装格式即完成
 
 ## ★下载链接
 <font size=3em>皆同步更新, QQ群里有很高几率能得到问题答复<br>
-1: <a href='https://drive.google.com/drive/folders/170tmk7yJBIz5eJuy7KXzqIgtvtDajyDu?usp=sharing'>谷歌盘</a>
-2: <a href='https://pan.baidu.com/s/1jAXn066e6K7vSfUd5zJEcg'>百度云, 提取码 hevc</a>,
-3: QQ群存档: <a href='https://jq.qq.com/?_wv=1027&k=5YJFXyf'>691892901</a><br>
+1: <a href='/'>Github直链</a>, 
+2: <a href='https://drive.google.com/drive/folders/170tmk7yJBIz5eJuy7KXzqIgtvtDajyDu?usp=sharing'>谷歌盘</a>, 
+3: <a href='https://pan.baidu.com/s/1jAXn066e6K7vSfUd5zJEcg'>百度云, 提取码 hevc</a>, 
+4: QQ群存档: <a href='https://jq.qq.com/?_wv=1027&k=5YJFXyf'>691892901</a><br>
 
 附录α: <a href='https://www.nazorip.site/archives/44/'>QAAC音频压缩教程</a>或<a href='https://github.com/iAvoe/QAAC-Tutorial-Standalone/blob/master/%E6%95%99%E7%A8%8B.md'>Github</a><br>
 
