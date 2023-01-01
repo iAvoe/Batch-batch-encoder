@@ -6,46 +6,52 @@
  - One gallon of ffmpeg/Vapoursynth (vspipe)/Avisynth (avs2yuv)/Avisynth (avs2pipemod)
  - One cup of x264/x265
 
-## ★Advantages of this solution
+## ★Advantages
 
  - Python-free, satisfies entry level video editors' needs to work out-of-shelf
  - Simply follow the script's guide & supply the correct information
  - The script is natually uncompiled,which makes debugging & adding features to be quick & easy
- - The encoding steps supports 4 upstream pipe programs (ffmpeg, vspipe, avs2yuv, avs2pipemod), as well as 2 downstream  programs (x264, x265), in total of 8 different routes
+ - The encoding steps supports 4 upstream pipe programs (ffmpeg, vspipe, avs2yuv, avs2pipemod)
+   - as well as 2 downstream  programs (x264, x265), in total of 8 different routes
 
 ![S1-4.png](S1-4.png)
 
-<center>Chart of encoding-workflow's routes</center>
+<p align="center">Chart of encoding-workflow's routes</p><br>
 
- - The multiplexing/encapsulating/containing step supports analysis of container formats, special containers, video streams, audio tracks, subtitle tracks, font tracks, as well as 4 output format options
+ - The multiplexing/encapsulating/containing step supports analysis of containers, special containers, video streams, audio tracks, subtitle tracks, font tracks
+    - as well as 4 output format options, with their compatibility check
 
 ![S5n.png](S5n.png)
 
-<center>Chart of multiplexing-workflow's routes (later added supports to VP9, FLAC, MXF)</center>
-<center><font size=1><del>Not really that complex in the code, but logically yes</del></font></center>
+<p align="center">Chart of multiplexing-workflow's routes (later added supports to VP9, FLAC, MXF)</p>
+<p align="center" size=1><del>Not really that complex in the code, but logically yes</del></p><br>
 
  - Auto-filling colorspace, bitdepth, resolution & framerate to ffmpeg, avs2yuv, x264, x265's options
  - Batch encoding workflow supports over 15000 individual tasks, with user options to pause/stop in middle of each tasks
- - Developed Fixed + Varying (par-var) structure of commandline variable assignment, the enduser could easily alter the "Var"s with changing variables for encode testing
- - Developed Encoder + Controller (enc-ctrl) batch layout, which greatly simplfies large-volume tasks' commandline
+ - Developed Fixed+Vary (par-var) structure of commandline assignment, the end-user could easily alter the "Var"s to repurpose for encode option/value testing
+ - Developed Encoder+Controller (enc-ctrl) batch layout, which greatly simplfies large-volume tasks' commandline
  - Setlocal+Endlocal, CMD /k and many for repeated-runs free of interference from previously assigned variables
 
 -----
 
 ## ☆At what cost?
 
- - Donated my winter break in a cycle of adding features --> new feature creates bug --> debug, as well as save a new copy to develop new routes --> debug --> write comments --> merge to original copy --> merging/separating variables introduced from new routes --> debug
- - This script suite runs in a more complexed way compared to most encoding programs
- - A lot of cmdlets and variables are creeated just to be compatible with commandline formatting requirements from especially ffmpeg
- - Some hard times to think-out and develop a twenty-hexadecimal (alphabet) carrying mathmatical operation within a for-loop, that is to support 15000+ individual encodes
+ - Donated my winter break in a ~~vicious~~ cycle of adding features --> new feature creates bug --> debug --> add comments
+ - This script suite is quite complex compared to most encoding programs, making it difficult to work with at beginning
+ - A lot of cmdlets, variables are creeated for formatting cmdlines, by requirements from especially ffmpeg
+ - The fear that I'll be joked at developing a twenty-hexadecimal (alphabet) carrying mathmatical operation within a for-loop to support 15000+ individual encodes
+   - just to elinimate numbers in batch variables
  - To make multiplexing/containing script robust/very capable, a 168-line ~~turbo encabulator~~ function was developed after a hellish endurance-challenging debugs (mostly due to my lack of systematilly study of coding)
  - As I've being told, supporting this project in future would be difficult
+<br>
 
 **★Why not choosing develop w/ C++, TypeScript, JS**
  - I haven't studied them =_=, also the environment setup would make too much change to the OS（？）；PowerShell & PS ISE are the opposite
  - I know docker exists, but telling docker about my phone number just to begin study c++ is a no
+<br>
 
 **☆Why not choosing to develop w/ Python, like installing Python is not that hard**
+
 Intalling Python is pretty straightforward, however in terms of IDEs:
  - Most people have never used Atom IDE, and some says it has performance issues on Windows
  - Python does not have a usable built-in IDE
@@ -74,11 +80,9 @@ Apdx α: <a href='https://www.nazorip.site/archives/44/'>QAAC audio encoder tuto
 
 Apdx β: <a href='https://nazorip.site/archives/169/'>ffprobe stream media probing tutorial</a>OR<a href='https://github.com/iAvoe/FFprobe-Tutorial-Standalone/blob/master/教程.md'>Github</a> (chromium/firefox-plugin webpage translation is required)<br>
 
-Apdx γ:
-
 δ: Download ffmpeg, ffprobe: <a href='http://ffmpeg.org/download.html'>official builds</a>OR<a href='https://ottverse.com/ffmpeg-builds'>Ottverse builds</a><br>
 
-ε: Download x264/5: <a href='http://www.mediafire.com/?6lfp2jlygogwa'>LigH (x265)</a>、
+ε: Download x264,  x265: <a href='http://www.mediafire.com/?6lfp2jlygogwa'>LigH (x265)</a>、
 <a href='https://www.mediafire.com/?bxvu1vvld31k1'>LigH (x264)</a>、
 <a href='https://drive.google.com/drive/u/0/folders/0BzA4dIFteM2dWEpvWGZXV3ZhdTA'>Rigaya (x265)</a>、
 <a href='https://www.mediafire.com/folder/arv5xmdqyiczc'>Patman (x264 x265)</a>、
@@ -105,10 +109,10 @@ Apdx γ:
  - however PowerShell 7 mandate users to run scripts with purely commandline, which is not acceptable, and caused the later shift to realize some of PS7's features in PowserShell 5.1
 
 **PowerShell generate multi-line string with loop**
- - Declare an array and string variable: $StrArray=@(); $MtlnString=\"\"
- - Aggregate string data into array from loop, place a \`n at rear: $StrArray+=\"some text \`n\"
- - Pass array to string variable after loop finishes: [string]$MtlnString=$StrArray
- - \`n enables the line switching, but also creates a space start from the 2nd line, remove it with -replace: $MtlnString=MtlnString -replace \" some\", \"some\"
+ - Declare an array and string variable: ` $StrArray=@(); $MtlnString="" `
+ - Aggregate string data into array from loop, place a \`n at rear: `` $StrArray+="some text `n"``
+ - Pass array to string variable after loop finishes: ` [string]$MtlnString=$StrArray `
+ - `` `n `` enables the line switching, but also creates a space start from the 2nd line: ` $MtlnString=$MtlnString -replace " some", "some" `
 
 ## ★Updates / change log
 
