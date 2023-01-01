@@ -90,7 +90,7 @@ Apdx β: <a href='https://nazorip.site/archives/169/'>ffprobe stream media probi
 <a href='https://down.7086.in/'>MeteorRain/7086 (x265)</a>
 </font><br><br>
 
-## ☆Tip coffee =_=
+## ☆Trinkgeld a cup of coffee =_=
 
 <p align="center"><img src="pp_tip_qrcode.png" alt="tips"></p>
 
