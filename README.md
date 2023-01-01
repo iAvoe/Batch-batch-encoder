@@ -1,2 +1,2 @@
---> <a href='READ-ZH-CN.md'>README - 中简.md</a><br>
+--> <a href='READ-ZH-CN.md'>README - 简中.md</a><br>
 --> <a href='READ-EN-AR.md'>README - English.md</a>
