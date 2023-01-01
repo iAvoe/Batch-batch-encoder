@@ -1,4 +1,4 @@
-# PowerShell+CMD-batch based multiple/single encoding/multiplexing tools suite
+# PowerShell+CMD-batch based multiple/single encoding/multiplexing scripts suite
 
 ## ☆Environment prerequsities
 
