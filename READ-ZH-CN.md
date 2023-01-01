@@ -70,7 +70,7 @@
 
 ## ★下载链接
 <font size=3em>皆同步更新, QQ群里有很高几率能得到问题答复<br>
-1: <a href='/'>Github直链</a>, 
+1: <a href='./bbenc-source'>Github直链</a>, 
 2: <a href='https://drive.google.com/drive/folders/170tmk7yJBIz5eJuy7KXzqIgtvtDajyDu?usp=sharing'>谷歌盘</a>, 
 3: <a href='https://pan.baidu.com/s/1jAXn066e6K7vSfUd5zJEcg'>百度云, 提取码 hevc</a>, 
 4: QQ群存档: <a href='https://jq.qq.com/?_wv=1027&k=5YJFXyf'>691892901</a><br>
@@ -112,12 +112,23 @@
  - PowerShell 5.1默认的utf-8编码选项是UTF-8BOM，且不原生支持导出UTF-8NoBOM；
  - 然而PowerShell 7要求用户用代码来运行.ps1脚本太过分，所以后期的开发完全回到PowerShell 5.1并实现了PowerShell 7中本来更容易实现的功能
 
+**PowerShell通过循环生成多行字符串**
+ - 定义序列和字符串变量: $StrArray=@(); $MtlnString=\"\"
+ - 循环中往序列累计字符串值，值尾加\`n: $StrArray+=\"some text \`n\"
+ - 循环跑完后直接赋值到字符串变量: [string]$MtlnString=$StrArray
+ - \`n实现了换行，但从第二行开始会于开头生成多余的空格，用-replace去掉: $MtlnString=MtlnString -replace " some", "some"
+
 ## ★更新信息
+**半正式 v0.1619**
+<ul>
+    <li> √ 更改了自动填写--pme参数的判断，从达到12核提高到22核</li>
+</ul>
+
 
 **半正式 v0.1618**
 <ul>
     <li> √ 修复了步骤 2 中单文件和大批量模式导入文件名交互文本太相似的问题</li>
-    <li> > √ 增加了步骤 2, 3 文件名导入交互中的两个方括号不能紧挨的提醒</li>
+    <li> > 增加了步骤 2, 3 文件名导入交互中的两个方括号不能紧挨的提醒</li>
 </ul>
  
 **内测 v0.1617**
@@ -127,7 +138,7 @@
 
 **内测 v0.1610**
 <ul>
-    <li>√ 增强了步骤 2，3 多个版本间的变量统一性</li>
+    <li> √ 增强了步骤 2，3 多个版本间的变量统一性</li>
     <li> √ 修复了步骤 2 所有版本中 Enc 和 Mux 变量赋值错误的问题</li>
     <li> √ 增强了步骤 2，3 多个版本间的文本交互信息格式，如报错从 Write-Output 改为 Write-Warning</li>
     <li> √ 增强了步骤 2 大批量和单文件版的集数累计变量的判断过程做了区分</li>
