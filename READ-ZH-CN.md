@@ -1,16 +1,14 @@
-# 原创 原创 PowerShell+CMD 多线路单文件 + 大批量压制 + 封装工具
+# 原创 PowerShell+CMD 多线路单文件 + 大批量压制 + 封装工具
 
 囊括了分析，压制和封装的大型 CLI+GUI 压制辅助工具. (绝对不是因为等不来小丸工具箱更新而做的...)
 
 囊括了分析，压制和封装的大型 CLI+GUI 压制辅助工具. (绝对不是因为等不来小丸工具箱更新而做的...)
-
 
 <font size=4><b>☆环境得...</b></font>
 
  - 有一两 ffprobe (一般下载 ffmpeg 后附带)
  - 多一斤 ffmpeg/Vapoursynth (vspipe)/Avisynth (avs2yuv)/Avisynth (avs2pipemod)
  - 含一克 x264/x265
-
 
 <font size=4><b>★优势在...</b></font>
 
@@ -19,14 +17,14 @@
  - 由于不用编译软件，所以能直接编辑源码并测试效果
  - 压制部分支持 ffmpeg，vspipe，avs2yuv，avs2pipemod 及下游 x264，x265 的 8 条线路，消灭了一大块学习成本
 
-![S1-4.png](https://img4.yesya.net/img/5/2023-01/S1-4.png)
+![S1-4.png](S1-4.png)
 
 <center>编码/压制工作流的线路图</center>
 
 
  - 封装部分支持导入封装文件，特殊封装文件，视频流，音频流，字幕轨，字体轨，以及四种封装导出格式的多线并发网络
 
-![S5n.png](https://img4.yesya.net/img/5/2023-01/S5.png)
+![S5n.png](S5n.png)
 
 <center>封装工作流的线路图</center>
 <center><font size=1><del>实际没有这么复杂，但逻辑上是支持的</del></font></center>
