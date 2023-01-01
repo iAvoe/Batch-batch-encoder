@@ -201,12 +201,12 @@ Apdx β: <a href='https://nazorip.site/archives/169/'>ffprobe stream media probi
     <li> √ Created the roughwork of downstream route x264</li>
     <li> √ Autofill of option -r in ffmpeg</li>
     <li> √ Step 2, 3 (x265)'s single-encode mode has been added with ffmpegParB for creating MP4 container with ffmpeg, to workaround ffmpeg's limitation of multiplexing raw video stream to MKV</li>
-    <li> √ 增加了生成单文件封装命令的 PowerShell 脚本: 步骤 5</li>
-    <li> √ 步骤 5 实现了自动根据判断多种不兼容参数, 不兼容流, 不兼容封装格式来提醒 / 警告, 以及生成和调整封装命令的能力</li>
-    <li> √ 步骤 5 经过一些测试后解决了 ffmpeg 刁钻的命令书写顺序问题</li>
-    <li> √ 步骤 5 支持在元数据 codec_tag_string 被删除的情况下自动切换到 codec_name</li>
-    <li> √ 步骤 5 的代码复杂度超过了之前所有步骤的集合</li>
-    <li> √ 选择封装改到靠后的代码部分</li>
+    <li> √ Step 5 (to multiplex video streams) is now avaialble</li>
+    <li> √ Step 5 is now capable to automatially deal with some export format's comaptibility with different stream/track media formats</li>
+    <li> √ Step 5 now fully supports ffmpeg's commandline "typesetting"</li>
+    <li> √ Step 5 now support fallback from empty codec_tag_string to codec_name under ffprobe probing</li>
+    <li> √ Step 5 is born with the most complex codework than step 2, 3 combined</li>
+    <li> √ Moved the option to select file types to export to the rear of prompt order</li>
 </ul>
 
 **Internal v0.190**
@@ -219,13 +219,12 @@ Apdx β: <a href='https://nazorip.site/archives/169/'>ffprobe stream media probi
 
 **Internal v0.180**
 <ul>
-    <li> √ 步骤 3 增加了 avs2pipemod 的支持,</li>
-    <li> √ 步骤 3 从 4 个文件合并为 1 个文件, 降低了开发难度, </li>
+    <li> √ Added support to avs2pipemod in step 3</li>
     <li> √ Autofilling of x265 option --pme, </li>
     <li> √ Autofilling avs2yuv's colorspace and resolution option</li>
     <li> √ Added colorspace incompatibility warning (nv12, nv16) under avs2yuv & avs2pipemod</li>
-    <li> √ 升级了路径验证 (根目录下有, 但非根目录下没有), </li>
-    <li> √ 区分了 4 条线路 + 两种版本下输出主控文件的文件名</li>
+    <li> √ Upgraded function to get path to automatially add slash at rear (inconsistency caused by root directory has slash, but folder doesn't)</li>
+    <li> √ Planned 4 upstream routes + 2 downstream programs script design for encoding steps</li>
 </ul>
 
 **Earlier**
