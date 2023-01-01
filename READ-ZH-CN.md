@@ -2,15 +2,13 @@
 
 囊括了分析，压制和封装的大型 CLI+GUI 压制辅助工具. (绝对不是因为等不来小丸工具箱更新而做的...)
 
-囊括了分析，压制和封装的大型 CLI+GUI 压制辅助工具. (绝对不是因为等不来小丸工具箱更新而做的...)
-
-<font size=4><b>☆环境得...</b></font>
+## ☆环境得...
 
  - 有一两 ffprobe (一般下载 ffmpeg 后附带)
  - 多一斤 ffmpeg/Vapoursynth (vspipe)/Avisynth (avs2yuv)/Avisynth (avs2pipemod)
  - 含一克 x264/x265
 
-<font size=4><b>★优势在...</b></font>
+## ★优势在...
 
  - 完全不依赖包括 Python 的编程语言，满足了入门视频剪辑用户一般都不会 Python 的要求
  - 按代码要求，提供需要的信息即可，使用不需要教程
@@ -29,7 +27,6 @@
 <center>封装工作流的线路图</center>
 <center><font size=1><del>实际没有这么复杂，但逻辑上是支持的</del></font></center>
 
-
  - 自动为 ffmpeg，avs2yuv，x264，x265 填写色彩空间，位深，分辨率和帧率
  - 批量压制模式支持 15000 + 次独立的编码，每个压制的间隔都可以选择暂停和停止
  - 研发了固定 + 变化 (par-var) 的参数架构，稍加修改就可用于测试各种变量下的影响
@@ -38,8 +35,7 @@
 
 -----
 
-
-<font size=4><b>☆代价是...</b></font>
+## ☆代价是...
 
  - 献祭了寒假，维持了几十个添加功能 --> 新功能制造 bug --> debug 的循环，以及扩充新线路所需的另存在新版本 --> 修改线路 --> 写注释 --> debug --> 合并到原版 --> 区分变量 --> debug 的循环
  - 代码的运行逻辑比一般的压制软件复杂，为了兼容不同程序的命令排版格式而使用了很多变量来分割与重构命令行
@@ -63,18 +59,16 @@
 
 -----
 
-
-<font size=4><b>▲怎么使用</b></font>
+## ▲怎么用
 
  1. 解压下载好的压缩包，按大批量或单文件压制需求选.ps1脚本，照序号顺序右键点击"编辑 (PowerShell ISE)"或"用PowerShell打开". 按说明文本的要求照做，输入需要的信息后的得到批处理。
-![bbenc-ttl1.png](https://yesya.oss-ap-northeast-2.aliyuncs.com/5/2023-01/bbenc-ttl1.png)
-![bbenc-ttl2.png](https://yesya.oss-ap-northeast-2.aliyuncs.com/5/2023-01/bbenc-ttl2.png)
+![bbenc-ttl1.png](bbenc-ttl1.png)
+![bbenc-ttl2.png](bbenc-ttl2.png)
  2. 集齐一套压制批处理，一个对应（大批量/单文件）的主控批处理后，双击主控批处理运行
-![bbenc-ttl3.png](https://yesya.oss-ap-northeast-2.aliyuncs.com/5/2023-01/bbenc-ttl3.png)
+![bbenc-ttl3.png](bbenc-ttl3.png)
  3. 运行封装的.ps1脚本，按照提示导入需要封装的源文件，然后继续导入其它要封装的流，最后选择封装格式后即完成
 
-
-<font size=4><b>★下载链接</b></font><br>
+## ★下载链接
 <font size=3em>皆同步更新, QQ群里有很高几率能得到问题答复<br>
 1: <a href='https://drive.google.com/drive/folders/170tmk7yJBIz5eJuy7KXzqIgtvtDajyDu?usp=sharing'>谷歌盘</a>
 2: <a href='https://pan.baidu.com/s/1jAXn066e6K7vSfUd5zJEcg'>百度云, 提取码 hevc</a>,
@@ -96,17 +90,14 @@
 <a href='https://down.7086.in/'>MeteorRain/7086 (x265)</a>
 </font><br><br>
 
-
-
-<font size=4><b>☆打赏信息</b></font>
+## ☆打赏信息
 
 "免费即最贵" 的魔咒荼毒大地，让生灵涂炭；扫描下方二维码，用大数战胜罪恶与恐惧；保卫宇宙，守护文明，创造未来，意辉孟洺，赢得世界，锚定天理，金石萃编，葱烧鲤鱼
-
-![pp_tip_qrcode.png](https://yesya.oss-ap-northeast-2.aliyuncs.com/5/2022-05/pp_tip_qrcode.png)
+<p align="center"><img src="pp_tip_qrcode.png" alt="支持一下"></p>
 
 -----
 
-<font size=4><b>☆开发笔记</b></font>
+## ☆开发笔记
 
 **IDE**
  - 使用了notepad（记事本），VSCode，PowerShell ISE完成编写。
@@ -120,8 +111,7 @@
  - PowerShell 5.1默认的utf-8编码选项是UTF-8BOM，且不原生支持导出UTF-8NoBOM；
  - 然而PowerShell 7要求用户用代码来运行.ps1脚本太过分，所以后期的开发完全回到PowerShell 5.1并实现了PowerShell 7中本来更容易实现的功能
 
-
-<font size=4><b>★更新信息</b></font>
+## ★更新信息
 
 **半正式 v0.1618**
 > √ 修复了步骤 2 中单文件和大批量模式导入文件名交互文本太相似的问题
