@@ -34,43 +34,15 @@
 
 -----
 
-## ☆At what cost?
-
- - Donated my winter break in a ~~vicious~~ cycle of adding features --> new feature creates bug --> debug --> add comments
- - This script suite is quite complex compared to most encoding programs, making it difficult to work with at beginning
- - A lot of cmdlets, variables are creeated for formatting cmdlines, by requirements from especially ffmpeg
- - The fear that I'll be joked at developing a twenty-hexadecimal (alphabet) carrying mathmatical operation within a for-loop to support 15000+ individual encodes
-   - just to elinimate numbers in batch variables
- - To make multiplexing/containing script robust/very capable, a 168-line ~~turbo encabulator~~ function was developed after a hellish endurance-challenging debugs (mostly due to my lack of systematilly study of coding)
- - As I've being told, supporting this project in future would be difficult
-<br>
-
-**★Why not choosing develop w/ C++, TypeScript, JS**
- - I haven't studied them =_=, also the environment setup would make too much change to the OS（？）；PowerShell & PS ISE are the opposite
- - I know docker exists, but telling docker about my phone number just to begin study c++ is a no
-<br>
-
-**☆Why not choosing to develop w/ Python, like installing Python is not that hard**
-
-Intalling Python is pretty straightforward, however in terms of IDEs:
- - Most people have never used Atom IDE, and some says it has performance issues on Windows
- - Python does not have a usable built-in IDE
- - VSCode needs too much effort of customizations, and their message poping is quite annoying for entry-level users（I'm used to it, though）
- - np++'s author is into white political bulls, and Vim is pure toture for entry-users
- - Sublime is premium and probably even less people uses it
-
-This level of gatekeeping is a waste of time and efort for people who don't actually develop codes; In contrast, we have a clean, efficient and prety easy to use PowerShell ISE that is just better for entry-level users
-
------
-
 ## ▲How to run
 
- 1. Unzip downloaded files, choose inbetween single & multiple encode jobs, start from top to bottom. right click & select "Edit" or "Run with PowerShell". Follow the interactive prompts to fill the needed information. Batch script(s) will be generated in the end.
+ 1. Unzip downloaded files, the step 2's generated batch file works as the parts/components to be assembled & activated by step 3's generated batch - controller. The single/multiple mode indicates development was made for single video, or multiple episodes of videos
+ 2. Choose inbetween single & multiple encode jobs, start from top to bottom. right click & select "Edit" or "Run with PowerShell". Follow the interactive prompts to fill the needed information. Batch script(s) will be generated in the end.
 ![bbenc-ttl1.png](bbenc-ttl1.png)
 ![bbenc-ttl2.png](bbenc-ttl2.png)
- 2. When encoder batch(s) with its/their corresponding controller batch gets generated, make sure both of them are in the same directory/folder. Simply doubleclick to start encoding tasks
+ 3. When encoder batch(s) with its/their corresponding controller batch gets generated, make sure both of them are in the same directory/folder. Simply doubleclick to start encoding tasks
 ![bbenc-ttl3.png](bbenc-ttl3.png)
- 3. Finally, run the .ps1 for multiplexing, follow the interactive prompts to repeat import streams/tracks that is going to be multiplexed into 1 container file (usually 1 episode). Finally choose the output container format to finish off
+ 4. Finally, run the .ps1 for multiplexing, follow the interactive prompts to repeat import streams/tracks that is going to be multiplexed into 1 container file (usually 1 episode). Finally choose the output container format to finish off
 
 ## ★Downloads
 1: <a href='./bbenc-source'>Github directlink</a>, 
@@ -113,6 +85,37 @@ Apdx β: <a href='https://nazorip.site/archives/169/'>ffprobe stream media probi
  - Aggregate string data into array from loop, place a \`n at rear: `` $StrArray+="some text `n"``
  - Pass array to string variable after loop finishes: ` [string]$MtlnString=$StrArray `
  - `` `n `` enables the line switching, but also creates a space start from the 2nd line: ` $MtlnString=$MtlnString -replace " some", "some" `
+
+-----
+
+## ☆At what cost?
+
+ - Donated my winter break in a ~~vicious~~ cycle of adding features --> new feature creates bug --> debug --> add comments
+ - This script suite is quite complex compared to most encoding programs, making it difficult to work with at beginning
+ - A lot of cmdlets, variables are creeated for formatting cmdlines, by requirements from especially ffmpeg
+ - The fear that I'll be joked at developing a twenty-hexadecimal (alphabet) carrying mathmatical operation within a for-loop to support 15000+ individual encodes
+   - just to elinimate numbers in batch variables
+ - To make multiplexing/containing script robust/very capable, a 168-line ~~turbo encabulator~~ function was developed after a hellish endurance-challenging debugs (mostly due to my lack of systematilly study of coding)
+ - As I've being told, supporting this project in future would be difficult
+<br>
+
+**★Why not choosing develop w/ C++, TypeScript, JS**
+ - I haven't studied them =_=, also the environment setup would make too much change to the OS（？）；PowerShell & PS ISE are the opposite
+ - I know docker exists, but telling docker about my phone number just to begin study c++ is a no
+<br>
+
+**☆Why not choosing to develop w/ Python, like installing Python is not that hard**
+
+Intalling Python is pretty straightforward, however in terms of IDEs:
+ - Most people have never used Atom IDE, and some says it has performance issues on Windows
+ - Python does not have a usable built-in IDE
+ - VSCode needs too much effort of customizations, and their message poping is quite annoying for entry-level users（I'm used to it, though）
+ - np++'s author is into white political bulls, and Vim is pure toture for entry-users
+ - Sublime is premium and probably even less people uses it
+
+This level of gatekeeping is a waste of time and efort for people who don't actually develop codes; In contrast, we have a clean, efficient and prety easy to use PowerShell ISE that is just better for entry-level users
+
+-----
 
 ## ★Updates / change log
 
