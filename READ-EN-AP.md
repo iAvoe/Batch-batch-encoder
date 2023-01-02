@@ -36,7 +36,11 @@
 
 ## ▲How to run
 
- 1. Unzip downloaded files, the step 2's generated batch file works as the parts/components to be assembled & activated by step 3's generated batch - controller. The single/multiple mode indicates development was made for single video, or multiple episodes of videos
+
+ 1. Unzip downloaded files
+   - Step 2 generates a batch file that works as part(s)/component(s) to be assembled & activated by step 3's generated batch - the controlleris
+   - Step 5 is a ffmpeg-based dedicated video multiplexing/container commandline generator, it works independently
+   - The single/multiple mode indicates development was made for single video, or multiple episodes of videos
  2. Choose inbetween single & multiple encode jobs, start from top to bottom. right click & select "Edit" or "Run with PowerShell". Follow the interactive prompts to fill the needed information. Batch script(s) will be generated in the end.
 ![bbenc-ttl1.png](bbenc-ttl1.png)
 ![bbenc-ttl2.png](bbenc-ttl2.png)
