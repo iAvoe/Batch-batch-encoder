@@ -47,7 +47,7 @@
  3. When encoder batch(s) with its/their corresponding controller batch gets generated, make sure both of them are in the same directory/folder. Simply doubleclick to start encoding tasks
 ![bbenc-ttl3.png](bbenc-ttl3.png)
 ![bbenc-ttl4.png](bbenc-ttl4.png)
-<center>Screenshot of running multi-encoding batch (under early stage testing)</center>
+<p align='center'>Screenshot of running multi-encoding batch (under early stage testing)</p><br>
  4. Finally, run the .ps1 for multiplexing, follow the interactive prompts to repeat import streams/tracks that is going to be multiplexed into 1 container file (usually 1 episode). Finally choose the output container format to finish off
 
 
