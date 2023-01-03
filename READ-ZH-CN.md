@@ -17,15 +17,15 @@
 
 ![S1-4.png](S1-4.png)
 
-<center>编码/压制工作流的线路图</center>
+<p align='center'>编码/压制工作流的线路图</p>
 
 
  - 封装部分支持导入封装文件，特殊封装文件，视频流，音频流，字幕轨，字体轨，以及四种封装导出格式的多线并发网络
 
 ![S5n.png](S5n.png)
 
-<center>封装工作流的线路图</center>
-<center><font size=1><del>实际没有这么复杂，但逻辑上是支持的</del></font></center>
+<p align='center'>封装工作流的线路图</p>
+<p align='center'><font size=1><del>实际没有这么复杂，但逻辑上是支持的</del></font></p>
 
  - 自动为 ffmpeg，avs2yuv，x264，x265 填写色彩空间，位深，分辨率和帧率
  - 批量压制模式支持 15000 + 次独立的编码，每个压制的间隔都可以选择暂停和停止
@@ -47,7 +47,7 @@
  3. 集齐压制批处理，与其对应（大批量/单文件）的主控批处理后，双击主控批处理运行即可启动压制任务
 ![bbenc-ttl3.png](bbenc-ttl3.png)
 ![bbenc-ttl4.png](bbenc-ttl4.png)
-<center>大批量模式下的批处理运行截图(早期测试)</center><br>
+<p align='center'>大批量模式下的批处理运行截图(早期测试)</p><br>
  4. 最后, 运行封装用的.ps1脚本，按照提示导入构建一集视频所需的全部流/轨道，选择导出的封装格式即完成
 
 ## ★下载链接
