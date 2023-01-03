@@ -9,6 +9,10 @@
 ## ★Advantages
 
  - Python-free, satisfies entry level video editors' needs to work out-of-shelf
+ - Auto-filling colorspace, bitdepth, resolution & framerate to ffmpeg, avs2yuv, x264, x265's options
+ - Multiple encoding mode supports over 15000 individual tasks, with user options to pause/stop in middle of each tasks
+ - Developed Fixed+Vary (par-var) structure of commandline assignment, the end-user could easily alter the "Var"s to repurpose for encode option/value testing
+ - Developed Encoder+Controller (enc-ctrl) batch layout, which greatly simplfies large-volume tasks' commandline
  - Simply follow the script's guide & supply the correct information
  - The script is natually uncompiled,which makes debugging & adding features to be quick & easy
  - The encoding steps supports 4 upstream pipe programs (ffmpeg, vspipe, avs2yuv, avs2pipemod)
@@ -26,10 +30,6 @@
 <p align="center">Chart of multiplexing-workflow's routes (later added supports to VP9, FLAC, MXF)</p>
 <p align="center" size=1><del>Not really that complex in the code, but logically yes</del></p><br>
 
- - Auto-filling colorspace, bitdepth, resolution & framerate to ffmpeg, avs2yuv, x264, x265's options
- - Batch encoding workflow supports over 15000 individual tasks, with user options to pause/stop in middle of each tasks
- - Developed Fixed+Vary (par-var) structure of commandline assignment, the end-user could easily alter the "Var"s to repurpose for encode option/value testing
- - Developed Encoder+Controller (enc-ctrl) batch layout, which greatly simplfies large-volume tasks' commandline
  - Setlocal+Endlocal, CMD /k and many for repeated-runs free of interference from previously assigned variables
 
 -----
