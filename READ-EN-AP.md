@@ -125,6 +125,13 @@ This level of gatekeeping is a waste of time and efort for people who don't actu
 -----
 
 ## ★Updates / change log
+**v1.1621**
+<ul>
+    <li> √  Improved step 3 to auto-fill x265's option --subme</li>
+    <li> √ Fixed step 3's exporting filename's checking code being duplicated after capability expansion</li>
+    <li> √ Fixed step 3's some mode-variation's "sourcing via external copy" is lacking of exporting filename extraction mechanism</li>
+    <li> √ Improved all steps' tutorial information delievery and filename for better user-end understanding</li>
+</ul>
 
 **Almost 1.0 v0.1619**
 <ul>
