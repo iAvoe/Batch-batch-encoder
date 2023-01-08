@@ -36,19 +36,21 @@
 
 ## ▲How to run
 
-
- 1. Unzip downloaded files
+ 1. Start a PowerShell instance, execute `Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope CurrentUser` to remove policy restriction on running scripts. Check whether the restriction is lifted with `Get-ExecutionPolicy`
+    - Corporate/public workstations requires administrator priviledge to start PowerShell
+    - If you don't own this PC, remember to set the restriction back-on with `Set-ExecutionPolicy -ExecutionPolicy Restricted -Scope CurrentUser`
+ 2. Unzip downloaded files
     - Step 2 generates a batch file that works as part(s)/component(s) to be assembled & activated by step 3's generated batch - the controlleris
     - Step 5 is a ffmpeg-based dedicated video multiplexing/container commandline generator, it works independently
     - The single/multiple mode indicates development was made for single video, or multiple episodes of videos
- 2. Choose inbetween single & multiple encode jobs, start from top to bottom. right click & select "Edit" or "Run with PowerShell". Follow the interactive prompts to fill the needed information. Batch script(s) will be generated in the end.
+ 3. Choose inbetween single & multiple encode jobs, start from top to bottom. right click & select "Edit" or "Run with PowerShell". Follow the interactive prompts to fill the needed information. Batch script(s) will be generated in the end.
 ![bbenc-ttl1.png](bbenc-ttl1.png)
 ![bbenc-ttl2.png](bbenc-ttl2.png)
- 3. When encoder batch(s) with its/their corresponding controller batch gets generated, make sure both of them are in the same directory/folder. Simply doubleclick to start encoding tasks
+ 4. When encoder batch(s) with its/their corresponding controller batch gets generated, make sure both of them are in the same directory/folder. Simply doubleclick to start encoding tasks
 ![bbenc-ttl3.png](bbenc-ttl3.png)
 ![bbenc-ttl4.png](bbenc-ttl4.png)
 <p align='center'>Screenshot of running multi-encoding batch (under early stage testing)</p><br>
- 4. Finally, run the .ps1 for multiplexing, follow the interactive prompts to repeat import streams/tracks that is going to be multiplexed into 1 container file (usually 1 episode). Finally choose the output container format to finish off
+ 5. Finally, run the .ps1 for multiplexing, follow the interactive prompts to repeat import streams/tracks that is going to be multiplexed into 1 container file (usually 1 episode). Finally choose the output container format to finish off
 
 
 ## ★Downloads
