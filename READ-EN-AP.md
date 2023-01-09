@@ -127,6 +127,19 @@ This level of gatekeeping is a waste of time and efort for people who don't actu
 -----
 
 ## ★Updates / change log
+**v1.1632**
+<ul>
+    <li> √ Corrected a missed capitalize of Function</li>
+    <li> √ Padded space inbetween comments & commands for all encoding modes' generated batch</li>
+    <li> √ All batch script to adopt REM commenting, since accidental execution of comments, ignored commands got worse in Windows 11</li>
+    <li> √ Removed all && style/stx-sugar due to severe compatibility issue under Windows 11</li>
+    <li> √ Added doublequotes after all SET commands due to space misinterpretation issue under Windows 11, the downside is made the PowerShell script extra complex due to looped commandline building code structures</li>
+    <li> √ Updated step 3's manual export filename script being less capable than step 2's</li>
+    <li> √ Fixed a problem in step 3: path searching function (whichlocation) to automatically adding "\" in the end of path fails under some encodming modes</li>
+    <li> √ Fixed a problem in step 3: path assembly feature (filepath + filename + extension) has an unwanted doublequote showing up</li>
+    <li> √ Fixed a problem in step 3: episode counter $serial being added and checked-out under single-encode mode (shouldn't have happened)</li>
+</ul>
+
 **v1.1621**
 <ul>
     <li> √  Improved step 3 to auto-fill x265's option --subme</li>
