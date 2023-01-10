@@ -36,21 +36,22 @@
 -----
 
 ## ▲怎么用
- 1. 打开PowerShell, 运行`Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope CurrentUser`以解除运行脚本的限制. 若不知道是否已开启则运行`Get-ExecutionPolicy`来检查
+ 1. Windows 11 下确保安装了对应文件名语言的语言包. 如要处理阿拉伯语的文件名就去`设置 --> 时间和语言 -->[左栏] 语言 --> 添加语言 --> 阿拉伯语`. Windows10 下不需要
+ 2. 打开PowerShell, 运行`Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope CurrentUser`以解除运行脚本的限制. 若不知道是否已开启则运行`Get-ExecutionPolicy`来检查
     - 添加到域的公司或公用电脑需要以管理员权限运行PowerShell
     - 如果不是自己的电脑，记得用完脚本后运行`Set-ExecutionPolicy -ExecutionPolicy Restricted -Scope CurrentUser`以改回原本的限制
- 2. 解压下载好的压缩包
+ 3. 解压下载好的压缩包
     - 步骤2生成待调用的编码批处理零件，由步骤3生成的主控批处理组装和调用
     - 步骤5是专门处理视频封装的批处理生成工具，可以单独拎出来用
     - 大批量和单文件模式的区别在于一个针对多集视频开发，一个用针对单视频开发
- 3. 按大批量或单文件压制需求，照序号顺序右键点击"编辑"或"用PowerShell打开". 照说明文本的要求输入需要的信息，最后得到批处理
+ 4. 按大批量或单文件压制需求，照序号顺序右键点击"编辑"或"用PowerShell打开". 照说明文本的要求输入需要的信息，最后得到批处理
 ![bbenc-ttl1.png](bbenc-ttl1.png)
 ![bbenc-ttl2.png](bbenc-ttl2.png)
- 4. 集齐压制批处理，与其对应（大批量/单文件）的主控批处理后，双击主控批处理运行即可启动压制任务
+ 5. 集齐压制批处理，与其对应（大批量/单文件）的主控批处理后，双击主控批处理运行即可启动压制任务
 ![bbenc-ttl3.png](bbenc-ttl3.png)
 ![bbenc-ttl4.png](bbenc-ttl4.png)
 <p align='center'>大批量模式下的批处理运行截图(早期测试)</p><br>
- 5. 最后, 运行封装用的.ps1脚本，按照提示导入构建一集视频所需的全部流/轨道，选择导出的封装格式即完成
+ 6. 最后, 运行封装用的.ps1脚本，按照提示导入构建一集视频所需的全部流/轨道，选择导出的封装格式即完成
 
 ## ★下载链接
 <font size=3em>皆同步更新, QQ群里有很高几率能得到问题答复<br>
