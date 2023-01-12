@@ -127,6 +127,17 @@ This level of gatekeeping is a waste of time and efort for people who don't actu
 -----
 
 ## ★Updates / change log
+**v1.1640**
+<ul>
+    <li> √ Creation of a new environment checking script (Step 1) that checks:<ul>
+        <li> √ Write & modify access on C-drive</li>
+        <li> √ PowerShell version</li>
+        <li> √ Workstation hardwares</li>
+        <li> √ Check if some trivial x265 option add/evict switching works</li></ul>
+    </li>
+    <li> √ Some code optimization was made for step 3</li>
+</ul>
+
 **v1.1632**
 <ul>
     <li> √ Corrected a missed capitalize of Function</li>
