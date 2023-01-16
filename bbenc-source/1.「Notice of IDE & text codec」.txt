@@ -1,0 +1,16 @@
+「IDE」
+ - This project was coded on Notepad, VSCode & PowerShell ISE. It's recommended to develop (e.g., port to another coding language) with integrated development environment (IDE) with colorcoding & comfy interface due to the sheer amount of content
+
+「utf8+BOM text codec is required for PowerShell」
+ - Under the 4 horsemen of PowerShell, PowerShell ISE, CMD/batch & UTF-8 filenames. Only utf8+BOM text codec could work it out. However the generated CMD batches are coded with UTF-8NoBOM
+ - PowerShell，PowerShell ISE shraightup fail to decode UTF-8NoBOM
+ - CMD doesn't support Unicode（UTF-16LE？）
+ - PowerShell 5.1 does not natively support UTF-8NoBOM
+ - however PowerShell 7 mandate users to run scripts with purely commandline, which is not acceptable, and caused the later shift to realize some of PS7's features in PowserShell 5.1
+
+「Windows11 Language-pack requirement」
+ - A Windows11 batch compatibility problem that has not yet been reproduced under Windows10
+ - If path/filename contains any language that is not installed (e.g., Arabic, Japanese, Korean), batch will produce garbled text and fails miserably
+ - To install a language pack, go to Settings-->Time & Language-->[Left pane]Languages-->Add a language
+ - You don't need to set the newly installed language as the default displaying language
+ - If you don't usually work on files with that foreign language, simply change the filename will do
