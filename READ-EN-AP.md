@@ -127,14 +127,18 @@ This level of gatekeeping is a waste of time and efort for people who don't actu
 -----
 
 ## ★Updates / change log
-**v1.1700**
+**v1.1701**
 <ul>
     <li> √ Improved folder/directory/path selecting window's feature-set:<ul>
         <li> √ Hinting text that tells user to drag corner to enlarge selection window</li>
         <li> √ Added a button to create a new folder</li>
         <li> √ Removed "Library" from selecting window</li></ul>
     </li>
-    <li> × Attempt to add SVFI upstream pipe program: input only supports image sequence，It requires a "upper" stream to perform decoding, which would eventrually causes too much change in this script</li>
+    <li> ？Unsuccessful attempt to add SVFI upstream pipe source: input only supports png, job, tiff image sequence:<ul>
+        <li>To make do, SVFI requires a "upper" process to perform video stream decoding, which leads to a large scale change in current script</li>
+        <li>Used steam professional distro. According to a contributor the steam distro might be older than current</li></ul>
+    </li>
+    <li> √ Fixed a compatibility issue in step 3: x264 doesn't support --colormatrix unknown & --transfer unknown option, added a translation to --colormatrix undef & --transfer undef</li>
 </ul>
 
 **v1.1640**
