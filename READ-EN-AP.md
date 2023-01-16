@@ -127,6 +127,16 @@ This level of gatekeeping is a waste of time and efort for people who don't actu
 -----
 
 ## ★Updates / change log
+**v1.1700**
+<ul>
+    <li> √ Improved folder/directory/path selecting window's feature-set:<ul>
+        <li> √ Hinting text that tells user to drag corner to enlarge selection window</li>
+        <li> √ Added a button to create a new folder</li>
+        <li> √ Removed "Library" from selecting window</li></ul>
+    </li>
+    <li> × Attempt to add SVFI upstream pipe program: input only supports image sequence，It requires a "upper" stream to perform decoding, which would eventrually causes too much change in this script</li>
+</ul>
+
 **v1.1640**
 <ul>
     <li> √ Creation of a new environment checking script (Step 1) that checks:<ul>
