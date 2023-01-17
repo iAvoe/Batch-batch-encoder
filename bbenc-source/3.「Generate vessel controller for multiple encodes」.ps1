@@ -1,6 +1,6 @@
 ﻿cls #「Bootstrap -」Multi-encode methods require users to manually add importing filenames
-Read-Host "Multiple encoding mode only specifies the path to import files to encode, which require manually adding filenames into generated controller batch`r`nx264 usually comes with lavf, unlike x265, therefore x265 usually exports .hevc raw-streams instead of .mp4. Press Enter to proceed"
-
+Read-Host "[Multiple encoding mode] only specifies the path to import files to encode, which require manually adding filenames into generated controller batch`r`nx264 usually comes with lavf, unlike x265, therefore x265 usually exports .hevc raw-streams instead of .mp4. Press Enter to proceed"
+$mode="m"
 #Function namecheck([string]$inName) {
 #    $badChars = '[{0}]' -f [regex]::Escape(([IO.Path]::GetInvalidFileNameChars() -join ''))
 #    ForEach ($_ in $badChars) {if ($_ -match $inName) {return $false}}
@@ -18,27 +18,15 @@ Function whereisit($startPath='DESKTOP') {
 }
 
 Function whichlocation($startPath='DESKTOP') {
-    #启用System.Windows.Forms选择文件夹的GUI交互窗, 通过SelectedPath将GUI交互窗锁定到桌面文件夹, 效果一般
-    Add-Type -AssemblyName System.Windows.Forms
-    $startPath = New-Object System.Windows.Forms.FolderBrowserDialog -Property @{ Description="选择路径用的窗口. 拖拽边角可放大此窗口"; SelectedPath=[Environment]::GetFolderPath($startPath); RootFolder='MyComputer'; ShowNewFolderButton=$true }
-    #打开选择文件的GUI交互窗, 用if拦截误操作
-    if ($startPath.ShowDialog() -eq "OK") {[string]$endPath = $startPath.SelectedPath}
-    #由于选择根目录时路径变量含"\", 而文件夹时路径变量缺"\", 所以要自动判断并补上
-    if (($endPath.SubString($endPath.Length-1) -eq "\") -eq $false) {$endPath+="\"}
-    return $endPath
-}
-
-Function whichlocation($startPath='DESKTOP') {
     #Opens a System.Windows.Forms GUI to pick a folder/path/dir
     Add-Type -AssemblyName System.Windows.Forms
-    $startPath = New-Object System.Windows.Forms.FolderBrowserDialog -Property @{ Description="Select a directory. Drag bottom corner to enlarge"; SelectedPath=[Environment]::GetFolderPath($startPath); RootFolder='MyComputer'; ShowNewFolderButton=$true }
+    $startPath = New-Object System.Windows.Forms.FolderBrowserDialog -Property @{ Description="Select a directory. Drag bottom corner to enlarge for convenience"; SelectedPath=[Environment]::GetFolderPath($startPath); RootFolder='MyComputer'; ShowNewFolderButton=$true }
     #Intercepting failed inputs with if statement
     if ($startPath.ShowDialog() -eq "OK") {[string]$endPath = $startPath.SelectedPath}
     #Root directory always have a "\" in return, whereas a folder/path/dir doesn't. Therefore an if statement is used to add "\" when needed, but comment out under single-encode mode
     if (($endPath.SubString($endPath.Length-1) -eq "\") -eq $false) {$endPath+="\"}
     return $endPath
 }
-
 #「@MrNetTek」Use high-DPI rendering, to fix blurry System.Windows.Forms
 Add-Type -TypeDefinition @'
 using System.Runtime.InteropServices;
@@ -50,31 +38,31 @@ public class ProcessDPI {
 $null = [ProcessDPI]::SetProcessDPIAware()
 
 #「Bootstrap A」Generate 1~n amount of "enc_[numbers].bat". Not needed in singular encode mode
-[array]$validChars='A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'
-[int]$qty=0 #Start counting from 0 instead of 1
-Do {[int]$qty = (Read-Host -Prompt "Specify the previous amount of [generated encoding batches]. Range from 1~15625")
-        if ($qty -eq 0) {"Non-integer or no value was entered"} elseif ($qty -gt 15625) {Write-Warning "Greater than 15625 individual encodes"}
-} While (($qty -eq 0) -or ($qty -gt 15625))
-
-#「Bootstrap B」Locate path to export batch files
+if ($mode -eq "m") {
+    [array]$validChars='A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'
+    [int]$qty=0 #Start counting from 0 instead of 1
+    Do {[int]$qty = (Read-Host -Prompt "Specify the previous amount of [generated encoding batches]. Range from 1~15625")
+        if ($qty -eq 0) {"Non-integer or no value was entered"} elseif ($qty -gt 15625) {Write-Error "× Greater than 15625 individual encodes"}
+    } While (($qty -eq 0) -or ($qty -gt 15625))
+    #「Bootstrap B」Locate path to export batch files
+    if ($qty -gt 9) {#Skip questionare for single digit $qtys
+        Do {[string]$leadCHK=""; [int]$ldZeros=0
+            Switch (Read-Host "Choose [y|n] to [add leading zeros] on exporting filename's episode counter. E.g., use 01, 02... for 2-digit episodes") {
+                y {$leadCHK="y"; Write-Output "√ enable leading 0s`r`n"; $ldZeros=$qty.ToString().Length}
+                n {$leadCHK="n"; Write-Output "× disable leading 0s`r`n"}
+                default {Write-Warning "Bad input, try again"}
+            }
+        } While ($leadCHK -eq "")
+        [string]$zroStr="0"*$ldZeros #Gaining '000' protion for ".ToString('000')" method. $zroStr would be 0 if leading zero feature is deactivated, the calculation still haves but takes no effect
+    } else {[string]$zroStr="0"}
+}
+#「Bootstrap C」Locate path to export batch files
 Read-Host "`r`nPress Enter to open a window that locates [path for exporting batch files], it may pop up at rear of current window."
 $exptPath = whichlocation
 Write-Output "√ Selected $exptPath`r`n"
 
-#「Bootstrap C」Choose if user wants leading zeros in exporting file (both stream & temp-multiplex files), INT variable $qty has no Length property, therefore INT-str convertion were used. Not needed in singular encode mode
-if ($qty -gt 9) {#Skip questionare for single digit $qtys
-    Do {[string]$leadCHK=""; [int]$ldZeros=0
-        Switch (Read-Host "Choose [y|n] to [add leading zeros] on exporting filename's episode counter. E.g., use 01, 02... for 2-digit episodes") {
-            y {$leadCHK="y"; Write-Output "√ enable leading 0s`r`n"; $ldZeros=$qty.ToString().Length}
-            n {$leadCHK="n"; Write-Output "× disable leading 0s`r`n"}
-            default {Write-Warning "Bad input, try again"}
-        }
-    } While ($leadCHK -eq "")
-    [string]$zroStr="0"*$ldZeros #Gaining '000' protion for ".ToString('000')" method. $zroStr would be 0 if leading zero feature is deactivated, the calculation still haves but takes no effect
-} else {[string]$zroStr="0"}
-
 #「Bootstrap D」Locate path to export encoded files
-Read-Host "Press Enter to proceed open a window to [locate path to export encoded files]"
+Read-Host "Hit Enter to proceed open a window to [locate path to export encoded files]"
 $fileEXP = whichlocation
 Write-Output "√ Selected $fileEXP`r`n"
 
@@ -82,59 +70,70 @@ Write-Output "√ Selected $fileEXP`r`n"
 Write-Output "Reference: [Video file formats]https://en.wikipedia.org/wiki/Video_file_format"
 Write-Output "Step 2 already learns paths to ffmpeg & so. Here it's about to import a path with files to encode`r`n"
 Do {$IMPchk=$vidIMP=$vpyIMP=$avsIMP=$apmIMP=""
-    Switch (Read-Host "The previously selected pipe upstream program was [A: ffmpeg | B: vspipe | C: avs2yuv | D: avs2pipemod]") {
+    Switch (Read-Host "The previously selected pipe upstream program was [A: ffmpeg | B: vspipe | C: avs2yuv | D: avs2pipemod | E: SVFI (alpha)]") {
         a {$IMPchk="a"; Write-Output "`r`nSelected ffmpeg-----video source. Opening a window to [locate path/directory w/ files to encode]`r`nThe procedure is to import path & add filnames in generated batch later"; $vidIMP=whichlocation}
         b {$IMPchk="b"; Write-Output "`r`nSelected vspipe------.vpy source. Opening a window to [locate path/directory w/ files to encode]`r`nThe procedure is to import path & add filnames in generated batch later"; $vpyIMP=whichlocation} #Multi-encode only, procedure is different from single-encode mode
         c {$IMPchk="c"; Write-Output "`r`nSelected avs2yuv-----.avs source. Opening a window to [locate path/directory w/ files to encode]`r`nThe procedure is to import path & add filnames in generated batch later"; $avsIMP=whichlocation}
         d {$IMPchk="d"; Write-Output "`r`nSelected avs2pipemod-.avs source. Opening a window to [locate path/directory w/ files to encode]`r`nThe procedure is to import path & add filnames in generated batch later"; $apmIMP=whichlocation}
+        e {$IMPchk="e"; Write-Output "`r`nSelected scfi(α)---video source. Opening a window to [locate path/directory w/ files to encode]`r`nThe procedure is to import path & add filnames in generated batch later"; $vidIMP=whichlocation}
         default {Write-Warning "Bad input, try again"}
     }
 } While ($IMPchk -eq "")
 
 #「Bootstrap F1」Aggregate and feedback user's selected path
-$impEXTa=$vidIMP+$vpyIMP+$avsIMP+$apmIMP
-Write-Output "`r`nPath/File selected under multi/single-encode mode is $impEXTa`r`n"
+$impEXTs=$vidIMP+$vpyIMP+$avsIMP+$apmIMP
+if ($mode -eq "m") {Write-Output "`r`n√ Importing path is selected as $impEXTm`r`n"}
+if ($mode -eq "s") {Write-Output "`r`n√ Importing file is selected as $impEXTm`r`n"
+    if (($impEXTs -eq "") -eq $true) {Write-Error "× Imported file is blank"; pause; exit}
+    else {#「Bootstrap F2」File extension fetching under single encode mode. Ditched Get-ChildItem because it containmates variables
+        $impEXTs=[io.path]::GetExtension($impEXTs)
+        $impFNM=[io.path]::GetFileNameWithoutExtension($impEXTs)
+    }
+    #「Bootstrap F3」Check file extension for avs2yuv, avs2pipemod routes
+    if (($IMPchk -eq "d") -or ($IMPchk -eq "c")) {
+        if ($impEXTs -ne ".avs") {Write-Warning "Imported file extension is $impEXTs instead of .avs`r`n"} #if statement is used to prevent selection of ffmpeg path + an empty $impEXTs
+    } elseif ($IMPchk -eq "b") {#「Bootstrap F4」Check file extension for vspipe routes
+        if ($impEXTs -ne ".vpy") {Write-Warning "Imported file extension is $impEXTs instead of .vpy`r`n"} #Comment this out during multi-encode mode as no source file is imported
+    } #Note: Path source: $impEXTm, File source: $impEXTs, File export: $fileEXP
+}
 
-#「Bootstrap F2」Under single encode mode, file extension analysis is needed, makes Bootstrap F different. Ditched Get-ChildItem because it containmates variables
-#$impEXTc=$vidIMP+$vpyIMP+$avsIMP+$apmIMP
-#if (($impEXTc -eq "") -eq $true) {Write-Error "× Imported file is blank"; pause; exit}
-#else {
-#    $impEXTc=[io.path]::GetExtension($impEXTc)
-#    $impFNM=[io.path]::GetFileNameWithoutExtension($impEXTc)
-#}
-
-#Report if imported files doesn't have a matching extension (e.g., vspipe=".vpy", avs2yuv=".avs")
-#if (($IMPchk -eq "d") -or ($IMPchk -eq "c")) {
-#    if (($impEXTc -eq ".avs") -eq $false) {Write-Warning "Imported file extension is $impEXTc instead of .avs`r`n"} #if statement is used to prevent selection of ffmpeg path + an empty $impEXTc
-#} elseif ($IMPchk -eq "b") {
-#    if (($impEXTc -eq ".vpy") -eq $false) {Write-Warning "Imported file extension is $impEXTc instead of .vpy`r`n"} #Comment this out during multi-encode mode as no source file is imported
-#} #Note: Import variable: $impEXTc; Export variable: $fileEXP
-
-#「Bootstrap G」Avs2pipemod requires avisynth.dll, which needs to be added to commandline
+#「Bootstrap G1」Importing required avisynth.dll by Avs2pipemod
 if ($IMPchk -eq "d") {
-    Read-Host "Press Enter to proceed open a window to [import a sample source video for ffprobe to analyze]. Note that ffprobe cannot analyze .vpy/.avs files"
+    Read-Host "Hit Enter to proceed open a window to [Select avisynth.dll] for Avs2pipemod, it may pop up at rear of current window"
     $apmDLL=whereisit
-    $DLLchk=(Get-ChildItem $apmDLL).Extension #Report if imported file extension isn't .dll
+    $DLLchk=(Get-ChildItem $apmDLL).Extension #Report error if file extension is not .dll
     if (($DLLchk -eq ".dll") -eq $false) {Write-Warning "File extension is $apmDLL instead of .dll"}
     Write-Output "√ Added avs2pipemod option: $apmDLL`r`n"
-} else {$apmDLL="X:\Somewhere\avisynth.dll"}
+} else {
+    $apmDLL="X:\Somewhere\avisynth.dll"
+    Write-Output "Not chooing route for Avs2pipemod, path to AVS dynamic link lib will be set to $apmDLL`r`n"
+}
+#「Bootstrap G2」Importing required config.ini by SVFI. !No frame interpolation in default!
+if ($IMPchk -eq "e") {
+    Write-Warning "This script will disable frame interpolation by automatically replcing a line: target_fps=<ffprobe detected fps>`r`This is to make the frames cohesive with encoding fps generated for x264/5. Replace both target_fps & x264/5Par's --fps manually if interpolation is desired."
+    Read-Host "Hit Enter to proceed open a window to [rendering-configuration.ini] for SVFI, it may pop up at rear of current window.`r`nThe path under Steam distro looks like this: X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini"
+    $olsINI=whereisit
+    $INIchk=(Get-ChildItem $olsINI).Extension #Report error if file extension is not .ini
+    if (($INIchk -eq ".ini") -eq $false) {Write-Warning "File extension is $olsINI instead of .ini"}
+    Write-Output "√ Added SVFI option: $olsINI`r`n"
+} else {
+    $olsINI="X:\Somewhere\SVFI-render-customize.ini"
+    Write-Output "Not chooing route for SVFI, path to config ini file will be set to $olsINI`r`n"
+}
 
-#「Bootstrap H1」Importing a video file for ffprobe to check, under non-ffmpeg upstream routes. Only for single-encode mode as ffmpeg route imports a video, instead of a path
-#if ($IMPchk -eq "a") {$impEXTc=$vidIMP}
-#else {
-#    Read-Host "Press Enter to proceed open a window to [import a source video sample for analysis] by ffprobe. Note that ffprobe cannot analyze .vpy nor .avs files"
-#    $impEXTc=whereisit
-#}
-#「Bootstrap H2」For multi-encode mode
-Read-Host "Press Enter to proceed open a window to [import a source video sample for analysis] by ffprobe. Note that ffprobe cannot analyze .vpy nor .avs files"
-$impEXTc=whereisit
+#「Bootstrap H」Importing a video file for ffprobe to check under 4 circs: VS(1) route, AVS(2) routes, multi-encoding mode(1)
+if (($mode -eq "m") -or (($IMPchk -ne "a") -and ($IMPchk -ne "e"))) {
+    Read-Host "Hit Enter to proceed open a window to [import a source video sample] for ffprobe to analyze. This is due to the fact that .vpy, .avs input source are not videos"
+    $impEXTs=whereisit
+} else {$impEXTs=$vidIMP}
+Write-Output "√ Video file for ffprobe to analyze: $impEXTs`r`n"
 
 #「Bootstrap I」Locate ffprobe
-Read-Host "Press Enter to proceed open a window to [locate ffprobe.exe]"
+Read-Host "Hit Enter to proceed open a window to [locate ffprobe.exe]"
 $fprbPath=whereisit
 
 #「ffprobeA2」Begin analyze sample video. Due to people confuses at MKV files' NUMBER_OF_FRAMES; NUMBER_OF_FRAMES-eng & etc. tagging, some MKV files ends up not having data on NUMBER_OF_FRAMES tag (at CSV's tag 24,25), therefore by reading both and keep the non-0 value would provide fallback
-$parsProbe = $fprbPath+" -i '$impEXTc' -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
+$parsProbe = $fprbPath+" -i '$impEXTs' -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
 Invoke-Expression $parsProbe > "C:\temp_v_info.csv"
 
 #i.e.: $parsProbe = "D:\ffprobe.exe -i `"F:\Asset\Video\BDRipPT\[Beatrice-Raws] Anne Happy [BDRip 1920x1080 x264 FLAC]\[Beatrice-Raws] Anne Happy 01 [BDRip 1920x1080 x264 FLAC].mkv`" -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
@@ -157,23 +156,33 @@ if ($ffprobeCSV.H -lt 61) {
 Write-Output "√ Added x265 option: $x265subme"
 
 $WxH="--input-res "+$ffprobeCSV.B+"x"+$ffprobeCSV.C+""
-$color_matrix="--colormatrix "+$ffprobeCSV.F
+$color_mtx="--colormatrix "+$ffprobeCSV.F
 $trans_chrctr="--transfer "+$ffprobeCSV.G
-if ($ffprobeCSV.F -eq "unknown") {$avc_mtx="--colormatrix undef"} else {$avc_mtx=$color_matrix} #x264: ×--colormatrix unknown √--colormatrix undef
+if ($ffprobeCSV.F -eq "unknown") {$avc_mtx="--colormatrix undef"} else {$avc_mtx=$color_mtx} #x264: ×--colormatrix unknown √--colormatrix undef
 if ($ffprobeCSV.G -eq "unknown") {$avc_tsf="--colormatrix undef"} else {$avc_tsf=$trans_chrctr} #x264: ×--transfer unknown    √--transfer undef
 $fps="--fps "+$ffprobeCSV.H
 $fmpgfps="-r "+$ffprobeCSV.H
-Write-Output "√ Added x264 options: $fps $WxH`r`n√ Added x265 options: $color_matrix $trans_chrctr $fps $WxH`r`n√ Added ffmpeg options: $fmpgfps`r`n"
+Write-Output "√ Added x264 options: $fps $WxH`r`n√ Added x265 options: $color_mtx $trans_chrctr $fps $WxH`r`n√ Added ffmpeg options: $fmpgfps`r`n"
 
-#「ffprobeC」fetch total frame count with ffprobe, then parse to variable $x265VarA, for single-encode mode only
-#if ($ffprobeCSV.I -match "^\d+$") {
-#    $nbrFrames = "--frames "+$ffprobeCSV.I
-#    Write-Output "Detecting MPEGtag total frame count`r`n√ Added x264-5 option: $nbrFrames"
-#} elseif ($ffprobeCSV.AA -match "^\d+$") {
-#    $nbrFrames = "--frames "+$ffprobeCSV.AA
-#    Write-Output "Detecting MKVtag total frame count`r`n√ Added x264-5 option: $nbrFrames"
-#} else {Write-Output "× tag: Total frame count is missing, Leaving blank on x264-5 option --frames, the drawback is ETA information will be missing during encoding (estimate time of completion)"}
-
+#「ffprobeC1」Automatically replacing SVFI render configuratiion's target_fps line, then export as new file. rote SVFI only
+if ($IMPchk -eq "e") {
+    $iniEXP="C:\bbenc_svfi_targetfps_mod_"+(Get-Date).ToString('yyyy-MM-dd.hh-mm-ss')+".ini"
+    $olsfps="target_fps="+$ffprobeCSV.H
+    $iniCxt=Get-Content $olsINI
+    $iniTgt=$iniCxt | Select-String target_fps | Select-Object -ExpandProperty Line
+    $iniCxt | ForEach-Object {$_ -replace $iniTgt,$olsfps}>$iniEXP
+    Write-Output "√ Replaced render config file $olsINI 's target_fps line as $olsfps,`r`n√ New render config file is created as $iniEXP"
+}
+#「ffprobeC2」fetch total frame count with ffprobe, then parse to variable $x265VarA, single-encode mode only
+if ($mode -eq "s") {
+    if ($ffprobeCSV.I -match "^\d+$") {$nbrFrames="--frames "+$ffprobeCSV.I
+        Write-Output "√ Detecting MPEGtag total frames`r`n√ Added x264/5 option: $nbrFrames"
+    } elseif ($ffprobeCSV.AA -match "^\d+$") {$nbrFrames="--frames "+$ffprobeCSV.AA
+        Write-Output "√ Detecting MKV-tag total frames`r`n√ Added x264/5 option: $nbrFrames"
+    } else {
+        Write-Output "× Total frame count tag is missing, Leaving blank on x264/5 option --frames, the drawback is ETA information will be missing during encoding (estimation of finish time)"
+    }
+}
 #「ffprobeD1」fetch colorspace & depth format forffmpeg, VapourSynth, AviSynth, AVS2PipeMod, x264 & x265
 [string]$avsCSP=[string]$avsD=[string]$encCSP=[string]$ffmpegCSP=[string]$encD=$null
 Do {Switch ($ffprobeCSV.D) {
@@ -209,28 +218,32 @@ $encEXT=$x265Path+$x264Path
 Write-Output "√ Selected $encEXT"
 
 #「Bootstrap K」Select multiple ways of specifying exporting filenames, episode variable $serial works at lower loop structure
-$vidEXP=[io.path]::GetFileNameWithoutExtension($impEXTc)
-Do {Switch (Read-Host "`r`nChoose how to specify filename of encoding exports [A: Input manually | B: Copy from an existing file | C: $vidEXP]`r`nNote that PowerShell misinterprets square brackets next to eachother, e.g., [some][text]. Space inbetween them is required") {
-        a { $vidEXP=Read-Host "`r`nSpecify filename to export (w/out file extension). Place episode conter `$serial in desired location.`r`n`r`n`$serial should be padded from trailing alphabets. e.g., [Zzz] Memories – `$serial (BDRip 1764x972 HEVC)"
-            $chkme=namecheck($vidEXP)
-            if (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false)) {Write-Warning "Missing variable `$serial under multi-encode mode; No value entered; Or intercepted illegal characters / | \ < > : ? * `""}
-            #if (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false)) {Write-Warning "Detecting variable `$serial in single-encode mode; No value entered; Or intercepted illegal characters / | \ < > : ? * `""}
-            #[string]$serial=($s).ToString($zroStr) #Example of parsing leading zeros to $serial. Used in for loop below (supplies variable $s)
-            #$vidEXP=$ExecutionContext.InvokeCommand.ExpandString($vidEXP) #Activating $serial as a variable with expand string method. Used in for loop below
+$vidEXP=[io.path]::GetFileNameWithoutExtension($impEXTs)
+Switch (Read-Host "`r`nChoose how to specify filename of encoding exports [A: Copy from an existing file | B: Input manually | C: $vidEXP]`r`nNote that PowerShell misinterprets square brackets next to eachother, e.g., [some][text]. Space inbetween them is required") {
+    a { Write-Output "Opening a selection window to [get filename from a file]"
+        $vidEXP=whereisit
+        $chkme=namecheck($vidEXP)
+        $vidEXP=[io.path]::GetFileNameWithoutExtension($vidEXP)
+        if ($mode -eq "m") {$vidEXP+='_$serial'} #!Using single quotes to prevent variable expansion of $serial
+    } b {
+        if ($mode -eq "m") {#Multi-encoding mode
+            Do {$vidEXP=Read-Host "`r`nSpecify filename to export (no extension). Place episode conter `$serial in desired location.`r`n`r`n`$serial should be padded from trailing alphabets. e.g., [Zzz] Memories – `$serial (BDRip 1764x972 HEVC)"
+                $chkme=namecheck($vidEXP)
+                if  (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false)) {Write-Warning "Missing variable `$serial under multi-encode mode; No value entered; Or intercepted illegal characters / | \ < > : ? * `""}
+            } While (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false))
         }
-        b { Write-Output "Opening a selection window to [get filename from a file]"
-            $vidEXP=whereisit
-            $chkme=namecheck($vidEXP)
-            $vidEXP=[io.path]::GetFileNameWithoutExtension($vidEXP)
-            $vidEXP+='_$serial' #Single quotes are used to prevent variable being expanded (becomes static value), comment this out in singular encoding batch mode
-            Write-Output "`r`nIn multi-encode mode, option B, C will add a trailing counter in filename`r`n"
+        if ($mode -eq "s") {#Single encoding mode
+            Do {$vidEXP=Read-Host "`r`nSpecify filename to export (no extension). e.g., [Zzz] Memories – 01 (BDRip 1764x972 HEVC)"
+                $chkme=namecheck($vidEXP)
+                if  (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false)) {Write-Warning "Detecting variable `$serial in single-encode mode; No value entered; Or intercepted illegal characters / | \ < > : ? * `""}
+            } While (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false))
         }
-        c { $chkme=namecheck($vidEXP)
-            $vidEXP+='_$serial'}  #Single quotes are used to prevent variable being expanded (becomes static value), comment this out in singular encoding batch mode
-        default {Write-Warning "Bad input, try again"}
+        #[string]$serial=($s).ToString($zroStr) #Example of parsing leading zeros to $serial. Used in for loop below (supplies variable $s)
+        #$vidEXP=$ExecutionContext.InvokeCommand.ExpandString($vidEXP) #Activating $serial as a variable with expand string method. Used in for loop below
+    } default {
+        if ($mode -eq "m") {$vidEXP+='_$serial'} #!Using single quotes to prevent variable expansion of $serial
     }
-} While (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false)) #Multi-encoding only, comment out under single-encode mode
-#} While (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false)) #Single-encoding only, comment out under multi-encode mode
+}
 Write-Output "√ Added exporting filename $vidEXP`r`n"
 
 #「Bootstrap L, M」1: Specify file extention based on x264-5. 2: For x265, ddd pme/pools based on cpu core count & motherboard node count.
@@ -246,7 +259,7 @@ elseif ($ENCops -eq "a") {
 
     $AllProcs=Get-CimInstance Win32_Processor | Select Availability
     ForEach ($_ in $AllProcs) {if ($_.Availability -eq 3) {$procNodes+=1}}
-    if ($procNodes -eq 2) {$pools="--pools +,-"}
+    if     ($procNodes -eq 2) {$pools="--pools +,-"}
     elseif ($procNodes -eq 4) {$pools="--pools +,-,-,-"}
     elseif ($procNodes -eq 6) {$pools="--pools +,-,-,-,-,-"}
     elseif ($procNodes -eq 8) {$pools="--pools +,-,-,-,-,-,-,-"}
@@ -257,7 +270,7 @@ elseif ($ENCops -eq "a") {
 Set-PSDebug -Strict
 $utf8NoBOM=New-Object System.Text.UTF8Encoding $false #export batch file w/ utf-8NoBOM text codec
 
-#Note: Inport file variable: $impEXTc; Export file variable: $fileEXP
+#Note: Inport file variable: $impEXTs; Export file variable: $fileEXP
 #「Initialize」$ffmpegPar-ameters variable contains no trailing spaces
 #「Limitation」$ffmpegPar-ameters can only be added after all of file-imported option ("-i")s are written, & ffmpeg option "-hwaccel" must be written before of "-i". This further increases the string reallocation work & amount of variables needed to assemble ffmpeg commandline
 #Remove option "loglevel" when debugging
@@ -267,12 +280,20 @@ $ffmpegParB="$ffmpegCSP $fmpgfps -loglevel 16 -y -hide_banner -c:v copy" #The ff
 $vspipeParA="--y4m"
 $avsyuvParA="$avsCSP $avsD"
 $avsmodParA="`"$apmDLL`" -y4mp" #Note: avs2pipemod uses "| -" instead of other tools' "- | -" pipe commandline (leave upstream/leftside "-" blank). y4mp, y4mt, y4mb represents progressive, top-field-1st interlace, bottom-field-1st interlace. This script does not bother interlaced sources to lower program complexity
+$olsargParA="-c `"$iniEXP`" --pipe-out" #Note: svfi doesn't support y4m pipe
 
 #「Initialize」x265Par-ameters, contains a trailing space
-$x265ParA="$encD $x265subme $color_matrix $trans_chrctr $fps $WxH $encCSP $pme $pools --tu-intra-depth 4 --tu-inter-depth 4 --max-tu-size 16 --me umh --merange 48 --weightb --max-merge 4 --early-skip --ref 3 --no-open-gop --min-keyint 5 --keyint 250 --fades --bframes 16 --b-adapt 2 --radl 3 --bframe-bias 20 --constrained-intra --b-intra --crf 22 --crqpoffs -4 --cbqpoffs -2 --ipratio 1.6 --pbratio 1.3 --cu-lossless --tskip --psy-rdoq 2.3 --rdoq-level 2 --hevc-aq --aq-strength 0.9 --qg-size 8 --rd 3 --limit-modes --limit-refs 1 --rskip 1 --rc-lookahead 68 --rect --amp --psy-rd 1.5 --splitrd-skip --rdpenalty 2 --qp-adaptation-range 4 --deblock -1:0 --limit-sao --sao-non-deblock --hash 2 --allow-non-conformance --single-sei --y4m -"
-$x264ParA="$encD $avc_mtx $avc_tsf $fps $WxH $encCSP --me umh --subme 9 --merange 48 --no-fast-pskip --direct auto --weightb --keyint 360 --min-keyint 5 --bframes 12 --b-adapt 2 --ref 3 --rc-lookahead 90 --crf 20 --qpmin 9 --chroma-qp-offset -2 --aq-mode 3 --aq-strength 0.7 --trellis 2 --deblock 0:0 --psy-rd 0.77:0.22 --fgo 10 --y4m -"
-#「Initialize」x264-5 variables, adding --frames, no trailing spaces, single-file mode only
-#$x265VarA=$x264VarA="$nbrframes --output `"$fileEXP$vidEXP`""
+if ($IMPchk -eq "e") {$y4m=""
+    Write-Output "√ SVFI doesn't support yuv for mpeg pipe, therefore setting x264, x265 to raw pipe format is needed"
+} else {$y4m="--y4m"}
+$x265ParA="$encD $x265subme $color_mtx $trans_chrctr $fps $WxH $encCSP $pme $pools --tu-intra-depth 4 --tu-inter-depth 4 --max-tu-size 16 --me umh --merange 48 --weightb --max-merge 4 --early-skip --ref 3 --no-open-gop --min-keyint 5 --keyint 250 --fades --bframes 16 --b-adapt 2 --radl 3 --bframe-bias 20 --constrained-intra --b-intra --crf 22 --crqpoffs -4 --cbqpoffs -2 --ipratio 1.6 --pbratio 1.3 --cu-lossless --tskip --psy-rdoq 2.3 --rdoq-level 2 --hevc-aq --aq-strength 0.9 --qg-size 8 --rd 3 --limit-modes --limit-refs 1 --rskip 1 --rc-lookahead 68 --rect --amp --psy-rd 1.5 --splitrd-skip --rdpenalty 2 --qp-adaptation-range 4 --deblock -1:0 --limit-sao --sao-non-deblock --hash 2 --allow-non-conformance --single-sei $y4m -"
+$x264ParA="$encD $avc_mtx $avc_tsf $fps $WxH $encCSP --me umh --subme 9 --merange 48 --no-fast-pskip --direct auto --weightb --keyint 360 --min-keyint 5 --bframes 12 --b-adapt 2 --ref 3 --rc-lookahead 90 --crf 20 --qpmin 9 --chroma-qp-offset -2 --aq-mode 3 --aq-strength 0.7 --trellis 2 --deblock 0:0 --psy-rd 0.77:0.22 --fgo 10 $y4m -"
+
+#「Initialize」ffmpeg, vspipe, avs2yuv, avs2pipemod Variable optoins, multi-encoding mode requires different filename and other attributes to separate tasks, therefore all Var-iables will first be loop-assigned
+if ($mode -eq "s") {
+    $ffmpegVarA=$vspipeVarA=$avsyuvVarA=$avsmodVarA=$olsargVarA="-i `"$impEXTs`"" #Upstream Vars
+    $x265VarA=$x264VarA="$nbrframes --output `"$fileEXP$vidEXP`"" #Downstream Vars
+}
 
 #Iteration begins, carry as any axis reaches letter 27. Switch occupies temp-variable $_ which cannot be used to initialize this loop. Counts as a 3-digit twenty-hexagonal
 $ffmpegVarSChar=$vspipeVarSChar=$avsyuvVarSChar=$avsmodVarSChar=$x265VarNosChar=$x264VarNosChar=$encCallNosChar=$vidEXX=@()

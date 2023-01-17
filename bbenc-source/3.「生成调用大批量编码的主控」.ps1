@@ -1,6 +1,6 @@
 ﻿cls #「启动-」大批量版生成的主控缺失文件名, 所以要提醒
-Read-Host "大批量模式下, 生成的主控里没有导入用的文件名, 因此需要手动逐个填写导入文件名`r`nx264一般自带lavf, x265一般不带, 因此x265输出文件后缀一般是未封装成.mp4的.hevc. 按Enter继续"
-
+Read-Host "[大批量模式]大批量模式下, 生成的主控里没有导入用的文件名, 因此需要手动逐个填写导入文件名`r`nx264一般自带lavf, x265一般不带, 因此x265输出文件后缀一般是未封装成.mp4的.hevc. 按Enter继续"
+$mode="m"
 #Function namecheck([string]$inName) {
 #    $badChars = '[{0}]' -f [regex]::Escape(([IO.Path]::GetInvalidFileNameChars() -join ''))
 #    ForEach ($_ in $badChars) {if ($_ -match $inName) {return $false}}
@@ -19,14 +19,13 @@ Function whereisit($startPath='DESKTOP') {
 Function whichlocation($startPath='DESKTOP') {
     #启用System.Windows.Forms选择文件夹的GUI交互窗, 通过SelectedPath将GUI交互窗锁定到桌面文件夹, 效果一般
     Add-Type -AssemblyName System.Windows.Forms
-    $startPath = New-Object System.Windows.Forms.FolderBrowserDialog -Property @{ Description="选择路径用的窗口. 拖拽边角可放大此窗口"; SelectedPath=[Environment]::GetFolderPath($startPath); RootFolder='MyComputer'; ShowNewFolderButton=$true }
+    $startPath = New-Object System.Windows.Forms.FolderBrowserDialog -Property @{ Description="选择路径用的窗口. 拖拽边角可放大以便操作"; SelectedPath=[Environment]::GetFolderPath($startPath); RootFolder='MyComputer'; ShowNewFolderButton=$true }
     #打开选择文件的GUI交互窗, 用if拦截误操作
     if ($startPath.ShowDialog() -eq "OK") {[string]$endPath = $startPath.SelectedPath}
     #由于选择根目录时路径变量含"\", 而文件夹时路径变量缺"\", 所以要自动判断并补上
     if (($endPath.SubString($endPath.Length-1) -eq "\") -eq $false) {$endPath+="\"}
     return $endPath
 }
-
 #「@MrNetTek」高DPI显示渲染模式的System.Windows.Forms
 Add-Type -TypeDefinition @'
 using System.Runtime.InteropServices;
@@ -38,28 +37,28 @@ public class ProcessDPI {
 $null = [ProcessDPI]::SetProcessDPIAware()
 
 #「启动A」生成1~n个"enc_[序号].bat"单文件版不需要
-[array]$validChars='A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'
-[int]$qty=0#从0开始数
-Do {[int]$qty = (Read-Host -Prompt "指定[之前生成压制批处理]的[整数数量]")
-        if ($qty -eq 0) {"输入了非整数或空值"} elseif ($qty -gt 15625) {Write-Warning "编码次数超过15625"; pause; exit}
-} While ($qty -eq 0)
-
-#「启动B」定位导出主控文件用路径
+if ($mode -eq "m") {
+    [array]$validChars='A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'
+    [int]$qty=0 #从0而非1开始数
+    Do {[int]$qty = (Read-Host -Prompt "指定[之前生成压制批处理]的[整数数量]")
+        if ($qty -eq 0) {"输入了非整数或空值"} elseif ($qty -gt 15625) {Write-Error "× 编码次数超过15625"; pause; exit}
+    } While ($qty -eq 0)
+    #「启动B」选择是否在导出文件序号上补零, 由于int变量$qty得不到字长Length, 所以先转string再取值
+    if ($qty -gt 9) {#个位数下关闭补零
+        Do {[string]$leadCHK=""; [int]$ldZeros=0
+            Switch (Read-Host "选择之前[y启用了 | n关闭了]导出压制文件名的[序号补0]. 如导出十位数文件时写作01, 02...") {
+                y {$leadCHK="y"; Write-Output "√ 启用补零`r`n"; $ldZeros=$qty.ToString().Length}
+                n {$leadCHK="n"; Write-Output "× 关闭补零`r`n"}
+                default {Write-Warning "输入错误, 重试"}
+            }
+        } While ($leadCHK -eq "")
+        [string]$zroStr="0"*$ldZeros #得到.ToString('000')所需的'000'部分, 如果关闭补零则$zroStr为0, 补零计算仍然存在但没有效果
+    } else {[string]$zroStr="0"}
+}
+#「启动C」定位导出主控文件用路径
 Read-Host "将打开[导出主控批处理]的路径选择窗, 可能会在窗口底层弹出. 按Enter继续"
 $exptPath = whichlocation
 Write-Output "√ 选择的路径为 $exptPath`r`n"
-
-#「启动C」选择是否在导出文件序号上补零, 由于int变量$qty得不到字长Length, 所以先转string再取值
-if ($qty -gt 9) {#个位数下关闭补零
-    Do {[string]$leadCHK=""; [int]$ldZeros=0
-        Switch (Read-Host "选择之前[y启用了 | n关闭了]导出压制文件名的[序号补0]. 如导出十位数文件时写作01, 02...") {
-            y {$leadCHK="y"; Write-Output "√ 启用补零`r`n"; $ldZeros=$qty.ToString().Length}
-            n {$leadCHK="n"; Write-Output "× 关闭补零`r`n"}
-            default {Write-Warning "输入错误, 重试"}
-        }
-    } While ($leadCHK -eq "")
-    [string]$zroStr="0"*$ldZeros #得到.ToString('000')所需的'000'部分, 如果关闭补零则$zroStr为0, 补零计算仍然存在但没有效果
-} else {[string]$zroStr="0"}
 
 #「启动D」定位导出压制结果用路径
 Read-Host "将打开[导出压制文件]的路径选择窗, 可能会在窗口底层弹出. 按Enter继续"
@@ -70,58 +69,70 @@ Write-Output "选择的路径为 $fileEXP`r`n"
 Write-Output "参考[视频文件类型]https://en.wikipedia.org/wiki/Video_file_format"
 Write-Output "由于步骤2已填写ffmpeg, vspipe, avs2yuv, avs2pipemod的所在路径, 所以步骤3中选择的是待压制文件`r`n"
 Do {$IMPchk=$vidIMP=$vpyIMP=$avsIMP=$apmIMP=""
-    Switch (Read-Host "之前选择的pipe上游方案是[A: ffmpeg | B: vspipe | C: avs2yuv | D: avs2pipemod]") {
-        a {$IMPchk="a"; Write-Output "`r`n选择了ffmpeg----视频源. 已打开[定位所有源所在路径]的选窗`r`n由于分别导入文件太慢, 所以要求在生成的主控批处理中手动写入文件名"; $vidIMP=whichlocation}
-        b {$IMPchk="b"; Write-Output "`r`n选择了vspipe----.vpy源. 已打开[定位所有源所在路径]的选窗`r`n由于分别导入文件太慢, 所以要求在生成的主控批处理中手动写入文件名"; $vpyIMP=whichlocation}
-        c {$IMPchk="c"; Write-Output "`r`n选择了avs2yuv---.avs源. 已打开[定位所有源所在路径]的选窗`r`n由于分别导入文件太慢, 所以要求在生成的主控批处理中手动写入文件名"; $avsIMP=whichlocation}
-        d {$IMPchk="d"; Write-Output "`r`n选了avs2pipemod-.avs源. 已打开[定位所有源所在路径]的选窗`r`n由于分别导入文件太慢, 所以要求在生成的主控批处理中手动写入文件名"; $apmIMP=whichlocation}
+    Switch (Read-Host "之前选择的pipe上游方案是[A: ffmpeg | B: vspipe | C: avs2yuv | D: avs2pipemod | E: SVFI (alpha)]") {
+        a {$IMPchk="a"; Write-Output "`r`n选择了ffmpeg----视频源. 已打开[定位所有源所在]的路径选窗`r`n由于分别导入文件太慢, 所以要求在生成的主控批处理中手动写入文件名"; $vidIMP=whichlocation}
+        b {$IMPchk="b"; Write-Output "`r`n选择了vspipe----.vpy源. 已打开[定位所有源所在]的路径选窗`r`n由于分别导入文件太慢, 所以要求在生成的主控批处理中手动写入文件名"; $vpyIMP=whichlocation}
+        c {$IMPchk="c"; Write-Output "`r`n选择了avs2yuv---.avs源. 已打开[定位所有源所在]的路径选窗`r`n由于分别导入文件太慢, 所以要求在生成的主控批处理中手动写入文件名"; $avsIMP=whichlocation}
+        d {$IMPchk="d"; Write-Output "`r`n选了avs2pipemod-.avs源. 已打开[定位所有源所在]的路径选窗`r`n由于分别导入文件太慢, 所以要求在生成的主控批处理中手动写入文件名"; $apmIMP=whichlocation}
+        e {$IMPchk="e"; Write-Output "`r`n选了SVFI(alpha)-视频源. 已打开[定位所有源所在路径]的选窗`r`n由于分别导入文件太慢, 所以要求在生成的主控批处理中手动写入文件名"; $vidIMP=whichlocation}
         default {Write-Warning "输入错误, 重试"}
     }
 } While ($IMPchk -eq "")
 
-#「启动F1M」整合并反馈选取的路径/文件
-$impEXTa=$vidIMP+$vpyIMP+$avsIMP+$apmIMP
-Write-Output "`r`n大批量/单文件模式下选择的路径/文件为 $impEXTa`r`n"
+#「启动F1」整合并反馈选取的路径/文件
+$impEXTm=$vidIMP+$vpyIMP+$avsIMP+$apmIMP
+if ($mode -eq "m") {Write-Output "`r`n√ 选择的路径为 $impEXTs`r`n"}
+if ($mode -eq "s") {Write-Output "`r`n√ 选择的文件为 $impEXTs`r`n"
+    if (($impEXTs -eq "") -eq $true) {Write-Error "× 没有导入任何文件"; pause; exit}
+    else {#「启动F2」单文件模式下生成默认导出文件名, 而需获取文件名与后缀的方法. 由于变量污染问题摒弃了Get-ChildItem
+        $impEXTs=[io.path]::GetExtension($impEXTs)
+        $impFNM=[io.path]::GetFileNameWithoutExtension($impEXTs)
+    }
+    #「启动F3」avs2yuv, avs2pipemod线路检查文件后缀名是否正常
+    if (($IMPchk -eq "d") -or ($IMPchk -eq "c")) {
+        if ($impEXTs -ne ".avs") {Write-Warning "文件后缀名是 $impEXTs 而非 .avs`r`n"} #if选项用于防止ffmpeg线路下输入了空值$impEXTs
+    } elseif ($IMPchk -eq "b") {#「启动F4」vspipe线路检查文件后缀名是否正常
+        if ($impEXTs -ne ".vpy") {Write-Warning "文件后缀名是 $impEXTs 而非 .vpy`r`n"} #大批量模式下输入的是路径所以失效
+    } #注: 导入路径: $impEXTm, 导入文件: $impEXTs, 导出路径: $fileEXP
+}
 
-#「启动F2」单文件模式下获取文件名与后缀, 用于生成默认导出文件名. 由于变量污染问题摒弃了Get-ChildItem
-#if (($impEXTc -eq "") -eq $true) {Write-Error "× 没有导入任何文件"; pause; exit}
-#else {
-#    $impEXTc=[io.path]::GetExtension($impEXTc)
-#    $impFNM=[io.path]::GetFileNameWithoutExtension($impEXTc)
-#}
-
-#检测输入文件格式是否匹配选择的线路 (vspipe=".vpy", avs2yuv=".avs")
-#if (($IMPchk -eq "d") -or ($IMPchk -eq "c")) {
-#    if (($impEXTc -eq ".avs") -eq $false) {Write-Warning "文件后缀名是 $impEXTc 而非 .avs`r`n"} #if选项用于防止ffmpeg线路下输入了空值$impEXTc
-#} elseif ($IMPchk -eq "b") {
-#    if (($impEXTc -eq ".vpy") -eq $false) {Write-Warning "文件后缀名是 $impEXTc 而非 .vpy`r`n"} #大批量模式下输入的是路径所以失效
-#} #注: 导入路径: $impEXTa, 导入文件: $impEXTc, 导出路径: $fileEXP
-
-#「启动G」Avs2pipemod需要的文件
+#「启动G1」Avs2pipemod需要的文件
 if ($IMPchk -eq "d") {
     Read-Host "将为Avs2pipemod打开[选择avisynth.dll]的路径选择窗, 可能会在窗口底层弹出. 按Enter继续"
     $apmDLL=whereisit
     $DLLchk=(Get-ChildItem $apmDLL).Extension #检查文件后缀是否为.dll并报错
     if (($DLLchk -eq ".dll") -eq $false) {Write-Warning "文件后缀名是 $apmDLL 而非 .dll"}
     Write-Output "√ 已添加avs2pipemod参数: $apmDLL`r`n"
-} else {$apmDLL="X:\Somewhere\avisynth.dll"}
+} else {
+    $apmDLL="X:\Somewhere\avisynth.dll"
+    Write-Output "未选择Avs2pipemod线路, AVS动态链接库路径将临时设为 $apmDLL`r`n"
+}
+#「启动G2」SVFI需要的文件
+if ($IMPchk -eq "e") {
+    Write-Warning "本程序会生成新的渲染配置ini文件, 其中的target_fps值将会被替换为ffprobe检测源视频的帧数, 目的是将下游x264/5编码器的帧数设置统一起来`r`n但缺点是自定义的插帧设置会失效, 若需插帧则手动修改target_fps及x264/5Par设置的--fps参数."
+    Read-Host "将为SVFI打开[自定渲染配置.ini]的路径选择窗, 可能会在窗口底层弹出.`r`nSteam发布端的路径如 X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini 按Enter继续"
+    $olsINI=whereisit
+    $INIchk=(Get-ChildItem $olsINI).Extension #检查文件后缀是否为.ini并报错
+    if (($INIchk -eq ".ini") -eq $false) {Write-Warning "文件后缀名是 $olsINI 而非 .ini"}
+    Write-Output "√ 已添加SVFI参数: $olsINI`r`n"
+} else {
+    $olsINI="X:\Somewhere\SVFI-render-customize.ini"
+    Write-Output "未选择SVFI线路, 配置文件路径将临时设为 $olsINI`r`n"
+}
 
-#「启动H1」非ffmpeg上游方案下, 导入一份视频文件给ffprobe检测. 唯独单文件版的ffmpeg线路下会直接导入视频, 所以和大批量版全部线路导入路径不同
-#if ($IMPchk -eq "a") {$impEXTc=$vidIMP}
-#else {
-#    Read-Host "将为ffprobe打开[送检用源视频]的路径选择窗, 因为大批量版下只会导入路径, 而单文件版下ffprobe无法检测.vpy和.avs"
-#    $impEXTc=whereisit
-#}
-#「启动H2」大批量模式, 所有线路导入的都是路径, 所以要另导入一份视频文件给ffprobe检测
-Read-Host "将为ffprobe打开[送检用源视频]的路径选择窗. 注意ffprobe无法检测.vpy和.avs"
-$impEXTc=whereisit
+#「启动H」四种情况下需要专门导入视频给ffprobe检测: VS(1), AVS(2), 大批量模式(1)
+if (($mode -eq "m") -or (($IMPchk -ne "a") -and ($IMPchk -ne "e"))) {
+    Read-Host "将为ffprobe打开[送检用源视频]的文件选择窗, 因为大批量版下只会导入路径, 而单文件版下ffprobe无法检测.vpy和.avs"
+    $impEXTs=whereisit
+} else {$impEXTs=$vidIMP}
+Write-Output "√ 将导入视频到ffprobe进行检测: $impEXTs`r`n"
 
 #「启动I」定位ffprobe
 Read-Host "将打开[定位ffprobe.exe]的选择窗. 按Enter继续"
 $fprbPath=whereisit
 
 #「ffprobeA2」开始检测片源, 由于mkv有给不同视频流标注多种视频总帧数的tag功能, 导致封装视频的人会错标 NUMBER_OF_FRAMES 成 NUMBER_OF_FRAMES-eng (两者分别占据csv的第24,25号), 所以同时尝试读取两者, 缺少任意一值则X位中显示另一值, 所以只检测X位
-$parsProbe = $fprbPath+" -i '$impEXTc' -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
+$parsProbe = $fprbPath+" -i '$impEXTs' -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
 Invoke-Expression $parsProbe > "C:\temp_v_info.csv"
 
 #例: $parsProbe = "D:\ffprobe.exe -i `"F:\Asset\Video\BDRip私种\[Beatrice-Raws] Anne Happy [BDRip 1920x1080 x264 FLAC]\[Beatrice-Raws] Anne Happy 01 [BDRip 1920x1080 x264 FLAC].mkv`" -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
@@ -144,23 +155,33 @@ if ($ffprobeCSV.H -lt 61) {
 Write-Output "√ 已添加x265参数: $x265subme"
 
 $WxH="--input-res "+$ffprobeCSV.B+"x"+$ffprobeCSV.C+""
-$color_matrix="--colormatrix "+$ffprobeCSV.F
+$color_mtx="--colormatrix "+$ffprobeCSV.F
 $trans_chrctr="--transfer "+$ffprobeCSV.G
-if ($ffprobeCSV.F -eq "unknown") {$avc_mtx="--colormatrix undef"} else {$avc_mtx=$color_matrix} #x264: ×--colormatrix unknown √--colormatrix undef
+if ($ffprobeCSV.F -eq "unknown") {$avc_mtx="--colormatrix undef"} else {$avc_mtx=$color_mtx} #x264: ×--colormatrix unknown √--colormatrix undef
 if ($ffprobeCSV.G -eq "unknown") {$avc_tsf="--colormatrix undef"} else {$avc_tsf=$trans_chrctr} #x264: ×--transfer unknown    √--transfer undef
 $fps="--fps "+$ffprobeCSV.H
 $fmpgfps="-r "+$ffprobeCSV.H
-Write-Output "√ 已添加x264参数: $fps $WxH`r`n√ 已添加x265参数: $color_matrix $trans_chrctr $fps $WxH√ 已添加ffmpeg参数: $fmpgfps`r`n"
+Write-Output "√ 已添加x264参数: $fps $WxH`r`n√ 已添加x265参数: $color_mtx $trans_chrctr $fps $WxH√ 已添加ffmpeg参数: $fmpgfps`r`n"
 
-#「ffprobeC」ffprobe获取视频总帧数并赋值到$x265VarA中, 唯单文件版可用
-#if ($ffprobeCSV.I -match "^\d+$") {
-#    $nbrFrames = "--frames "+$ffprobeCSV.I
-#    Write-Output "检测到MPEGtag视频总帧数`r`n√ 已添加x264/5参数: $nbrFrames"
-#} elseif ($ffprobeCSV.AA -match "^\d+$") {
-#    $nbrFrames = "--frames "+$ffprobeCSV.AA
-#    Write-Output "检测到MKVtag视频总帧数`r`n√ 已添加x264/5参数: $nbrFrames"
-#} else {Write-Output "× 总帧数的数据被删, 将留空x264/5参数--frames, 缺点是不再显示ETA（预计完成时间）"}
-#获得视频总帧数$nbrFrames
+#「ffprobeC1」自动替换SVFI渲染配置文件的target_fps, 并导出新文件. 唯SVFI线路需要
+if ($IMPchk -eq "e") {
+    $iniEXP="C:\bbenc_svfi_targetfps_mod_"+(Get-Date).ToString('yyyy.MM.dd.hh.mm.ss')+".ini"
+    $olsfps="target_fps="+$ffprobeCSV.H
+    $iniCxt=Get-Content $olsINI
+    $iniTgt=$iniCxt | Select-String target_fps | Select-Object -ExpandProperty Line
+    $iniCxt | ForEach-Object {$_ -replace $iniTgt,$olsfps}>$iniEXP
+    Write-Output "√ 已将渲染配置文件 $olsINI 的target_fps行替换为 $olsfps,`r`n√ 新的渲染配置文件已导出为 $iniEXP"
+}
+#「ffprobeC2」ffprobe获取视频总帧数并赋值到$x264/5VarA中, 唯单文件版可用
+if ($mode -eq "s") {
+    if ($ffprobeCSV.I -match "^\d+$") {$nbrFrames="--frames "+$ffprobeCSV.I
+        Write-Output "√ 检测到MPEGtag视频总帧数`r`n√ 已添加x264/5参数: $nbrFrames"
+    } elseif ($ffprobeCSV.AA -match "^\d+$") {$nbrFrames="--frames "+$ffprobeCSV.AA
+        Write-Output "√ 检测到MKV-tag视频总帧数`r`n√ 已添加x264/5参数: $nbrFrames"
+    } else {
+        Write-Output "× 总帧数的数据被删, 将留空x264/5参数--frames, 缺点是不再显示ETA（预计完成时间）"
+    }
+}
 
 #「ffprobeD1」获取色彩空间格式, 给ffmpeg, VapourSynth, AviSynth, AVS2PipeMod, x264和x265赋值
 [string]$avsCSP=[string]$avsD=[string]$encCSP=[string]$ffmpegCSP=[string]$encD=$null
@@ -198,28 +219,33 @@ Write-Output "√ 选择了 $encEXT"
 
 #「启动K」选择导出压制结果文件名的多种方式, 集数变量$serial于下方的循环中实现序号叠加
 [int]$serial=1
-$vidEXP=[io.path]::GetFileNameWithoutExtension($impEXTc)
-Do {Switch (Read-Host "`r`n选择导出压制结果的文件名. 注意PowerShell默认紧挨的方括号为一般表达式, 如[随便][什么]之间要隔开`r`n[A: 手动填写 | B: 选择文件并拷贝 | C: $vidEXP]") {
-        a { $vidEXP=Read-Host "`r`n填写导出用的文件名(无后缀), 于序号处填 `$serial. `$serial后不能紧挨英文字母. 如 [Zzz] Memories – `$serial (BDRip 1764x972 HEVC)"
-            $chkme=namecheck($vidEXP)
-            if (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false)) {Write-Warning "文件名中缺少变量`$serial, 输入了空值, 或拦截了不可用字符/ | \ < > : ? * `""}
-            #if (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false)) {Write-Warning "单文件模式下文件名中含变量`$serial; 输入了空值; 或拦截了不可用字符/ | \ < > : ? * `""}
-            #[string]$serial=($s).ToString($zroStr) #赋值示例. 用于下面的for循环(提供变量$s)
-            #$vidEXP=$ExecutionContext.InvokeCommand.ExpandString($vidEXP) #下面的for循环中, 用户输入的变量只能通过Expand方法才能作为变量激活$serial
+$vidEXP=[io.path]::GetFileNameWithoutExtension($impEXTs)
+Switch (Read-Host "`r`n选择导出压制结果的文件名. 注意PowerShell默认紧挨的方括号为一般表达式, 如[随便][什么]之间要隔开`r`n[A: 选择文件并拷贝 | B: 手动填写 | C: $vidEXP]") {
+    a { Write-Output "已打开[复制文件名]的选择窗"
+        $vidEXP=whereisit
+        $chkme=namecheck($vidEXP)
+        $vidEXP=[io.path]::GetFileNameWithoutExtension($vidEXP)
+        if ($mode -eq "m") {$vidEXP+='_$serial'} #!使用单引号防止$serial变量被激活
+        Write-Output "大批量模式下选项B, C会在末尾添加序号, 所以文件名尾会多出`"_`"`r`n"
+    } b {
+        if ($mode -eq "m") {#大批量模式用
+            Do {$vidEXP=Read-Host "`r`n填写文件名(无后缀), 大批量模式下要于集数变化处填 `$serial, 并隔开`$serial后的英文字母, 两个方括号间要隔开. 如 [Zzz] Memories – `$serial (BDRip 1764x972 HEVC)"
+                $chkme=namecheck($vidEXP)
+                if  (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false)) {Write-Warning "文件名中缺少变量`$serial, 输入了空值, 或拦截了不可用字符/ | \ < > : ? * `""}
+            } While (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false))
         }
-        b { Write-Output "已打开[复制文件名]的选择窗"
-            $vidEXP=whereisit
-            $chkme=namecheck($vidEXP)
-            $vidEXP=[io.path]::GetFileNameWithoutExtension($vidEXP)
-            $vidEXP+='_$serial' #使用单引号防止$serial变量被激活. 单文件模式下移除
-            Write-Output "大批量模式下选项B, C会在末尾添加序号, 所以文件名尾会多出`"_`"`r`n"
+        if ($mode -eq "s") {#单文件模式用
+            Do {$vidEXP=Read-Host "`r`n填写文件名(无后缀), 两个方括号间要隔开. 如 [Zzz] Memories – 01 (BDRip 1764x972 HEVC)"
+                $chkme=namecheck($vidEXP)
+                if  (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false)) {Write-Warning "单文件模式下文件名中含变量`$serial; 输入了空值; 或拦截了不可用字符/ | \ < > : ? * `""}
+            } While (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false))
         }
-        c { $chkme=namecheck($vidEXP)
-            $vidEXP+='_$serial'} #使用单引号防止$serial变量被激活. 单文件模式下移除
-        default {Write--Warning "输入错误, 重试`r`n"}
+        #[string]$serial=($s).ToString($zroStr) #赋值示例. 用于下面的for循环(提供变量$s)
+        #$vidEXP=$ExecutionContext.InvokeCommand.ExpandString($vidEXP) #下面的for循环中, 用户输入的变量只能通过Expand方法才能作为变量激活$serial
+    } default {
+        if ($mode -eq "m") {$vidEXP+='_$serial'} #!使用单引号防止$serial变量被激活
     }
-} While (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false)) #大批量模式用, 单文件模式下注释掉
-#} While (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false)) #单文件模式用, 大批量模式下注释掉
+}
 Write-Output "√ 写入了导出文件名 $vidEXP`r`n"
 
 #「启动L, M」1: 根据选择x264/5来决定输出.hevc/.mp4. 2: x265下据cpu核心数量, 节点数量添加pme/pools. x265一般不自带lavf(不支持导出MP4), x264一般带lavf但不支持pme和pools
@@ -234,7 +260,7 @@ elseif ($ENCops -eq "a") {
 
     $AllProcs=Get-CimInstance Win32_Processor | Select Availability
     ForEach ($_ in $AllProcs) {if ($_.Availability -eq 3) {$procNodes+=1}}
-    if ($procNodes -eq 2) {$pools="--pools +,-"}
+    if     ($procNodes -eq 2) {$pools="--pools +,-"}
     elseif ($procNodes -eq 4) {$pools="--pools +,-,-,-"}
     elseif ($procNodes -eq 6) {$pools="--pools +,-,-,-,-,-"}
     elseif ($procNodes -eq 8) {$pools="--pools +,-,-,-,-,-,-,-"}
@@ -245,7 +271,7 @@ elseif ($ENCops -eq "a") {
 Set-PSDebug -Strict
 $utf8NoBOM=New-Object System.Text.UTF8Encoding $false #导出utf-8NoBOM文本编码用
 
-#注: 导入路径: $impEXTa, 导入文件: $impEXTc 导出路径: $fileEXP
+#注: 导入路径: $impEXTm, 导入文件: $impEXTs 导出路径: $fileEXP
 #「初始化」$ffmpegPar(固定参数变量)的末尾不带空格
 #「限制」$ffmpegPar-ameters不能写在输入文件命令(-i)前面, ffmpeg参数 "-hwaccel"不能写在输入文件后面. 导致了字符串重组的流程变复杂, 及更多字符串变量的参与
 #debug时删"loglevel", 警告"-thread_queue_size过小"时加-thread_queue_size<压制平均码率kbps+1000>, 但最好换ffmpeg
@@ -254,16 +280,24 @@ $ffmpegParB="$ffmpegCSP $fmpgfps -loglevel 16 -y -hide_banner -c:v copy" #生成
 $vspipeParA="--y4m"
 $avsyuvParA="$avsCSP $avsD"
 $avsmodParA="`"$apmDLL`" -y4mp" #注: avs2pipemod使用"| -"而非其他工具的"- | -"pipe参数(左侧无"-"). y4mp, y4mt, y4mb代表逐行, 上场优先隔行, 下场优先隔行. 为了降低代码复杂度所以不做隔行
+$olsargParA="-c `"$iniEXP`" --pipe-out" #注: svfi不支持y4m pipe格式
 
-#「初始化」x265固定参数, 末尾加空格
-$x265ParA="$encD $x265subme $color_matrix $trans_chrctr $fps $WxH $encCSP $pme $pools --tu-intra-depth 4 --tu-inter-depth 4 --max-tu-size 16 --me umh --merange 48 --weightb --max-merge 4 --early-skip --ref 3 --no-open-gop --min-keyint 5 --keyint 250 --fades --bframes 16 --b-adapt 2 --radl 3 --bframe-bias 20 --constrained-intra --b-intra --crf 22 --crqpoffs -4 --cbqpoffs -2 --ipratio 1.6 --pbratio 1.3 --cu-lossless --tskip --psy-rdoq 2.3 --rdoq-level 2 --hevc-aq --aq-strength 0.9 --qg-size 8 --rd 3 --limit-modes --limit-refs 1 --rskip 1 --rc-lookahead 68 --rect --amp --psy-rd 1.5 --splitrd-skip --rdpenalty 2 --qp-adaptation-range 4 --deblock -1:0 --limit-sao --sao-non-deblock --hash 2 --allow-non-conformance --single-sei --y4m -"
-$x264ParA="$encD $avc_mtx $avc_tsf $fps $WxH $encCSP --me umh --subme 9 --merange 48 --no-fast-pskip --direct auto --weightb --keyint 360 --min-keyint 5 --bframes 12 --b-adapt 2 --ref 3 --rc-lookahead 90 --crf 20 --qpmin 9 --chroma-qp-offset -2 --aq-mode 3 --aq-strength 0.7 --trellis 2 --deblock 0:0 --psy-rd 0.77:0.22 --fgo 10 --y4m -"
-#「初始化」x264/5变化参数, 添加--frames, debug时注释掉, 末尾不加空格, 仅单文件版可用
-#$x265VarA=$x264VarA="$nbrframes --output `"$fileEXP$vidEXP`""
+#「初始化」x264/5固定参数, 末尾加空格
+if ($IMPchk -eq "e") {$y4m=""
+    Write-Output "√ 由于SVFI不支持yuv for mpeg pipe格式, 所以x264, x265参数设定为使用raw pipe格式"
+} else {$y4m="--y4m"}
+$x265ParA="$encD $x265subme $color_mtx $trans_chrctr $fps $WxH $encCSP $pme $pools --tu-intra-depth 4 --tu-inter-depth 4 --max-tu-size 16 --me umh --merange 48 --weightb --max-merge 4 --early-skip --ref 3 --no-open-gop --min-keyint 5 --keyint 250 --fades --bframes 16 --b-adapt 2 --radl 3 --bframe-bias 20 --constrained-intra --b-intra --crf 22 --crqpoffs -4 --cbqpoffs -2 --ipratio 1.6 --pbratio 1.3 --cu-lossless --tskip --psy-rdoq 2.3 --rdoq-level 2 --hevc-aq --aq-strength 0.9 --qg-size 8 --rd 3 --limit-modes --limit-refs 1 --rskip 1 --rc-lookahead 68 --rect --amp --psy-rd 1.5 --splitrd-skip --rdpenalty 2 --qp-adaptation-range 4 --deblock -1:0 --limit-sao --sao-non-deblock --hash 2 --allow-non-conformance --single-sei $y4m -"
+$x264ParA="$encD $avc_mtx $avc_tsf $fps $WxH $encCSP --me umh --subme 9 --merange 48 --no-fast-pskip --direct auto --weightb --keyint 360 --min-keyint 5 --bframes 12 --b-adapt 2 --ref 3 --rc-lookahead 90 --crf 20 --qpmin 9 --chroma-qp-offset -2 --aq-mode 3 --aq-strength 0.7 --trellis 2 --deblock 0:0 --psy-rd 0.77:0.22 --fgo 10 $y4m -"
+
+#「初始化」ffmpeg, vspipe, avs2yuv, avs2pipemod, one_line_shot_args变化参数, 大批量版需要单独计算每个视频的文件名所以不能直接赋值
+if ($mode -eq "s") {
+    $ffmpegVarA=$vspipeVarA=$avsyuvVarA=$avsmodVarA=$olsargVarA="-i `"$impEXTs`"" #上游变化参数
+    $x265VarA=$x264VarA="$nbrframes --output `"$fileEXP$vidEXP`"" #下游变化参数
+}
 
 #迭代过程, 当任意值超出定义范围(第27个字母)时就代表一次进位完成, 最高位数轴+1, 低位数轴归零, 由于Switch会占据临时变量, 所以不能用$s. 基本上算3位数26进制
-$ffmpegVarSChar=$vspipeVarSChar=$avsyuvVarSChar=$avsmodVarSChar=$x265VarNosChar=$x264VarNosChar=$encCallNosChar=$vidEXX=@()
-$ffmpegVarWarp=$vspipeVarWarp=$avsyuvVarWarp=$avsmodVarWarp=$x265VarWarp=$x264VarWarp=$tempMuxOut=$tempEncOut=""
+$ffmpegVarSChar=$vspipeVarSChar=$avsyuvVarSChar=$avsmodVarSChar=$olsargVarSChar=$x265VarNosChar=$x264VarNosChar=$encCallNosChar=$vidEXX=@()
+$ffmpegVarWarp=$vspipeVarWarp=$avsyuvVarWarp=$avsmodVarWarp=$olsargVarWrap=$x265VarWarp=$x264VarWarp=$tempMuxOut=$tempEncOut=""
 [int]$x=[int]$y=[int]$z=0
 For ($s=0; $s -lt $qty; $s++) {
     #$x+=1 完成所有赋值后才+1, 所以放在循环尾部
@@ -278,9 +312,10 @@ For ($s=0; $s -lt $qty; $s++) {
     $tempEncOut=$vidEXX[$s]+".hevc"
 
     $ffmpegVarSChar+="@set `"ffmpegVar"+$sChar+"=-hwaccel auto -i `"导入视频"+"_"+"$sChar.mkv`"`"`n"
-    $vspipeVarSChar+="@set `"vspipeVar"+$sChar+"=-i `"$impEXTa"+"导入视频"+"_"+"$sChar.mkv`"`"`n"
-    $avsyuvVarSChar+="@set `"avsyuvVar"+$sChar+"=-i `"$impEXTa"+"导入视频"+"_"+"$sChar.mkv`"`"`n"
-    $avsmodVarSChar+="@set `"avsmodVar"+$sChar+"=-i `"$impEXTa"+"导入视频"+"_"+"$sChar.mkv`"`"`n"
+    $vspipeVarSChar+="@set `"vspipeVar"+$sChar+"=-i `"$impEXTm"+"导入视频"+"_"+"$sChar.mkv`"`"`n"
+    $avsyuvVarSChar+="@set `"avsyuvVar"+$sChar+"=-i `"$impEXTm"+"导入视频"+"_"+"$sChar.mkv`"`"`n"
+    $avsmodVarSChar+="@set `"avsmodVar"+$sChar+"=-i `"$impEXTm"+"导入视频"+"_"+"$sChar.mkv`"`"`n"
+    $olsargVarSChar+="@set `"olsargVar"+$sChar+"=-i `"$impEXTa"+"导入视频"+"_"+"$sChar.mkv`" -t bbenc_run_$sChar`"`n"
 
     $x265VarNosChar+="@set `"x265Var"+$sChar+"=--output `"$fileEXP$tempMuxOut`"`"`n"
     $x264VarNosChar+="@set `"x264Var"+$sChar+"=--output `"$fileEXP$tempMuxOut`"`"`n"
@@ -293,6 +328,7 @@ For ($s=0; $s -lt $qty; $s++) {
 [string]$vspipeVarWrap=$vspipeVarSChar;$vspipeVarWrap=$vspipeVarWrap -replace " @set", "@set"
 [string]$avsyuvVarWrap=$avsyuvVarSChar;$avsyuvVarWrap=$avsyuvVarWrap -replace " @set", "@set"
 [string]$avsmodVarWrap=$avsmodVarSChar;$avsmodVarWrap=$avsmodVarWrap -replace " @set", "@set"
+[string]$olsargVarWrap=$olsargVarSChar;$olsargVarWrap=$olsargVarWrap -replace " @set", "@set"
 [string]$x265VarWrap = $x265VarNosChar;$x265VarWrap = $x265VarWrap   -replace " @set", "@set"
 [string]$x264VarWrap = $x264VarNosChar;$x264VarWrap = $x264VarWrap   -replace " @set", "@set"
 [string]$encCallWrap = $encCallNosChar;$encCallWrap = $encCallWrap   -replace " call", "call"
@@ -321,6 +357,7 @@ REM 「ffmpeg, vspipe, avsyuv, avs2pipemod固定参数」
 @set `"vspipeParA="+$vspipeParA+"`"
 @set `"avsyuvParA="+$avsyuvParA+"`"
 @set `"avsmodParA="+$avsmodParA+"`"
+@set `"olsargParA="+$olsargParA+"`"
 
 REM 「ffmpeg, vspipe, avsyuv, avs2pipemod变化参数」
 
@@ -328,6 +365,7 @@ REM 「ffmpeg, vspipe, avsyuv, avs2pipemod变化参数」
 "+$vspipeVarWrap+"
 "+$avsyuvVarWrap+"
 "+$avsmodVarWrap+"
+"+$olsargVarWrap+"
 
 REM 「x264/5固定参数」
 

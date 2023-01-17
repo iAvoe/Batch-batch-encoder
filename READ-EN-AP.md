@@ -127,6 +127,22 @@ This level of gatekeeping is a waste of time and efort for people who don't actu
 -----
 
 ## ★Updates / change log
+**v1.1769**
+<ul>
+    <li> √ Reduced coding complexity/difficulty in step 2, 3:<ul>
+        <li> √ Swapped differeciation method from commenting out to if separation, effects including easier of viewing, program executing efficiency, multiple-single version's cross referencing & so on</li>
+        <li> √Further aligned many code blocks that were misaligned by unequal lengthed texts/names</li></ul>
+    </li>
+    <li> × Due to large area of code were changed, this update may introduce several new bugs</li>
+    <li> ？ Step 3 has released a new complete-alpha-route to connect upstream rendering program SVFI<ul>
+        <li> ？ requires SVFI to roll out their internal verison that supports video source input, therefore this route does not reach to beta state</li>
+        <li> √ complete-route: in both multiple & single encoding version to generate all of the CLI options automatically, and adapts to video source each time</li></ul>
+    </li>
+    <li> ？ Step 2 still needs to follow up step 3 to complete generating SVFI inactive vessel batches</li>
+    <li> √ Step 3's pipe strategy has changed to automaically downgrade from y4m pipe to raw pipe to support SVFI</li>
+    <li> √ Step 3 new has a new feature to edit SVFI render configuration .ini file, for the target_fps option, and export to a new file</li>
+</ul>
+
 **v1.1701**
 <ul>
     <li> √ Improved folder/directory/path selecting window's feature-set:<ul>

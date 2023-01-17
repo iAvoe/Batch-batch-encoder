@@ -17,7 +17,7 @@ Function whereisit($startPath='DESKTOP') {
 Function whichlocation($startPath='DESKTOP') {
     #Opens a System.Windows.Forms GUI to pick a folder/path/dir
     Add-Type -AssemblyName System.Windows.Forms
-    $startPath = New-Object System.Windows.Forms.FolderBrowserDialog -Property @{ Description="Select a directory. Drag bottom corner to enlarge"; SelectedPath=[Environment]::GetFolderPath($startPath); RootFolder='MyComputer'; ShowNewFolderButton=$true }
+    $startPath = New-Object System.Windows.Forms.FolderBrowserDialog -Property @{ Description="Select a directory. Drag bottom corner to enlarge for convenience"; SelectedPath=[Environment]::GetFolderPath($startPath); RootFolder='MyComputer'; ShowNewFolderButton=$true }
     #Intercepting failed inputs with if statement
     if ($startPath.ShowDialog() -eq "OK") {[string]$endPath = $startPath.SelectedPath}
     #Root directory always have a "\" in return, whereas a folder/path/dir doesn't. Therefore an if statement is used to add "\" when needed, but comment out under single-encode mode
@@ -46,29 +46,28 @@ Write-Output "avs2yuv     [.avs] -csp<string> -depth<int> - | x265.exe --input-r
 Write-Output "avs2pipemod [.avs] -y4mp                      | x265.exe --y4m - --output`r`n"
 
 #「Bootstrap A」Generate 1~n amount of "enc_[numbers].bat". Not needed in singular encode mode
-#Non-integer input will cause error automatically as $qty was declared as INT
-[array]$validChars='A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'
-[int]$qty=0 #Start counting from 0 instead of 1
-Do {[int]$qty = (Read-Host -Prompt "Specify the integer amount of [individual encoding batches] to generate. Range from 1~15625")
-        if ($qty -eq 0) {"Non-integer or no value was entered"} elseif ($qty -gt 15625) {Write-Warning "Greater than 15625 individual encodes"}
-} While (($qty -eq 0) -or ($qty -gt 15625))
-
-#「Bootstrap B」Locate path to export batch files
-Read-Host "`r`nPress Enter to open a window that locates [path for exporting batch files], it may pop up at rear of current window"
+if ($mode -eq "m") {
+    [array]$validChars='A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'
+    [int]$qty=0 #Start counting from 0 instead of 1
+    Do {[int]$qty = (Read-Host -Prompt "Specify the previous amount of [generated encoding batches]. Range from 1~15625")
+        if ($qty -eq 0) {"Non-integer or no value was entered"} elseif ($qty -gt 15625) {Write-Error "× Greater than 15625 individual encodes"}
+    } While (($qty -eq 0) -or ($qty -gt 15625))
+    #「Bootstrap B」Locate path to export batch files
+    if ($qty -gt 9) {#Skip questionare for single digit $qtys
+        Do {[string]$leadCHK=""; [int]$ldZeros=0
+            Switch (Read-Host "Choose [y|n] to [add leading zeros] on exporting filename's episode counter. E.g., use 01, 02... for 2-digit episodes") {
+                y {$leadCHK="y"; Write-Output "√ enable leading 0s`r`n"; $ldZeros=$qty.ToString().Length}
+                n {$leadCHK="n"; Write-Output "× disable leading 0s`r`n"}
+                default {Write-Warning "Bad input, try again"}
+            }
+        } While ($leadCHK -eq "")
+        [string]$zroStr="0"*$ldZeros #Gaining '000' protion for ".ToString('000')" method. $zroStr would be 0 if leading zero feature is deactivated, the calculation still haves but takes no effect
+    } else {[string]$zroStr="0"}
+}
+#「Bootstrap C」Locate path to export batch files
+Read-Host "`r`nPress Enter to open a window that locates [path for exporting batch files], it may pop up at rear of current window."
 $exptPath = whichlocation
 Write-Output "√ Selected $exptPath`r`n"
-
-#「Bootstrap C」Choose if user wants leading zeros in exporting file (both stream & temp-multiplex files), INT variable $qty has no Length property, therefore INT-str convertion were used
-if ($qty -gt 9) {#Skip questionare for single digit $qtys
-    Do {[string]$leadCHK=""; [int]$ldZeros=0
-        Switch (Read-Host "Choose [y|n] to [add leading zeros] on exporting filename's episode counter. E.g., use 01, 02... for 2-digit episodes") {
-            y {$leadCHK="y"; Write-Output "√ enable leading 0s`r`n"; $ldZeros=$qty.ToString().Length}
-            n {$leadCHK="n"; Write-Output "× disable leading 0s`r`n"}
-            default {Write-Output "Bad input, try again"}
-        }
-    } While ($leadCHK -eq "")
-    [string]$zroStr="0"*$ldZeros #Gaining '000' protion for ".ToString('000')" method. $zroStr would be 0 if leading zero feature is deactivated, the calculation still haves but takes no effect
-} else {[string]$zroStr="0"}
 
 #「Bootstrap D」Choose upstream program of file pipe, y4m pipe & ffprobe analysis were both used for info-gathering fallback. Only Step 3 chooses video file to import
 Do {$IMPchk=$fmpgPath=$vprsPath=$avsyPath=$avspPath=""
@@ -100,21 +99,27 @@ $MUXops="b"
 if ($ENCops -eq "a") {
     Read-Host "Press Enter to open a window that locates [path to export temporary MP4 files] (may pop up at rear of current window)`r`nThis is a workaround for ffmpeg denies multiplexing straight from hevc/avc to MKV."
     $fileEXP = whichlocation 
-    Write-Output "√ Selected $fileEXP`r`n"
+    Write-Output "√ 选择的路径为 $fileEXP`r`n"
 
     Do {Switch (Read-Host "Choose [A: Copy from a file | B: Input] as the temporary MP4's filename") {
             a { Write-Output "Opening a selection window to [get filename from a file]"
                 $vidEXP=whereisit
                 $vidEXP=[io.path]::GetFileNameWithoutExtension($vidEXP)
-                $vidEXP+="_$serial" #Comment this out in singular encoding batch mode, variable $serial appends in the loop below
+                if ($mode -eq "m") {$vidEXP+='_$serial'} #!Using single quotes to prevent variable expansion of $serial
                 Write-Output "`r`nIn multi-encode mode, choosing A will add a trailing counter in filename`r`n"
             }
-            b { Do {$vidEXP=Read-Host "`r`nSpecify the filename without extension. Under multi-encode mode, specify episode counter `$serial in desired location`r`n`$serial should be padded from trailing alphabets.`r`nSpace is needed inbetween 2 square brackets e.g., [YYDM-11FANS] [Yuru Yuri 2]`$serial[BDRIP 720P]"
-                $chkme=namecheck($vidEXP)
-                    if (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false)) {Write-Warning "Missing variable `$serial under multi-encode mode; No value entered, Or intercepted illegal characters / | \ < > : ? * `""}
-                } While (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false)) #Multi-encoding only, comment out under single-encode mode
-                #    if (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false)) {Write-Warning "Detecting variable `$serial in single-encode mode; No value entered, Or intercepted illegal characters / | \ < > : ? * `""}
-                #} While (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false)) #Single-encoding only, comment out under multi-encode mode
+            b { if ($mode -eq "m") {#Multi-encoding mode
+                    Do {$vidEXP=Read-Host "`r`nSpecify the filename without extension. Under multi-encode mode, specify episode counter `$serial in desired location`r`n`$serial should be padded from trailing alphabets.`r`nSpace is needed inbetween 2 square brackets e.g., [YYDM-11FANS] [Yuru Yuri 2]`$serial[BDRIP 720P]"
+                        $chkme=namecheck($vidEXP)
+                        if  (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false)) {Write-Warning "Missing variable `$serial under multi-encode mode; No value entered, Or intercepted illegal characters / | \ < > : ? * `""}
+                    } While (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false))
+                }
+                if ($mode -eq "s") {#Single-encoding mode
+                    Do {$vidEXP=Read-Host "`r`nSpecify the filename without extension`r`nSpace is needed inbetween 2 square brackets e.g., [YYDM-11FANS] [Yuru Yuri 2]`$serial[BDRIP 720P]"
+                        $chkme=namecheck($vidEXP)
+                        if  (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false)) {Write-Warning "Detecting variable `$serial in single-encode mode; No value entered, Or intercepted illegal characters / | \ < > : ? * `""}
+                    } While (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false))
+                }
                 #[string]$serial=($s).ToString($zroStr) #Example of parsing leading zeros to $serial. Used in for loop below (supplies variable $s)
                 #$vidEXP=$ExecutionContext.InvokeCommand.ExpandString($vidEXP) #Activating $serial as a variable with expand string method. Used in for loop below
             }
@@ -122,7 +127,6 @@ if ($ENCops -eq "a") {
         }
     } While ($vidEXP -eq "")
     Write-Output "√ Added exporting filename $vidEXP`r`n"
-
     Write-Output "Manually edit option `$MUXops=[a: Write command to export temp-MP4 files (default)`r`n| b: write <A>, but comment it out`r`n| c: write <A> & delete source file after multiplex]`r`n"
     $MUXops="a"
 } #Closing if statement from $ENCops
