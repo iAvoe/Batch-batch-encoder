@@ -110,7 +110,7 @@ if ($IMPchk -eq "d") {
 #「启动G2」SVFI需要的文件
 if ($IMPchk -eq "e") {
     Write-Warning "本程序会生成新的渲染配置ini文件, 其中的target_fps值将会被替换为ffprobe检测源视频的帧数, 目的是将下游x264/5编码器的帧数设置统一起来`r`n但缺点是自定义的插帧设置会失效, 若需插帧则手动修改target_fps及x264/5Par设置的--fps参数."
-    Read-Host "将为SVFI打开[自定渲染配置.ini]的路径选择窗, 可能会在窗口底层弹出.`r`nSteam发布端的路径如 X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini 按Enter继续"
+    Read-Host "`r`n将为SVFI打开[自定渲染配置.ini]的路径选择窗, 可能会在窗口底层弹出.`r`nSteam发布端的路径如 X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini 按Enter继续"
     $olsINI=whereisit
     $INIchk=(Get-ChildItem $olsINI).Extension #检查文件后缀是否为.ini并报错
     if (($INIchk -eq ".ini") -eq $false) {Write-Warning "文件后缀名是 $olsINI 而非 .ini"}
@@ -122,8 +122,11 @@ if ($IMPchk -eq "e") {
 
 #「启动H」四种情况下需要专门导入视频给ffprobe检测: VS(1), AVS(2), 大批量模式(1)
 if (($mode -eq "m") -or (($IMPchk -ne "a") -and ($IMPchk -ne "e"))) {
-    Read-Host "将为ffprobe打开[送检用源视频]的文件选择窗, 因为大批量版下只会导入路径, 而单文件版下ffprobe无法检测.vpy和.avs"
-    $impEXTs=whereisit
+    Do {$continue="n"
+        Read-Host "将为ffprobe打开[送检用源视频]的文件选择窗, 因为大批量版下只会导入路径, 而单文件版下ffprobe无法检测.vpy和.avs"
+        $impEXTs=whereisit
+        if (Read-Host "[确认操作]检查输入的文件是否为视频, 若无误则[输入Y]" -eq "y") {$continue="y"; Write-Output "继续"} else {Write-Output "重试"}
+    } While ($continue -eq "n")
 } else {$impEXTs=$vidIMP}
 Write-Output "√ 将导入视频到ffprobe进行检测: $impEXTs`r`n"
 
@@ -161,7 +164,7 @@ if ($ffprobeCSV.F -eq "unknown") {$avc_mtx="--colormatrix undef"} else {$avc_mtx
 if ($ffprobeCSV.G -eq "unknown") {$avc_tsf="--colormatrix undef"} else {$avc_tsf=$trans_chrctr} #x264: ×--transfer unknown    √--transfer undef
 $fps="--fps "+$ffprobeCSV.H
 $fmpgfps="-r "+$ffprobeCSV.H
-Write-Output "√ 已添加x264参数: $fps $WxH`r`n√ 已添加x265参数: $color_mtx $trans_chrctr $fps $WxH√ 已添加ffmpeg参数: $fmpgfps`r`n"
+Write-Output "√ 已添加x264参数: $fps $WxH`r`n√ 已添加x265参数: $color_mtx $trans_chrctr $fps $WxH`r`n√ 已添加ffmpeg参数: $fmpgfps`r`n"
 
 #「ffprobeC1」自动替换SVFI渲染配置文件的target_fps, 并导出新文件. 唯SVFI线路需要
 if ($IMPchk -eq "e") {

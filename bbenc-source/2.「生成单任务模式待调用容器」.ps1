@@ -1,4 +1,5 @@
 ﻿cls #开发人员的Github: https://github.com/iAvoe
+$mode="s"
 Function namecheck([string]$inName) {
     $badChars = '[{0}]' -f [regex]::Escape(([IO.Path]::GetInvalidFileNameChars() -join ''))
     ForEach ($_ in $badChars) {if ($_ -match $inName) {return $false}}
@@ -70,16 +71,17 @@ $exptPath = whichlocation
 Write-Output "√ 选择的路径为 $exptPath`r`n"
 
 #「启动D」选择pipe上游程序, 同时使用y4m pipe和ffprobe两者来实现冗余/fallback. 步骤2选择上游程序, 步骤3选择片源
-Do {$IMPchk=$fmpgPath=$vprsPath=$avsyPath=$avspPath=""
-    Switch (Read-Host "选择pipe上游程序 [A: ffmpeg | B: vspipe | C: avs2yuv | D: avs2pipemod]") {
+Do {$IMPchk=$fmpgPath=$vprsPath=$avsyPath=$avspPath=$svfiPath=""
+    Switch (Read-Host "选择pipe上游程序 [A: ffmpeg | B: vspipe | C: avs2yuv | D: avs2pipemod | E: SVFI]") {
         a {$IMPchk="a"; Write-Output "`r`n选择了ffmpeg----A线路. 已打开[定位ffmpeg.exe]的选窗"; $fmpgPath=whereisit}
         b {$IMPchk="b"; Write-Output "`r`n选择了vspipe----B线路. 已打开[定位vspipe.exe]的选窗"; $vprsPath=whereisit}
-        c {$IMPchk="c"; Write-Output "`r`n选择了avs2yuv---C线路. 已打开[定位avs2yuv.exe]的选窗"; $avsyPath=whereisit}
+        c {$IMPchk="c"; Write-Output "`r`n选择了avs2yuv---C线路. 已打开[定位avs2yuv.avs]的选窗"; $avsyPath=whereisit}
         d {$IMPchk="d"; Write-Output "`r`n选了avs2pipemod-D线路. 已打开[定位avs2pipemod.exe]的选窗"; $avspPath=whereisit}
+        e {$IMPchk="e"; Write-Output "`r`n选了svfi--------E线路. 已打开[定位one_line_shot_args.exe]的选窗`r`nSteam发布端的路径如 X:\SteamLibrary\steamapps\common\SVFI\one_line_shot_args.exe"; $svfiPath=whereisit}
         default {Write-Output "输入错误, 重试"}
     }
 } While ($IMPchk -eq "")
-$impEXT=$fmpgPath+$vprsPath+$avsyPath+$avspPath
+$impEXT=$fmpgPath+$vprsPath+$avsyPath+$avspPath+$svfiPath
 Write-Output "√ 选择了 $impEXT`r`n"
 
 #「启动E」选择pipe下游程序, x264或x265
@@ -117,7 +119,7 @@ if ($ENCops -eq "a") {
                     } While (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false))
                 }
                 if ($mode -eq "s") {#单文件模式用
-                    Do {$vidEXP=Read-Host "`r`n填写文件名(无后缀), 两个方括号间要隔开. 如[YYDM-11FANS] [Yuru Yuri 2]`$serial[BDRIP 720P]"
+                    Do {$vidEXP=Read-Host "`r`n填写文件名(无后缀), 两个方括号间要隔开. 如 [YYDM-11FANS] [Yuru Yuri 2]01[BDRIP 720P]"
                         $chkme=namecheck($vidEXP)
                         if  (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false)) {Write-Warning "单文件模式下文件名中含变量`$serial; 输入了空值; 或拦截了不可用字符/ | \ < > : ? * `""}
                     } While (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false))
@@ -129,7 +131,7 @@ if ($ENCops -eq "a") {
         }
     } While ($vidEXP -eq "")
     Write-Output "√ 写入了导出文件名 $vidEXP`r`n"
-    Write-Output "手动在脚本中更改`$MUXops=[a: 写入临时封装为MP4的命令 | b: 写入<A>但注释掉 | c: 写入<A>, 并且删除未封装流]`r`n"
+    Write-Output "手动在脚本中更改`$MUXops=[`r`n| a: 写入临时封装为MP4的命令 | b: 写入<A>但注释掉 | c: 写入<A>, 并且删除未封装流]`r`n"
     $MUXops="a"
 } #关闭ENCops的if选项
 

@@ -127,6 +127,15 @@ This level of gatekeeping is a waste of time and efort for people who don't actu
 -----
 
 ## ★Updates / change log
+**v1.1787**
+<ul>
+    <li> √ Eliminated issues created from adopting to if-codeblock-separation (single-enc-mode & multi-enc-mode) for Step 2</li>
+    <li> √ Step 2 has now one the same page with step 3 that supports SVFI. This is a fully functional support, single-sided though</li>
+    <li> √ Fixed a differenciation issue in the prompt-printed example of manual input filename strategy: in single-enc-mode, filename episode counter variable from user input is not needed</li>
+    <li> √ Step 3's ffprobe analysis step now has a new manual error interception feature. This would prevent long-filename-caused file-extension-oversight</li>
+    <li> √ Step 3 has completed some rounds of run tests to make sure hidden issues are discovered and get addressed</li>
+</ul>
+
 **v1.1769**
 <ul>
     <li> √ Reduced coding complexity/difficulty in step 2, 3:<ul>

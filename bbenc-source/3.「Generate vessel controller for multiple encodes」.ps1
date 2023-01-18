@@ -111,7 +111,7 @@ if ($IMPchk -eq "d") {
 #「Bootstrap G2」Importing required config.ini by SVFI. !No frame interpolation in default!
 if ($IMPchk -eq "e") {
     Write-Warning "This script will disable frame interpolation by automatically replcing a line: target_fps=<ffprobe detected fps>`r`This is to make the frames cohesive with encoding fps generated for x264/5. Replace both target_fps & x264/5Par's --fps manually if interpolation is desired."
-    Read-Host "Hit Enter to proceed open a window to [rendering-configuration.ini] for SVFI, it may pop up at rear of current window.`r`nThe path under Steam distro looks like this: X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini"
+    Read-Host "`r`nHit Enter to proceed open a window to [rendering-configuration.ini] for SVFI, it may pop up at rear of current window.`r`ni.e. under Steam distro: X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini"
     $olsINI=whereisit
     $INIchk=(Get-ChildItem $olsINI).Extension #Report error if file extension is not .ini
     if (($INIchk -eq ".ini") -eq $false) {Write-Warning "File extension is $olsINI instead of .ini"}
@@ -123,8 +123,11 @@ if ($IMPchk -eq "e") {
 
 #「Bootstrap H」Importing a video file for ffprobe to check under 4 circs: VS(1) route, AVS(2) routes, multi-encoding mode(1)
 if (($mode -eq "m") -or (($IMPchk -ne "a") -and ($IMPchk -ne "e"))) {
-    Read-Host "Hit Enter to proceed open a window to [import a source video sample] for ffprobe to analyze. This is due to the fact that .vpy, .avs input source are not videos"
-    $impEXTs=whereisit
+    Do {$continue="n"
+        Read-Host "Hit Enter to proceed open a window to [import a source video sample] for ffprobe to analyze. This is due to the fact that .vpy, .avs input source are not videos"
+        $impEXTs=whereisit
+        if (Read-Host "[Confirmation]Assure the input source is video, then [input Y] to continue" -eq "y") {$continue="y"; Write-Output "Continue"} else {Write-Output "Rework"}
+    } While ($continue -eq "n")
 } else {$impEXTs=$vidIMP}
 Write-Output "√ Video file for ffprobe to analyze: $impEXTs`r`n"
 

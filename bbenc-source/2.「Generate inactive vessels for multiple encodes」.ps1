@@ -1,4 +1,5 @@
 ﻿cls #Dev's Github: https://github.com/iAvoe
+$mode="m"
 Function namecheck([string]$inName) {
     $badChars = '[{0}]' -f [regex]::Escape(([IO.Path]::GetInvalidFileNameChars() -join ''))
     ForEach ($_ in $badChars) {if ($_ -match $inName) {return $false}}
@@ -65,22 +66,23 @@ if ($mode -eq "m") {
     } else {[string]$zroStr="0"}
 }
 #「Bootstrap C」Locate path to export batch files
-Read-Host "`r`nPress Enter to open a window that locates [path for exporting batch files], it may pop up at rear of current window."
+Read-Host "`r`nHit Enter to proceed open a window that locates [path for exporting batch files], it may pop up at rear of current window."
 $exptPath = whichlocation
 Write-Output "√ Selected $exptPath`r`n"
 
 #「Bootstrap D」Choose upstream program of file pipe, y4m pipe & ffprobe analysis were both used for info-gathering fallback. Only Step 3 chooses video file to import
 Do {$IMPchk=$fmpgPath=$vprsPath=$avsyPath=$avspPath=""
-    Switch (Read-Host "Choose an upstream pipe program [A: ffmpeg | B: vspipe | C: avs2yuv | D: avs2pipemod]") {
+    Switch (Read-Host "Choose an upstream pipe program [A: ffmpeg | B: vspipe | C: avs2yuv | D: avs2pipemod | E: SVFI]") {
         a {$IMPchk="a"; Write-Output "`r`nSelecting ffmpeg----route A. Opening a selection window to [locate ffmpeg.exe]"; $fmpgPath=whereisit}
         b {$IMPchk="b"; Write-Output "`r`nSelecting vspipe----route B. Opening a selection window to [locate vspipe.exe]"; $vprsPath=whereisit}
         c {$IMPchk="c"; Write-Output "`r`nSelecting avs2yuv---route C. Opening a selection window to [locate avs2yuv.avs]"; $avsyPath=whereisit}
         d {$IMPchk="d"; Write-Output "`r`nSelects avs2pipemod-route D. Opening a selection window to [locate avs2pipemod.exe]"; $avspPath=whereisit}
+        e {$IMPchk="e"; Write-Output "`r`nChoosing svfi-------route E. Opening a selection window to [locate one_line_shot_args.exe]`r`ni.e. under Steam distro: X:\SteamLibrary\steamapps\common\SVFI\one_line_shot_args.exe"; $svfiPath=whereisit}
         default {Write-Warning "Bad input, try again"}
     }
 } While ($IMPchk -eq "")
-$impEXT=$fmpgPath+$vprsPath+$avsyPath+$avspPath
-Write-Output "√ Selected $impEXT`r`n"
+$impEXT=$fmpgPath+$vprsPath+$avsyPath+$avspPath+$svfiPath
+Write-Output "`r`n√ Selected $impEXT`r`n"
 
 #「Bootstrap E」Choose downstream program of file pipe, x264 or x265
 Do {$ENCops=$x265Path=$x264Path=""
@@ -91,13 +93,13 @@ Do {$ENCops=$x265Path=$x264Path=""
     }
 } While ($ENCops -eq "")
 $encEXT=$x265Path+$x264Path
-Write-Output "√ Selected $encEXT`r`n"
+Write-Output "`r`n√ Selected $encEXT`r`n"
 
 #「Bootstrap F」Locate path to export temporary multiplexed MP4 files for x265. x264 usually has libav & therefore filtered by $ENCops. Only Step 3 locates the path to export encoded files
 $MUXops="b"
 [string]$vidEXP=[string]$serial=""
 if ($ENCops -eq "a") {
-    Read-Host "Press Enter to open a window that locates [path to export temporary MP4 files] (may pop up at rear of current window)`r`nThis is a workaround for ffmpeg denies multiplexing straight from hevc/avc to MKV."
+    Read-Host "Hit Enter to proceed open a window that locates [path to export temporary MP4 files] (may pop up at rear of current window)`r`nThis is a workaround for ffmpeg denies multiplexing straight from hevc/avc to MKV."
     $fileEXP = whichlocation 
     Write-Output "√ 选择的路径为 $fileEXP`r`n"
 
@@ -115,7 +117,7 @@ if ($ENCops -eq "a") {
                     } While (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false))
                 }
                 if ($mode -eq "s") {#Single-encoding mode
-                    Do {$vidEXP=Read-Host "`r`nSpecify the filename without extension`r`nSpace is needed inbetween 2 square brackets e.g., [YYDM-11FANS] [Yuru Yuri 2]`$serial[BDRIP 720P]"
+                    Do {$vidEXP=Read-Host "`r`nSpecify the filename without extension`r`nSpace is needed inbetween 2 square brackets e.g., [YYDM-11FANS] [Yuru Yuri 2]01[BDRIP 720P]"
                         $chkme=namecheck($vidEXP)
                         if  (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false)) {Write-Warning "Detecting variable `$serial in single-encode mode; No value entered, Or intercepted illegal characters / | \ < > : ? * `""}
                     } While (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false))
@@ -127,7 +129,7 @@ if ($ENCops -eq "a") {
         }
     } While ($vidEXP -eq "")
     Write-Output "√ Added exporting filename $vidEXP`r`n"
-    Write-Output "Manually edit option `$MUXops=[a: Write command to export temp-MP4 files (default)`r`n| b: write <A>, but comment it out`r`n| c: write <A> & delete source file after multiplex]`r`n"
+    Write-Output "Manually edit option `$MUXops=[`r`n| a: Write command to export temp-MP4 files (default)`r`n| b: write <A>, but comment it out`r`n| c: write <A> & delete source file after multiplex`r`n"
     $MUXops="a"
 } #Closing if statement from $ENCops
 
