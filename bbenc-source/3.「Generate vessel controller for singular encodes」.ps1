@@ -27,6 +27,37 @@ Function whichlocation($startPath='DESKTOP') {
     if (($endPath.SubString($endPath.Length-1) -eq "\") -eq $false) {$endPath+="\"}
     return $endPath
 }
+
+function x265submecalc{ # 24fps=3, 48fps=4, 60fps=5, ++=6
+    Param ([Parameter(Mandatory=$true)]$CSVfps)
+    if     ($CSVfps -lt 25) {return "--subme 3"}
+    elseif ($CSVfps -lt 49) {return "--subme 4"}
+    elseif ($CSVfps -lt 61) {return "--subme 5"}
+    else {return "--subme 6"}
+}
+
+function poolscalc{
+    $allprocs=Get-CimInstance Win32_Processor | Select Availability
+    $DebugPreference="Continue" #Cannot use Write-Output/Host or " " inside a function as it would trigger a value return, modify Write-Debug instead
+    [int]$procNodes=0
+    ForEach ($_ in $allprocs) {if ($_.Availability -eq 3) {$procNodes+=1}} #Only adding processors in normal state, otherwise it counts uninstalled slot as well
+    if ($procNodes -gt 1) {
+        if     ($procNodes -eq 2) {return "--pools +,-"}
+        elseif ($procNodes -eq 4) {return "--pools +,-,-,-"}
+        elseif ($procNodes -eq 6) {return "--pools +,-,-,-,-,-"}
+        elseif ($procNodes -eq 8) {return "--pools +,-,-,-,-,-,-,-"}
+        elseif ($procNodes -gt 8) {Write-Debug "? Detecting an unusal amount of installed processor nodes ($procNodes), add option --pools manually"; return ""} #Cannot use else, otherwise -eq 1 gets accounted for "unusual amount of comp nodes
+    } else {Write-Debug "√ Detected 1 processor is running, avoided adding x265 option --pools"; return ""}
+}
+
+function framescalc{
+    Param ([Parameter(Mandatory=$true)]$fcountCSV, [Parameter(Mandatory=$true)]$fcountAUX)
+    $DebugPreference="Continue" #Cannot use Write-Output/Host or " " inside a function as it would trigger a value return, modify Write-Debug instead
+    if     ($fcountCSV -match "^\d+$") {Write-Debug "√ Detecting MPEGtag total frame-count"; return "--frames "+$fcountCSV}
+    elseif ($fcountAUX -match "^\d+$") {Write-Debug "√ Detecting MKV-tag total frame-count"; return "--frames "+$fcountAUX}
+    else {return ""}
+}
+
 #「@MrNetTek」Use high-DPI rendering, to fix blurry System.Windows.Forms
 Add-Type -TypeDefinition @'
 using System.Runtime.InteropServices;
@@ -157,14 +188,8 @@ Invoke-Expression $parsProbe > "C:\temp_v_info.csv"
 $ffprobeCSV = Import-Csv "C:\temp_v_info.csv" -Header A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,AA
 Remove-Item "C:\temp_v_info.csv" #File is saved to C drive because most Windows PC has only has 1 logical disk
 
-#「ffprobeB3」Filling x265's option --subme <24fps=3, 48fps=4, 60fps=5, ++=6>
-if ($ffprobeCSV.H -lt 61) {
-    $x265subme="--subme 5"
-    if ($ffprobeCSV.H -lt 49) {
-        $x265subme="--subme 4"
-        if ($ffprobeCSV.H -lt 25) {
-            $x265subme="--subme 3"}}
-} else {$x265subme="--subme 6"}
+#「ffprobeB3」Filling x265's option --subme
+$x265subme=x265submecalc -CSVfps $ffprobeCSV.H
 Write-Output "√ Added x265 option: $x265subme"
 
 $WxH="--input-res "+$ffprobeCSV.B+"x"+$ffprobeCSV.C+""
@@ -186,15 +211,9 @@ if ($IMPchk -eq "e") {
     Write-Output  "√ Replaced render config file $olsINI 's target_fps line as $olsfps,`r`n√ New render config file is created as $iniEXP"
 }
 #「ffprobeC2」fetch total frame count with ffprobe, then parse to variable $x265VarA, single-encode mode only
-if ($mode -eq "s") {
-    if ($ffprobeCSV.I -match "^\d+$") {$nbrFrames="--frames "+$ffprobeCSV.I
-        Write-Output "√ Detecting MPEGtag total frames`r`n√ Added x264/5 option: $nbrFrames"
-    } elseif ($ffprobeCSV.AA -match "^\d+$") {$nbrFrames="--frames "+$ffprobeCSV.AA
-        Write-Output "√ Detecting MKV-tag total frames`r`n√ Added x264/5 option: $nbrFrames"
-    } else {
-        Write-Output "× Total frame count tag is missing, Leaving blank on x264/5 option --frames, the drawback is ETA information will be missing during encoding (estimation of finish time)"
-    }
-}
+if ($mode -eq "s") {$nbrFrames=framescalc -fcountCSV $ffprobeCSV.I -fcountAUX $ffprobeCSV.AA}
+if ($nbrFrames -ne "") {Write-Output "√ Added x264/5 option: $nbrFrames"}
+else {Write-Warning "× Total frame count tag is missing, Leaving blank on x264/5 option --frames, the drawback is ETA information will be missing during encoding (estimation of finish time)"}
 
 #「ffprobeD1」fetch colorspace & depth format forffmpeg, VapourSynth, AviSynth, AVS2PipeMod, x264 & x265
 [string]$avsCSP=[string]$avsD=[string]$encCSP=[string]$ffmpegCSP=[string]$encD=$null
@@ -259,7 +278,7 @@ Switch (Read-Host "`r`nChoose how to specify filename of encoding exports [A: Co
 }
 Write-Output "√ Added exporting filename $vidEXP`r`n"
 
-#「BootstrapL, M」1: Specify file extention based on x264/5. 2: For x265, ddd pme/pools based on cpu core count & motherboard node count.
+#「BootstrapL, M」1: Specify file extention based on x264/5. 2: For x265, add pme/pools based on cpu core count & motherboard node count.
 #Extra filtering x265 that usually doesn't come with lavf (cannot export MP4), x264 usually comes with lavf but does not support pme/pools
 if ($ENCops -eq "b") {$vidEXP+=".mp4"}
 elseif ($ENCops -eq "a") {
@@ -270,14 +289,8 @@ elseif ($ENCops -eq "a") {
     [int]$cores=(wmic cpu get NumberOfCores)[2]
     if ($cores -gt 21) {$pme="--pme"; Write-Output "√ Detecting processor's core count reaching 22, added x265 option: --pme"}
 
-    $AllProcs=Get-CimInstance Win32_Processor | Select Availability
-    ForEach ($_ in $AllProcs) {if ($_.Availability -eq 3) {$procNodes+=1}}
-    if     ($procNodes -eq 2) {$pools="--pools +,-"}
-    elseif ($procNodes -eq 4) {$pools="--pools +,-,-,-"}
-    elseif ($procNodes -eq 6) {$pools="--pools +,-,-,-,-,-"}
-    elseif ($procNodes -eq 8) {$pools="--pools +,-,-,-,-,-,-,-"}
-    elseif ($procNodes -gt 8) {Write-Warning "? Detecting an unusal amount of installed processor nodes ($procNodes), please add option --pools manually"} #Cannot use else, otherwise -eq 1 gets accounted for "unusual amount of comp nodes"
-    if ($procNodes -gt 1) {Write-Output "√ Detected $procNodes installed processors, added x265 option: $pools"}
+    $pools=poolscalc
+    if ($pools -ne "") {Write-Output "√ Added x265 option: $pools"}
 }
 
 Set-PSDebug -Strict
@@ -296,9 +309,7 @@ $avsmodParA="`"$apmDLL`" -y4mp" #Note: avs2pipemod uses "| -" instead of other t
 $olsargParA="-c `"$iniEXP`" --pipe-out" #Note: svfi doesn't support y4m pipe
 
 #「Initialize」x265Par-ameters, contains a trailing space
-if ($IMPchk -eq "e") {$y4m=""
-    Write-Output "√ SVFI doesn't support yuv for mpeg pipe, therefore setting x264, x265 to raw pipe format is needed"
-} else {$y4m="--y4m"}
+if ($IMPchk -eq "e") {$y4m=""; Write-Output "√ SVFI doesn't support yuv for mpeg pipe, therefore setting x264, x265 to raw pipe format is needed"} else {$y4m="--y4m"}
 $x265ParA="$encD $x265subme $color_mtx $trans_chrctr $fps $WxH $encCSP $pme $pools --tu-intra-depth 4 --tu-inter-depth 4 --max-tu-size 16 --me umh --merange 48 --weightb --max-merge 4 --early-skip --ref 3 --no-open-gop --min-keyint 5 --keyint 250 --fades --bframes 16 --b-adapt 2 --radl 3 --bframe-bias 20 --constrained-intra --b-intra --crf 22 --crqpoffs -4 --cbqpoffs -2 --ipratio 1.6 --pbratio 1.3 --cu-lossless --tskip --psy-rdoq 2.3 --rdoq-level 2 --hevc-aq --aq-strength 0.9 --qg-size 8 --rd 3 --limit-modes --limit-refs 1 --rskip 1 --rc-lookahead 68 --rect --amp --psy-rd 1.5 --splitrd-skip --rdpenalty 2 --qp-adaptation-range 4 --deblock -1:0 --limit-sao --sao-non-deblock --hash 2 --allow-non-conformance --single-sei $y4m -"
 $x264ParA="$encD $avc_mtx $avc_tsf $fps $WxH $encCSP --me umh --subme 9 --merange 48 --no-fast-pskip --direct auto --weightb --keyint 360 --min-keyint 5 --bframes 12 --b-adapt 2 --ref 3 --rc-lookahead 90 --crf 20 --qpmin 9 --chroma-qp-offset -2 --aq-mode 3 --aq-strength 0.7 --trellis 2 --deblock 0:0 --psy-rd 0.77:0.22 --fgo 10 $y4m -"
 

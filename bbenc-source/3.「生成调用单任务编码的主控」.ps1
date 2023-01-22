@@ -26,6 +26,37 @@ Function whichlocation($startPath='DESKTOP') {
     if (($endPath.SubString($endPath.Length-1) -eq "\") -eq $false) {$endPath+="\"}
     return $endPath
 }
+
+function x265submecalc{ # 24fps=3, 48fps=4, 60fps=5, ++=6
+    Param ([Parameter(Mandatory=$true)]$CSVfps)
+    if     ($CSVfps -lt 25) {return "--subme 3"}
+    elseif ($CSVfps -lt 49) {return "--subme 4"}
+    elseif ($CSVfps -lt 61) {return "--subme 5"}
+    else {return "--subme 6"}
+}
+
+function poolscalc{
+    $allprocs=Get-CimInstance Win32_Processor | Select Availability
+    $DebugPreference="Continue" #Cannot use Write-Output/Host or " " inside a function as it would trigger a value return, modify Write-Debug instead
+    [int]$procNodes=0
+    ForEach ($_ in $allprocs) {if ($_.Availability -eq 3) {$procNodes+=1}} #只添加正常的处理器，否则未安装的槽也算
+    if ($procNodes -gt 1) {
+        if     ($procNodes -eq 2) {return "--pools +,-"}
+        elseif ($procNodes -eq 4) {return "--pools +,-,-,-"}
+        elseif ($procNodes -eq 6) {return "--pools +,-,-,-,-,-"}
+        elseif ($procNodes -eq 8) {return "--pools +,-,-,-,-,-,-,-"}
+        elseif ($procNodes -gt 8) {Write-Debug "？ 检测到安装了超过8颗处理器($procNodes), 需手动填写--pools"; return ""} #不能用else, 否则-eq 1也会被算进去
+    } else {Write-Debug "√ 检测到安装了1颗处理器, 将不会填写--pools"; return ""}
+}
+
+function framescalc{
+    Param ([Parameter(Mandatory=$true)]$fcountCSV, [Parameter(Mandatory=$true)]$fcountAUX)
+    $DebugPreference="Continue" #Cannot use Write-Output/Host or " " inside a function as it would trigger a value return, modify Write-Debug instead
+    if     ($fcountCSV -match "^\d+$") {Write-Debug "√ 检测到MPEGtag视频总帧数"; return "--frames "+$fcountCSV}
+    elseif ($fcountAUX -match "^\d+$") {Write-Debug "√ 检测到MKV-tag视频总帧数"; return "--frames "+$fcountAUX}
+    else {return ""}
+}
+
 #「@MrNetTek」高DPI显示渲染模式的System.Windows.Forms
 Add-Type -TypeDefinition @'
 using System.Runtime.InteropServices;
@@ -147,14 +178,8 @@ Invoke-Expression $parsProbe > "C:\temp_v_info.csv"
 $ffprobeCSV = Import-Csv "C:\temp_v_info.csv" -Header A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,AA
 Remove-Item "C:\temp_v_info.csv" #由于多数Windows系统只有C盘, 所以临时生成CSV在C盘
 
-#「ffprobeB3」根据视频帧数自动填写x265的--subme <24fps=3, 48fps=4, 60fps=5, ++=6>
-if ($ffprobeCSV.H -lt 61) {
-    $x265subme="--subme 5"
-    if ($ffprobeCSV.H -lt 49) {
-        $x265subme="--subme 4"
-        if ($ffprobeCSV.H -lt 25) {
-            $x265subme="--subme 3"}}
-} else {$x265subme="--subme 6"}
+#「ffprobeB3」根据视频帧数自动填写x265的--subme
+$x265subme=x265submecalc -CSVfps $ffprobeCSV.H
 Write-Output "√ 已添加x265参数: $x265subme"
 
 $WxH="--input-res "+$ffprobeCSV.B+"x"+$ffprobeCSV.C+""
@@ -176,15 +201,9 @@ if ($IMPchk -eq "e") {
     Write-Output "√ 已将渲染配置文件 $olsINI 的target_fps行替换为 $olsfps,`r`n√ 新的渲染配置文件已导出为 $iniEXP"
 }
 #「ffprobeC2」ffprobe获取视频总帧数并赋值到$x264/5VarA中, 唯单文件版可用
-if ($mode -eq "s") {
-    if ($ffprobeCSV.I -match "^\d+$") {$nbrFrames="--frames "+$ffprobeCSV.I
-        Write-Output "√ 检测到MPEGtag视频总帧数`r`n√ 已添加x264/5参数: $nbrFrames"
-    } elseif ($ffprobeCSV.AA -match "^\d+$") {$nbrFrames="--frames "+$ffprobeCSV.AA
-        Write-Output "√ 检测到MKV-tag视频总帧数`r`n√ 已添加x264/5参数: $nbrFrames"
-    } else {
-        Write-Output "× 总帧数的数据被删, 将留空x264/5参数--frames, 缺点是不再显示ETA（预计完成时间）"
-    }
-}
+if ($mode -eq "s") {$nbrFrames=framescalc -fcountCSV $ffprobeCSV.I -fcountAUX $ffprobeCSV.AA}
+if ($nbrFrames -ne "") {Write-Output "√ 已添加x264/5参数: $nbrFrames"}
+else {Write-Warning "× 总帧数的数据被删, 将留空x264/5参数--frames, 缺点是不再显示ETA（预计完成时间）"}
 
 #「ffprobeD1」获取色彩空间格式, 给ffmpeg, VapourSynth, AviSynth, AVS2PipeMod, x264和x265赋值
 [string]$avsCSP=[string]$avsD=[string]$encCSP=[string]$ffmpegCSP=[string]$encD=$null
@@ -260,14 +279,8 @@ elseif ($ENCops -eq "a") {
     [int]$cores=(wmic cpu get NumberOfCores)[2]
     if ($cores -gt 21) {$pme="--pme"; Write-Output "√ 检测到处理器核心数达22, 已添加x265参数: --pme"}
 
-    $AllProcs=Get-CimInstance Win32_Processor | Select Availability
-    ForEach ($_ in $AllProcs) {if ($_.Availability -eq 3) {$procNodes+=1}}
-    if     ($procNodes -eq 2) {$pools="--pools +,-"}
-    elseif ($procNodes -eq 4) {$pools="--pools +,-,-,-"}
-    elseif ($procNodes -eq 6) {$pools="--pools +,-,-,-,-,-"}
-    elseif ($procNodes -eq 8) {$pools="--pools +,-,-,-,-,-,-,-"}
-    elseif ($procNodes -gt 8) {Write-Warning "？ 检测到安装了超过8颗处理器($procNodes), 需手动填写--pools"} #不能用else, 否则-eq 1也会被算进去
-    if ($procNodes -gt 1) {Write-Output "√ 检测到安装了 $procNodes 颗处理器, 已添加x265参数: $pools"}
+    $pools=poolscalc
+    if ($pools -ne "") {Write-Output "√ 已添加x265参数: $pools"}
 }
 
 Set-PSDebug -Strict
@@ -284,9 +297,7 @@ $avsmodParA="`"$apmDLL`" -y4mp" #注: avs2pipemod使用"| -"而非其他工具�
 $olsargParA="-c `"$iniEXP`" --pipe-out" #注: svfi不支持y4m pipe格式
 
 #「初始化」x264/5固定参数, 末尾加空格
-if ($IMPchk -eq "e") {$y4m=""
-    Write-Output "√ 由于SVFI不支持yuv for mpeg pipe格式, 所以x264, x265参数设定为使用raw pipe格式"
-} else {$y4m="--y4m"}
+if ($IMPchk -eq "e") {$y4m=""; Write-Output "√ 由于SVFI不支持yuv for mpeg pipe格式, 所以x264, x265参数设定为使用raw pipe格式"} else {$y4m="--y4m"}
 $x265ParA="$encD $x265subme $color_mtx $trans_chrctr $fps $WxH $encCSP $pme $pools --tu-intra-depth 4 --tu-inter-depth 4 --max-tu-size 16 --me umh --merange 48 --weightb --max-merge 4 --early-skip --ref 3 --no-open-gop --min-keyint 5 --keyint 250 --fades --bframes 16 --b-adapt 2 --radl 3 --bframe-bias 20 --constrained-intra --b-intra --crf 22 --crqpoffs -4 --cbqpoffs -2 --ipratio 1.6 --pbratio 1.3 --cu-lossless --tskip --psy-rdoq 2.3 --rdoq-level 2 --hevc-aq --aq-strength 0.9 --qg-size 8 --rd 3 --limit-modes --limit-refs 1 --rskip 1 --rc-lookahead 68 --rect --amp --psy-rd 1.5 --splitrd-skip --rdpenalty 2 --qp-adaptation-range 4 --deblock -1:0 --limit-sao --sao-non-deblock --hash 2 --allow-non-conformance --single-sei $y4m -"
 $x264ParA="$encD $avc_mtx $avc_tsf $fps $WxH $encCSP --me umh --subme 9 --merange 48 --no-fast-pskip --direct auto --weightb --keyint 360 --min-keyint 5 --bframes 12 --b-adapt 2 --ref 3 --rc-lookahead 90 --crf 20 --qpmin 9 --chroma-qp-offset -2 --aq-mode 3 --aq-strength 0.7 --trellis 2 --deblock 0:0 --psy-rd 0.77:0.22 --fgo 10 $y4m -"
 

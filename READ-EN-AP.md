@@ -15,8 +15,8 @@
  - Developed Encoder+Controller (enc-ctrl) batch layout, which greatly simplfies large-volume tasks' commandline
  - Simply follow the script's guide & supply the correct information
  - The script is natually uncompiled,which makes debugging & adding features to be quick & easy
- - The encoding steps supports 4 upstream pipe programs (ffmpeg, vspipe, avs2yuv, avs2pipemod)
-   - as well as 2 downstream  programs (x264, x265), in total of 8 different routes
+ - The encoding steps supports 5 upstream pipe programs (ffmpeg, vspipe, avs2yuv, avs2pipemod, svfi)
+   - as well as 2 downstream  programs (x264, x265), in total of 10 different routes
 
 ![S1-4.png](S1-4.png)
 
@@ -127,6 +127,11 @@ This level of gatekeeping is a waste of time and efort for people who don't actu
 -----
 
 ## ★Updates / change log
+**v1.1788**
+<ul>
+    <li> √ Step 3 now has x265 --subme，--pools，--frames generation codes rewrote into functions, this makes working with main code easier, no changes in features' side</li>
+</ul>
+
 **v1.1787**
 <ul>
     <li> √ Eliminated issues created from adopting to if-codeblock-separation (single-enc-mode & multi-enc-mode) for Step 2</li>
