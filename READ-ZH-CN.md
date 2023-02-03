@@ -37,9 +37,10 @@
 
 ## ▲怎么用
  1. Windows 11 下确保安装了对应文件名语言的语言包. 如要处理阿拉伯语的文件名就去`设置 --> 时间和语言 -->[左栏] 语言 --> 添加语言 --> 阿拉伯语`. Windows10 下不需要
- 2. 打开PowerShell, 运行`Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope CurrentUser`以解除运行脚本的限制. 若不知道是否已开启则运行`Get-ExecutionPolicy`来检查
+ 2. 打开PowerShell, 运行`Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope CurrentUser`以解除运行PS脚本的限制
+    - 若不知道是否已开启则运行`Get-ExecutionPolicy`来检查
     - 添加到域的公司或公用电脑需要以管理员权限运行PowerShell
-    - 如果不是自己的电脑，记得用完脚本后运行`Set-ExecutionPolicy -ExecutionPolicy Restricted -Scope CurrentUser`以改回原本的限制
+    - 由于PS脚本可执行如删除注册表的高危操作，所以记得在公用电脑上用完脚本后运行`Set-ExecutionPolicy -ExecutionPolicy Restricted -Scope CurrentUser`以改回限制
  3. 解压下载好的压缩包
     - 步骤2生成待调用的编码批处理零件，由步骤3生成的主控批处理组装和调用
     - 步骤5是专门处理视频封装的批处理生成工具，可以单独拎出来用
@@ -128,9 +129,11 @@
 总之在编辑调试器这一点上如果没有开发调试 Python 的需求，确实会浪费时间精力；反过来系统自带的 PowerShell ISE 在性能，易用性，需要专门设置，学习上手的项目少，更适合一般用户
 
 ## ★更新信息
-**v1.1788**
+**v1.1789**
 <ul>
     <li> √ 步骤3将x265 --subme，--pools，--frames的参数值计算/生成重写为函数代码， 降低了本体代码的复杂度，功能上不变</li>
+    <li> √ 由于有人漏看了关闭PS解除运行限制的步骤，所以将其添加到了工作流的步骤中</li>
+    <li> √ 步骤 1 增加了在多种情况下都应该能万无一失关闭用户账户控制的方案</li>
 </ul>
 
 **v1.1787**

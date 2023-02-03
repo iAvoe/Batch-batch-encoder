@@ -36,9 +36,10 @@
 
 ## ▲How to run
  1. Makesure language-pack corresponds to foreign-UTF8-filename is installed under Windows 11. E.g., to actually handle arabic filenames, go to `Settings --> Time & Language -->[Left pane] Languages --> Add a language --> Arabic`. This isn't mandatory on Windows 10
- 2. Start a PowerShell instance, execute `Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope CurrentUser` to remove policy restriction on running scripts. Check whether the restriction is lifted with `Get-ExecutionPolicy`
-    - Corporate/public workstations requires administrator priviledge to start PowerShell
-    - If you don't own this PC, remember to set the restriction back-on with `Set-ExecutionPolicy -ExecutionPolicy Restricted -Scope CurrentUser`
+ 2. Start a PowerShell instance, execute `Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope CurrentUser` to remove run-restriction on PSScripts
+    - Check whether the restriction is lifted with `Get-ExecutionPolicy`
+    - Corporate/public workstations requires admin priviledge to run PowerShell
+    - Due to OS destructive ops such as registry deletion can be done with PSscript, please set the restriction back with `Set-ExecutionPolicy -ExecutionPolicy Restricted -Scope CurrentUser` on a public PC
  3. Unzip downloaded files
     - Step 2 generates a batch file that works as part(s)/component(s) to be assembled & activated by step 3's generated batch - the controlleris
     - Step 5 is a ffmpeg-based dedicated video multiplexing/container commandline generator, it works independently
@@ -127,9 +128,11 @@ This level of gatekeeping is a waste of time and efort for people who don't actu
 -----
 
 ## ★Updates / change log
-**v1.1788**
+**v1.1789**
 <ul>
     <li> √ Step 3 now has x265 --subme，--pools，--frames generation codes rewrote into functions, this makes working with main code easier, no changes in features' side</li>
+    <li> √ Due to proven ignorance of disable PSScript running restriction caused failure to run this workflow, this step has been added to Step 1 instructions</li>
+    <li> √ Step 1 now has a new feature to disable/restore Windows UAC successfully in many possible subpar conditions</li>
 </ul>
 
 **v1.1787**
