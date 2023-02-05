@@ -27,17 +27,41 @@ Function whichlocation($startPath='DESKTOP') {
     return $endPath
 }
 
-function x265submecalc{ # 24fps=3, 48fps=4, 60fps=5, ++=6
+Function hevcparwrapper {
+    Param ([Parameter(Mandatory=$true)]$PICKops)
+    Switch ($PICKops) {
+        a {return "--tu-intra-depth 3 --tu-inter-depth 3 --limit-tu 1 --rdpenalty 1 --me umh --merange 48 --weightb--ref 3 --max-merge 3 --early-skip --no-open-gop --min-keyint 5 --fades --bframes 8 --b-adapt 2 --radl 3 --b-intra --constrained-intra --crf 21 --crqpoffs -3 --crqpoffs -1 --rdoq-level 2 --aq-mode 4 --aq-strength 0.8 --rd 3 --limit-modes --limit-refs 1 --rskip 3 --tskip-fast --rect --amp --psy-rd 1 --splitrd-skip --qp-adaptation-range 4 --limit-sao --sao-non-deblock --deblock 0:-1 --hash 2 --allow-non-conformance"} #generalPurpose
+        b {return "--tu-intra-depth 4 --tu-inter-depth 4 --limit-tu 1 --me star --merange 48 --weightb --ref 3 --max-merge 4 --no-open-gop --min-keyint 3 --keyint 310 --fades --bframes 8 --b-adapt 2 --radl 3 --constrained-intra --b-intra --crf 21.8 --qpmin 8 --crqpoffs -3 --ipratio 1.2 --pbratio 1.5 --rdoq-level 2 --aq-mode 4 --qg-size 8 --rd 3 --limit-refs 0 --rskip 0 --rect --amp --psy-rd 1.6 --deblock 0:0 --limit-sao --sao-non-deblock --selective-sao 3 --hash 2 --allow-non-conformance"} #filmCustom
+        c {return "--tu-intra-depth 4 --tu-inter-depth 4 --limit-tu 1 --me star --merange 48 --weightb --ref 3 --max-merge 4 --no-open-gop --min-keyint 3 --fades --bframes 8 --b-adapt 2 --radl 3 --constrained-intra --b-intra --crf 21.8 --qpmin 8 --crqpoffs -3 --ipratio 1.2 --pbratio 1.5 --rdoq-level 2 --aq-mode 4 --aq-strength 1 --qg-size 8 --rd 3 --limit-refs 0 --rskip 0 --rect --amp --psy-rd 1 --qp-adaptation-range 3 --deblock 0:-1 --limit-sao --sao-non-deblock --selective-sao 3 --hash 2 --allow-non-conformance"} #stockFootag
+        d {return "--tu-intra-depth 4 --tu-inter-depth 4 --max-tu-size 16 --me umh --merange 48 --weightb --max-merge 4 --early-skip --ref 3 --no-open-gop --min-keyint 5 --fades --bframes 16 --b-adapt 2 --radl 3 --bframe-bias 20 --constrained-intra --b-intra --crf 22 --crqpoffs -4 --cbqpoffs -2 --ipratio 1.6 --pbratio 1.3 --cu-lossless --tskip --psy-rdoq 2.3 --rdoq-level 2 --hevc-aq --aq-strength 0.9 --qg-size 8 --rd 3 --limit-modes --limit-refs 1 --rskip 1 --rect --amp --psy-rd 1.5 --splitrd-skip --rdpenalty 2 --qp-adaptation-range 4 --deblock -1:0 --limit-sao --sao-non-deblock --hash 2 --allow-non-conformance --single-sei"} #animeFansubCustom
+        e {return "--tu-intra-depth 4 --tu-inter-depth 4 --max-tu-size 4 --limit-tu 1 --me star --merange 52 --analyze-src-pics --weightb --max-merge 4 --ref 3 --no-open-gop --min-keyint 1 --fades --bframes 16 --b-adapt 2 --radl 2 --b-intra --crf 17 --crqpoffs -5 --cbqpoffs -2 --ipratio 1.67 --pbratio 1.33 --cu-lossless --psy-rdoq 2.5 --rdoq-level 2 --hevc-aq --aq-strength 1.4 --qg-size 8 --rd 5 --limit-refs 0 --rskip 0 --rect --amp --no-cutree --psy-rd 1.5 --rdpenalty 2 --qp-adaptation-range 5 --deblock -2:-2 --limit-sao --sao-non-deblock --selective-sao 1 --hash 2 --allow-non-conformance"} #animeBDRipColdwar
+    }
+}
+
+Function avcparwrapper {
+    Param ([Parameter(Mandatory=$true)]$PICKops)
+    Switch ($PICKops) {
+        a {return "--me umh --merange 48 --no-fast-pskip --direct auto --weightb --min-keyint 5 --bframes 12 --b-adapt 2 --ref 3 --crf 19 --qpmin 9 --chroma-qp-offset -2 --aq-mode 3 --aq-strength 0.9 --trellis 2 --deblock0:-1 --psy-rd 0.6:1.1"} #generalPurpose
+        b {return "--me umh --merange 48 --no-fast-pskip --direct auto --weightb --min-keyint 1 --bframes 12 --b-adapt 2 --ref 3 --sliced-threads --crf 17 --tune grain --trellis 2"} #stockFootage
+    }
+}
+
+Function x265submecalc{ # 24fps=3, 48fps=4, 60fps=5, ++=6
     Param ([Parameter(Mandatory=$true)]$CSVfps)
-    if     ($CSVfps -lt 25) {return "--subme 3"}
-    elseif ($CSVfps -lt 49) {return "--subme 4"}
-    elseif ($CSVfps -lt 61) {return "--subme 5"}
+    if     ((Invoke-Expression $CSVfps) -lt 25) {return "--subme 3"}
+    elseif ((Invoke-Expression $CSVfps) -lt 49) {return "--subme 4"}
+    elseif ((Invoke-Expression $CSVfps) -lt 61) {return "--subme 5"}
     else {return "--subme 6"}
 }
 
-function poolscalc{
+Function keyintcalc{ # fps×9
+    Param ([Parameter(Mandatory=$true)]$CSVfps)
+    try {return "--keyint "+[math]::Round((Invoke-Expression $CSVfps)*9)} catch {return "--keyint 249"} #故意设定稀有值以同时方便debug和常用
+}
+
+Function poolscalc{
     $allprocs=Get-CimInstance Win32_Processor | Select Availability
-    $DebugPreference="Continue" #Cannot use Write-Output/Host or " " inside a function as it would trigger a value return, modify Write-Debug instead
+    $DebugPreference="Continue" #Cannot use Write-Output/Host or " " inside a Function as it would trigger a value return, modify Write-Debug instead
     [int]$procNodes=0
     ForEach ($_ in $allprocs) {if ($_.Availability -eq 3) {$procNodes+=1}} #只添加正常的处理器，否则未安装的槽也算
     if ($procNodes -gt 1) {
@@ -49,9 +73,9 @@ function poolscalc{
     } else {Write-Debug "√ 检测到安装了1颗处理器, 将不会填写--pools"; return ""}
 }
 
-function framescalc{
+Function framescalc{
     Param ([Parameter(Mandatory=$true)]$fcountCSV, [Parameter(Mandatory=$true)]$fcountAUX)
-    $DebugPreference="Continue" #Cannot use Write-Output/Host or " " inside a function as it would trigger a value return, modify Write-Debug instead
+    $DebugPreference="Continue" #Cannot use Write-Output/Host or " " inside a Function as it would trigger a value return, modify Write-Debug instead
     if     ($fcountCSV -match "^\d+$") {Write-Debug "√ 检测到MPEGtag视频总帧数"; return "--frames "+$fcountCSV}
     elseif ($fcountAUX -match "^\d+$") {Write-Debug "√ 检测到MKV-tag视频总帧数"; return "--frames "+$fcountAUX}
     else {return ""}
@@ -112,7 +136,7 @@ Do {$IMPchk=$vidIMP=$vpyIMP=$avsIMP=$apmIMP=""
 
 #「启动F1」整合并反馈选取的路径/文件
 $impEXTs=$vidIMP+$vpyIMP+$avsIMP+$apmIMP
-if ($mode -eq "m") {Write-Output "`r`n√ 选择的路径为 $impEXTs`r`n"}
+if ($mode -eq "m") {Write-Output "`r`n√ 选择的路径为 $impEXTm`r`n"}
 if ($mode -eq "s") {Write-Output "`r`n√ 选择的文件为 $impEXTs`r`n"
     if (($impEXTs -eq "") -eq $true) {Write-Error "× 没有导入任何文件"; pause; exit}
     else {#「启动F2」单文件模式下生成默认导出文件名, 而需获取文件名与后缀的方法. 由于变量污染问题摒弃了Get-ChildItem
@@ -136,7 +160,7 @@ if ($IMPchk -eq "d") {
     Write-Output "√ 已添加avs2pipemod参数: $apmDLL`r`n"
 } else {
     $apmDLL="X:\Somewhere\avisynth.dll"
-    Write-Output "未选择Avs2pipemod线路, AVS动态链接库路径将临时设为 $apmDLL`r`n"
+    Write-Output "未选择Avs2pipemod线路, AVS动态链接库路径将临时设为 $apmDLL"
 }
 #「启动G2」SVFI需要的文件
 if ($IMPchk -eq "e") {
@@ -148,15 +172,15 @@ if ($IMPchk -eq "e") {
     Write-Output "√ 已添加SVFI参数: $olsINI`r`n"
 } else {
     $olsINI="X:\Somewhere\SVFI-render-customize.ini"
-    Write-Output "未选择SVFI线路, 配置文件路径将临时设为 $olsINI`r`n"
+    Write-Output "未选择SVFI线路, 配置文件路径将临时设为 $olsINI"
 }
 
 #「启动H」四种情况下需要专门导入视频给ffprobe检测: VS(1), AVS(2), 大批量模式(1)
 if (($mode -eq "m") -or (($IMPchk -ne "a") -and ($IMPchk -ne "e"))) {
     Do {$continue="n"
-        Read-Host "将为ffprobe打开[送检用源视频]的文件选择窗, 因为大批量版下只会导入路径, 而单文件版下ffprobe无法检测.vpy和.avs"
+        Read-Host "`r`n将为ffprobe打开[送检用源视频]的文件选择窗, 因为大批量版下只会导入路径, 而单文件版下ffprobe无法检测.vpy和.avs; 按Enter继续..."
         $impEXTs=whereisit
-        if (Read-Host "[确认操作]检查输入的文件是否为视频, 若无误则[输入Y]" -eq "y") {$continue="y"; Write-Output "继续"} else {Write-Output "重试"}
+        if ((Read-Host "[检查]输入的文件 $impEXTs 是否为视频 [Y: 确认操作 | N: 更换源]") -eq "y") {$continue="y"; Write-Output "继续"} else {Write-Output "重试"}
     } While ($continue -eq "n")
 } else {$impEXTs=$vidIMP}
 Write-Output "√ 将导入视频到ffprobe进行检测: $impEXTs`r`n"
@@ -182,6 +206,10 @@ Remove-Item "C:\temp_v_info.csv" #由于多数Windows系统只有C盘, 所以临
 $x265subme=x265submecalc -CSVfps $ffprobeCSV.H
 Write-Output "√ 已添加x265参数: $x265subme"
 
+#「ffprobeB4」根据视频帧数自动填写x265, x264的--keyint
+$keyint=keyintcalc -CSVfps $ffprobeCSV.H
+Write-Output "√ 已添加x264/5参数: $keyint"
+
 $WxH="--input-res "+$ffprobeCSV.B+"x"+$ffprobeCSV.C+""
 $color_mtx="--colormatrix "+$ffprobeCSV.F
 $trans_chrctr="--transfer "+$ffprobeCSV.G
@@ -199,7 +227,8 @@ if ($IMPchk -eq "e") {
     $iniTgt=$iniCxt | Select-String target_fps | Select-Object -ExpandProperty Line
     $iniCxt | ForEach-Object {$_ -replace $iniTgt,$olsfps}>$iniEXP
     Write-Output "√ 已将渲染配置文件 $olsINI 的target_fps行替换为 $olsfps,`r`n√ 新的渲染配置文件已导出为 $iniEXP"
-}
+} else {$iniEXP=$olsINI}
+
 #「ffprobeC2」ffprobe获取视频总帧数并赋值到$x264/5VarA中, 唯单文件版可用
 if ($mode -eq "s") {$nbrFrames=framescalc -fcountCSV $ffprobeCSV.I -fcountAUX $ffprobeCSV.AA}
 if ($nbrFrames -ne "") {Write-Output "√ 已添加x264/5参数: $nbrFrames"}
@@ -269,19 +298,49 @@ Switch (Read-Host "`r`n选择导出压制结果的文件名. 注意PowerShell默
 }
 Write-Output "√ 写入了导出文件名 $vidEXP`r`n"
 
-#「启动L, M」1: 根据选择x264/5来决定输出.hevc/.mp4. 2: x265下据cpu核心数量, 节点数量添加pme/pools. x265一般不自带lavf(不支持导出MP4), x264一般带lavf但不支持pme和pools
-if ($ENCops -eq "b") {$vidEXP+=".mp4"}
+#「启动L, M」1: 根据选择x264/5来决定输出.hevc/.mp4. 2: x265下据cpu核心数量, 节点数量添加pme/pools
+if ($ENCops -eq "b") {
+    $nameIn+=".mp4"
+    Do {$PICKops=$x264ParWrap=""
+        Switch (Read-Host "选择x264压制参数预设 [A: 高画质高压缩 | B: 剪辑素材存档]") {
+            a {$x264ParWrap=avcparwrapper -PICKops "a"; Write-Output "`r`n√ 选择了高画质高压缩预设"}
+            b {$x264ParWrap=avcparwrapper -PICKops "b"; Write-Output "`r`n√ 选择了剪辑素材存档预设"}
+            default {Write-Warning "输入错误, 重试"}
+        }
+    } While ($x264ParWrap -eq "")
+    Write-Output "√ 已定义x264压制参数: $x264ParWrap"
+}
 elseif ($ENCops -eq "a") {
-    $vidEXP+=".hevc"
+    $nameIn+=".hevc"
     $pme=$pool=""
     $procNodes=0
-    
     [int]$cores=(wmic cpu get NumberOfCores)[2]
     if ($cores -gt 21) {$pme="--pme"; Write-Output "√ 检测到处理器核心数达22, 已添加x265参数: --pme"}
 
     $pools=poolscalc
     if ($pools -ne "") {Write-Output "√ 已添加x265参数: $pools"}
+
+    Do {$PICKops=$x265ParWrap=""
+        Switch (Read-Host "`r`n选择x265压制参数预设 [A: 通用-自定义 | B: 高压-录像 | C: 剪辑素材存档 | D: 高压-动漫字幕组 | E: HEDT-动漫BDRip冷战]") {
+            a {$x265ParWrap=hevcparwrapper -PICKops "a"; Write-Output "`r`n√ 选择了通用-自定义预设"}
+            b {$x265ParWrap=hevcparwrapper -PICKops "b"; Write-Output "`r`n√ 选择了高压-录像预设"}
+            c {$x265ParWrap=hevcparwrapper -PICKops "c"; Write-Output "`r`n√ 选择了剪辑素材存档预设"}
+            d {$x265ParWrap=hevcparwrapper -PICKops "d"; Write-Output "`r`n√ 选择了高压-动漫字幕组预设"}
+            e {$x265ParWrap=hevcparwrapper -PICKops "e"; Write-Output "`r`n√ 选择了HEDT-动漫BDRip冷战预设"}
+            default {Write-Warning "输入错误, 重试"}
+        }
+    } While ($x265ParWrap -eq "")
+    Write-Output "√ 已定义x265压制参数: $x265ParWrap"
 }
+
+#「启动N」如果使用了支持Film grain optimization的x264, 则开启
+#Do {$x264fgo=$FGOops=""
+#    Switch (Read-Host "选择x264 [A: 是 | B: 否] 支持基于高频信号量的率失真优化策略 (--fgo参数/Film grain optimization)注: AVC标准外") {
+#        a {$FGOops="A";Write-Output "`r`n修改率失真优化策略"; $x264fgo="--fgo 15"}
+#        b {$FGOops="B";Write-Output "`r`n保持率失真优化策略"; $x264fgo=""}
+#        default {Write-Warning "输入错误, 重试"}
+#    }
+#} While ($FGOops -eq "")
 
 Set-PSDebug -Strict
 $utf8NoBOM=New-Object System.Text.UTF8Encoding $false #导出utf-8NoBOM文本编码用
@@ -296,10 +355,12 @@ $avsyuvParA="$avsCSP $avsD"
 $avsmodParA="`"$apmDLL`" -y4mp" #注: avs2pipemod使用"| -"而非其他工具的"- | -"pipe参数(左侧无"-"). y4mp, y4mt, y4mb代表逐行, 上场优先隔行, 下场优先隔行. 为了降低代码复杂度所以不做隔行
 $olsargParA="-c `"$iniEXP`" --pipe-out" #注: svfi不支持y4m pipe格式
 
-#「初始化」x264/5固定参数, 末尾加空格
+#「初始化」x264/5固定参数
 if ($IMPchk -eq "e") {$y4m=""; Write-Output "√ 由于SVFI不支持yuv for mpeg pipe格式, 所以x264, x265参数设定为使用raw pipe格式"} else {$y4m="--y4m"}
-$x265ParA="$encD $x265subme $color_mtx $trans_chrctr $fps $WxH $encCSP $pme $pools --tu-intra-depth 4 --tu-inter-depth 4 --max-tu-size 16 --me umh --merange 48 --weightb --max-merge 4 --early-skip --ref 3 --no-open-gop --min-keyint 5 --keyint 250 --fades --bframes 16 --b-adapt 2 --radl 3 --bframe-bias 20 --constrained-intra --b-intra --crf 22 --crqpoffs -4 --cbqpoffs -2 --ipratio 1.6 --pbratio 1.3 --cu-lossless --tskip --psy-rdoq 2.3 --rdoq-level 2 --hevc-aq --aq-strength 0.9 --qg-size 8 --rd 3 --limit-modes --limit-refs 1 --rskip 1 --rc-lookahead 68 --rect --amp --psy-rd 1.5 --splitrd-skip --rdpenalty 2 --qp-adaptation-range 4 --deblock -1:0 --limit-sao --sao-non-deblock --hash 2 --allow-non-conformance --single-sei $y4m -"
-$x264ParA="$encD $avc_mtx $avc_tsf $fps $WxH $encCSP --me umh --subme 9 --merange 48 --no-fast-pskip --direct auto --weightb --keyint 360 --min-keyint 5 --bframes 12 --b-adapt 2 --ref 3 --rc-lookahead 90 --crf 20 --qpmin 9 --chroma-qp-offset -2 --aq-mode 3 --aq-strength 0.7 --trellis 2 --deblock 0:0 --psy-rd 0.77:0.22 --fgo 10 $y4m -"
+$x265ParA="$encD $x265subme $color_mtx $trans_chrctr $fps $WxH $encCSP $pme $pools $keyint $x265ParWrap $y4m -"
+$x264ParA="$encD $avc_mtx $avc_tsf $fps $WxH $encCSP $keyint $x264ParWrap $y4m -"
+$x265ParA=$x265ParA -replace "  ", " " #由于某些情况下只能生成空的参数变量, 所以会导致双空格出现, 但保留也不影响运行
+$x264ParA=$x264ParA -replace "  ", " "
 
 #「初始化」ffmpeg, vspipe, avs2yuv, avs2pipemod, one_line_shot_args变化参数, 大批量版需要单独计算每个视频的文件名所以不能直接赋值
 if ($mode -eq "s") {

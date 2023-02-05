@@ -36,7 +36,7 @@
 -----
 
 ## ▲怎么用
- 1. Windows 11 下确保安装了对应文件名语言的语言包. 如要处理阿拉伯语的文件名就去`设置 --> 时间和语言 -->[左栏] 语言 --> 添加语言 --> 阿拉伯语`. Windows10 下不需要
+ 1. Windows 11 下确保安装了对应〔文件名语言〕的语言包. 如要处理阿拉伯语的文件名就去`设置 --> 时间和语言 -->[左栏] 语言 --> 添加语言 --> 阿拉伯语`. Windows10 下不需要
  2. 打开PowerShell, 运行`Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope CurrentUser`以解除运行PS脚本的限制
     - 若不知道是否已开启则运行`Get-ExecutionPolicy`来检查
     - 添加到域的公司或公用电脑需要以管理员权限运行PowerShell
@@ -129,6 +129,20 @@
 总之在编辑调试器这一点上如果没有开发调试 Python 的需求，确实会浪费时间精力；反过来系统自带的 PowerShell ISE 在性能，易用性，需要专门设置，学习上手的项目少，更适合一般用户
 
 ## ★更新信息
+**v1.1836**
+<ul>
+    <li> √ 步骤 3:<ul>
+        <li> √ 修复了一处交互(prompt)文本错误</li>
+        <li> √ 进行了交互文本易读性的整理和优化</li>
+        <li> √ 现已支持选择[x264急用版教程](https://github.com/iAvoe/x264-x265-copypaste-tutorial-with-obs-record-setting)中的2种参数预设</li>
+        <li> √ 现已支持选择[x265急用版教程](https://github.com/iAvoe/x264-x265-copypaste-tutorial-with-obs-record-setting)中的5种参数预设</li>
+        <li> √ 强化了自动计算subme参数的反炒面能力（鲁棒性）</li>
+        <li> √ 参数构建步骤增加了消除因空变量导致双空格的功能，虽然不影响功能</li>
+        <li> √ 修复了一处未选择上游时临时ini路径变量传递断开的问题，虽然不影响功能</li>
+        <li> √ 现已实现自动为x264，x265填写--keyint参数的能力，值为 ROUND(fps×9)</li></ul>
+    </li>
+</ul>
+
 **v1.1789**
 <ul>
     <li> √ 步骤3将x265 --subme，--pools，--frames的参数值计算/生成重写为函数代码， 降低了本体代码的复杂度，功能上不变</li>

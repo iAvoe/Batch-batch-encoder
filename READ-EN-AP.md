@@ -128,6 +128,20 @@ This level of gatekeeping is a waste of time and efort for people who don't actu
 -----
 
 ## ★Updates / change log
+**v1.1836**
+<ul>
+    <li> √ Step 3:<ul>
+        <li> √ Fixed a prompt string from using wrong variable</li>
+        <li> √ Enhancement of prompt readability was made</li>
+        <li> √ Now supports 2 custom x264 presets from [x264-5 copypaste ready presets' repo](https://github.com/iAvoe/x264-x265-copypaste-tutorial-with-obs-record-setting)</li>
+        <li> √ Now supports 5 custom x265 presets (General-purpose, HC-film, ST-footage, HC-AnimeFS, HEDT-ABC) from [x264-5 copypaste ready presets' repo](https://github.com/iAvoe/x264-x265-copypaste-tutorial-with-obs-record-setting)</li>
+        <li> √ Enhanced robustness of function to calculate --subme option of x265</li>
+        <li> √ Added a double space removal step in parameter assembly (result of impossible to generate parameter caused empty variable), this problem doesn't affet usage, though</li>
+        <li> √ Fixed a variable-relay broken problem for SVFI's temporary .ini config-file path when unpicked, this problem doesn't affect usage, though</li>
+        <li> √ Now supports auto-filling of --keyint option for x264 & x265, as ROUND(fps×9)</li></ul>
+    </li>
+</ul>
+
 **v1.1789**
 <ul>
     <li> √ Step 3 now has x265 --subme，--pools，--frames generation codes rewrote into functions, this makes working with main code easier, no changes in features' side</li>
