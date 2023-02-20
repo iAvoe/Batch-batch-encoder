@@ -66,6 +66,8 @@ Apdx β: <a href='https://nazorip.site/archives/169/'>ffprobe stream media probi
 
 ε: Download x264,  x265: <a href='http://www.mediafire.com/?6lfp2jlygogwa'>LigH (x265)</a>、
 <a href='https://www.mediafire.com/?bxvu1vvld31k1'>LigH (x264)</a>、
+<a href='https://github.com/jpsdr/x264/releases'>jspdr (x264 tMod)</a>、
+<a href='https://github.com/jpsdr/x265/releases'>jspdr (x265 auto-aq Mod)</a>、
 <a href='https://drive.google.com/drive/u/0/folders/0BzA4dIFteM2dWEpvWGZXV3ZhdTA'>Rigaya (x265)</a>、
 <a href='https://www.mediafire.com/folder/arv5xmdqyiczc'>Patman (x264 x265)</a>、
 <a href='https://github.com/DJATOM/x265-aMod/releases'>DJATOM (x265)</a>、
