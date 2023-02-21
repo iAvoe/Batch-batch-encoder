@@ -1,4 +1,4 @@
-# PowerShell+CMD-batch based multiple/single encoding/multiplexing scripts suite
+# Heavyduty PSScript+Batch based encoding & multiplexing scripts that works in singular & multiple file mode, & includes custom x264, x265 presets, & simple to use!
 
 ## ☆Environment prerequsities
 
