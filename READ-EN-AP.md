@@ -36,10 +36,8 @@
 
 ## ▲How to run
  1. Makesure language-pack corresponds to foreign-UTF8-filename is installed under Windows 11. E.g., to actually handle arabic filenames, go to `Settings --> Time & Language -->[Left pane] Languages --> Add a language --> Arabic`. This isn't mandatory on Windows 10
- 2. Start a PowerShell instance, execute `Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope CurrentUser` to remove run-restriction on PSScripts
-    - Check whether the restriction is lifted with `Get-ExecutionPolicy`
-    - Corporate/public workstations requires admin priviledge to run PowerShell
-    - Due to OS destructive ops such as registry deletion can be done with PSscript, please set the restriction back with `Set-ExecutionPolicy -ExecutionPolicy Restricted -Scope CurrentUser` on a public PC
+ 2. Lift PSScript running restriction under Settings-->Update & Security-->For Developers:
+ ![bbenc-ttl5en.png](bbenc-ttl5en.png)
  3. Unzip downloaded files
     - Step 2 generates a batch file that works as part(s)/component(s) to be assembled & activated by step 3's generated batch - the controlleris
     - Step 5 is a ffmpeg-based dedicated video multiplexing/container commandline generator, it works independently
