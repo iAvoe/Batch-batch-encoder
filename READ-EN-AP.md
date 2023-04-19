@@ -96,6 +96,9 @@ Apdx β: <a href='https://nazorip.site/archives/169/'>ffprobe stream media probi
  - Pass array to string variable after loop finishes: ` [string]$MtlnString=$StrArray `
  - `` `n `` enables the line switching, but also creates a space start from the 2nd line: ` $MtlnString=$MtlnString -replace " some", "some" `
 
+**ffmpeg raw-hevc-to-MKV restriction**
+ - This socfgmrnugyew restriction made this project so much more difficult to code
+
 -----
 
 ## ☆At what cost?
@@ -128,6 +131,20 @@ This level of gatekeeping is a waste of time and efort for people who don't actu
 -----
 
 ## ★Updates / change log
+**v1.1840**
+<ul>
+    <li> √ Step 2:<ul>
+        <li> √ Added a workaround-step skipping switch for non-MKV containers in later steps... by rebuilding some codes</li>
+        <li> √ Fixed some formatting errors with Error, Warning, Switch-Read and more types of prompt messages</li>
+        <li> √ Now fully supports SVFI</li>
+        <li> √ Added a REM print to explain what does xxxVar do in the generated batch</li></ul>
+    </li>
+    <li> √ Step 3: Removed x265 option --single-sei for better end compatibility</li>
+    <li> √ Step 3: Changed AnimeBDRipColdWar commandline preset for usecase widening</li>
+    <li> √ Step 1: Fixed an issue in UAC operation success/fail determation script's wording</li>
+    <li> √ Step 2-3: Improved file/path selection functions: re-open the selection GUI when user hits cancel on error, otherwise by design this script would fail and should be terminated</li>
+</ul>
+
 **v1.1836**
 <ul>
     <li> √ Step 3:<ul>
