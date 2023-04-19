@@ -89,7 +89,7 @@ Do {$ENCops=$x265Path=$x264Path=""
     Switch (Read-Host "Choose a downstream pipe program [A: x265/hevc | B: x264/avc]") {
         a {$ENCops="a"; Write-Output "`r`nSelecting x265--route A. Opening a selection window to [locate x265.exe]"; $x265Path=whereisit}
         b {$ENCops="b"; Write-Output "`r`nSelecting x264--route B. Opening a selection window to [locate x264.exe]"; $x264Path=whereisit}
-        default {Write-Output "Bad input, try again"}
+        default {Write-Output "× Bad input, try again"}
     }
 } While ($ENCops -eq "")
 $encEXT=$x265Path+$x264Path
@@ -98,12 +98,19 @@ Write-Output "`r`n√ Selected $encEXT`r`n"
 [string]$MUXwrt=[string]$tempGen=[string]$sChar=""
 
 #「Bootstrap F」Locate path to export temporary multiplexed MP4 files for x265. x264 usually has libav & therefore filtered by $ENCops. Only Step 3 locates the path to export encoded files
-$MUXops="b"
-[string]$vidEXP=[string]$serial=""
+[string]$vidEXP=[string]$serial=[string]$MUXplan=""
+
 if ($ENCops -eq "a") {
-    Read-Host "Hit Enter to proceed open a window that locates [path to export temporary MP4 files] (may pop up at rear of current window)`r`nThis is a workaround for ffmpeg denies multiplexing straight from hevc/avc to MKV."
+    Do {Switch (Read-Host "Select [ A: I'm planning to use MKV container format later (Start a hevc-to-MKV workaround process for ffmpeg by generating temporary MP4 files)`r`n | B: I'm not planning to use MKV format later ]") {
+            a {$MUXplan="a"} b {$MUXplan="b"; $MUXops="c"} Default {Write-Warning "`r`n × Bad input, please try again"}
+        }#MUXops C: Print commented-out version of MUXwrt A
+    } While ($MUXplan -eq "")
+}
+
+if ($MUXplan -eq "a") {
+    Read-Host "Hit Enter to proceed open a window that locates [path to export temporary MP4 files]...`r`nThis selection window might pop up at rear of current PowerShell instance"
     $fileEXP = whichlocation 
-    Write-Output "√ 选择的路径为 $fileEXP`r`n"
+    Write-Output "√ Selected $fileEXP`r`n"
 
     Do {Switch (Read-Host "Choose [A: Copy from a file | B: Input] as the temporary MP4's filename") {
             a { Write-Output "Opening a selection window to [get filename from a file]"
@@ -127,11 +134,11 @@ if ($ENCops -eq "a") {
                 #[string]$serial=($s).ToString($zroStr) #Example of parsing leading zeros to $serial. Used in for loop below (supplies variable $s)
                 #$vidEXP=$ExecutionContext.InvokeCommand.ExpandString($vidEXP) #Activating $serial as a variable with expand string method. Used in for loop below
             }
-            default {Write-Output "Bad input, try again`r`n"}
+            default {Write-Warning "× Bad input, try again`r`n"}
         }
     } While ($vidEXP -eq "")
     Write-Output "√ Added exporting filename $vidEXP`r`n"
-    Write-Output "Manually edit option `$MUXops=[`r`n| a: Write command to export temp-MP4 files (default)`r`n| b: write <A>, but comment it out`r`n| c: write <A> & delete source file after multiplex]`r`n"
+    Write-Output "Note: you can manually edit option `$MUXops=[`r`n| a: Write command to export temp-MP4 files (default)`r`n| b: write <A> & delete source file after multiplex`r`n| c: write <A>, but comment it out (automatically selected when workaround is skipped)`r`n"
     $MUXops="a"
 } #Closing if statement from $ENCops
 
@@ -145,17 +152,18 @@ if ($ENCops -eq "a") {$ENCwrt="$impEXT %ffmpegVarA% %ffmpegParA% - | $x265Path %
 elseif ($ENCops -eq "b") {$ENCwrt="$impEXT %ffmpegVarA% %ffmpegParA% - | $x264Path %x264ParA% %x264VarA%"}
 else {Write-Error "× Failure: missing selection of video encoding program"; pause; exit}
 
-if ($MUXops -eq "a") {$MUXwrt="$impEXT %ffmpegVarA% %ffmpegParB% `"$fileEXP$tempMuxOut`"
-::del `"$fileEXP$tempEncOut`""}
-elseif ($MUXops -eq "b") {$MUXwrt="::$impEXT %ffmpegVarA% %ffmpegParB% `"$fileEXP$tempMuxOut`"
-::del `"$fileEXP$tempEncOut`""}
-elseif ($MUXops -eq "c") {$MUXwrt="$impEXT %ffmpegVarA% %ffmpegParB% `"$fileEXP$tempMuxOut`"
-del `"$fileEXP$tempEncOut`""}
+if ($MUXops -eq "a") {$MUXwrt="$impEXT %ffmpegVarA% %ffmpegParB% `"$fileEXP$tempEncOut`"
+::del `"$fileEXP$tempMuxOut`""}
+elseif ($MUXops -eq "b") {$MUXwrt="$impEXT %ffmpegVarA% %ffmpegParB% `"$fileEXP$tempEncOut`"
+del `"$fileEXP$tempMuxOut`""}
+elseif ($MUXops -eq "c") {$MUXwrt="::$impEXT %ffmpegVarA% %ffmpegParB% `"$fileEXP$tempEncOut`"
+::del `"$fileEXP$tempMuxOut`""}
+else {Write-Error "× Script broken: bad `$MUXops value"; pause; exit}
 
 #[string]$banner=[string]$cVO=[string]$fVO=[string]$xVO=[string]$aVO=""
 [string]$trueExpPath="" #trueExpPath is the actual variable used to export temporary MP4s, to not write "+"s into exporting files, as $exptPath cannot be connecting to enc_ without a "+"
 
-Switch ($IMPchk) { a {
+Switch ($IMPchk) { a { #ffmpeg
 
     Write-Output "  Generating enc_0S.bat"
 
@@ -174,10 +182,11 @@ REM @echo %x264VarA%
 REM pause
 
 REM 「Encode」Comment out during debugging
+REM Var is used to specify dynamic values such as input-output and tuned-by-source options
 
 "+$ENCwrt+"
 
-REM 「Temp-MP4-mux」Works with x265 (downstream of pipe)
+REM 「Temp-MP4-mux」Works with x265 (pipe downstream)
 
 "+$MUXwrt+"
 
@@ -189,11 +198,7 @@ if %ERRORLEVEL%==3 cmd /k
 if %ERRORLEVEL%==2 pause
 if %ERRORLEVEL%==1 endlocal && exit /b"
 
-    $trueExpPath=$exptPath+"enc_0S.bat" #Another variable assignment is needed to not write "+"s into exporting files, as $exptPath cannot be connecting to enc_ without a +
-    #Out-File -InputObject $enc_gen -FilePath $trueExpPath -Encoding utf8
-    [IO.File]::WriteAllLines($trueExpPath, $enc_gen, $utf8NoBOM) #Force exporting utf-8NoBOM text codec
-
-} b {
+} b { #vspipe
     
     Write-Output "  Generating enc_0S.bat"
     
@@ -212,6 +217,7 @@ REM @echo %x264VarA%
 REM pause
 
 REM 「Encode」Comment out during debugging
+REM Var is used to specify dynamic values such as input-output and tuned-by-source options
 
 "+$ENCwrt+"
 
@@ -227,11 +233,7 @@ if %ERRORLEVEL%==3 cmd /k
 if %ERRORLEVEL%==2 pause
 if %ERRORLEVEL%==1 endlocal && exit /b"
 
-    $trueExpPath=$exptPath+"enc_0S.bat" #Another variable assignment is needed to not write "+"s into exporting files, as $exptPath cannot be connecting to enc_ without a +
-    #Out-File -InputObject $enc_gen -FilePath $trueExpPath -Encoding utf8
-    [IO.File]::WriteAllLines($trueExpPath, $enc_gen, $utf8NoBOM) #Force exporting utf-8NoBOM text codec
-
-} c {
+} c { #avs2yuv
 
     Write-Output "`r`nGenerating enc_0S.bat"
     
@@ -250,6 +252,7 @@ REM @echo %x264VarA%
 REM pause
 
 REM 「Encode」Comment out during debugging
+REM Var is used to specify dynamic values such as input-output and tuned-by-source options
 
 "+$ENCwrt+"
 
@@ -265,11 +268,7 @@ if %ERRORLEVEL%==3 cmd /k
 if %ERRORLEVEL%==2 pause
 if %ERRORLEVEL%==1 endlocal && exit /b"
 
-    $trueExpPath=$exptPath+"enc_0S.bat" #Another variable assignment is needed to not write "+"s into exporting files, as $exptPath cannot be connecting to enc_ without a +
-    #Out-File -InputObject $enc_gen -FilePath $trueExpPath -Encoding utf8
-    [IO.File]::WriteAllLines($trueExpPath, $enc_gen, $utf8NoBOM) #Force exporting utf-8NoBOM text codec
-
-} d {
+} d { #avs2pipemod
     
     Write-Output "  Generating enc_0S.bat"
     
@@ -288,6 +287,7 @@ REM @echo %x264VarA%
 REM pause
 
 REM 「Encode」Comment out during debugging
+REM Var is used to specify dynamic values such as input-output and tuned-by-source options
 
 "+$ENCwrt+"
 
@@ -303,11 +303,47 @@ if %ERRORLEVEL%==3 cmd /k
 if %ERRORLEVEL%==2 pause
 if %ERRORLEVEL%==1 endlocal && exit /b"
 
-    $trueExpPath=$exptPath+"enc_0S.bat" #Another variable assignment is needed to not write "+"s into exporting files, as $exptPath cannot be connecting to enc_ without a +
-    #Out-File -InputObject $enc_gen -FilePath $trueExpPath -Encoding utf8
-    [IO.File]::WriteAllLines($trueExpPath, $enc_gen, $utf8NoBOM) #Force exporting utf-8NoBOM text codec
+} e { #SVFI
+    
+    Write-Output "  Generating enc_0S.bat"
+    
+    $enc_gen="REM 「Title」
+
+@echo.
+@echo -----------Starting encode 001-----------
+
+REM 「Debug」Comment out during normal usage
+REM @echo %olsargParA%
+REM @echo %olsargVarA%
+REM @echo %x265ParA%
+REM @echo %x265VarA%
+REM @echo %x264ParA%
+REM @echo %x264VarA%
+REM pause
+
+REM 「Encode」Comment out during debugging
+REM Var is used to specify dynamic values such as input-output and tuned-by-source options
+
+"+$ENCwrt+"
+
+REM 「Temp-MP4-mux」Works with x265 (downstream of pipe)
+
+"+$MUXwrt+"
+
+REM Choose「y:Continue/n:Pause/z:END」Continuing after 5s sleep, false input are blocked by choice statement, pause allows continue.
+
+choice /C YNZ /T 5 /D Y /M `" Continue? (Sleep=5; Default: Y, Pause: N, Stop: Z)`"
+
+if %ERRORLEVEL%==3 cmd /k
+if %ERRORLEVEL%==2 pause
+if %ERRORLEVEL%==1 endlocal && exit /b"
+
     }#Closing Switch selection
 }#Closing Switch statement
+
+$trueExpPath=$exptPath+"enc_0S.bat" #Another variable assignment is needed to not write "+"s into exporting files, as $exptPath cannot be connecting to enc_ without a +
+#Out-File -InputObject $enc_gen -FilePath $trueExpPath -Encoding utf8
+[IO.File]::WriteAllLines($trueExpPath, $enc_gen, $utf8NoBOM) #Force exporting utf-8NoBOM text codec
 
 Write-Output "Task completed"
 pause
