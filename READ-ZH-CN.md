@@ -59,13 +59,13 @@
 3: <a href='https://pan.baidu.com/s/1jAXn066e6K7vSfUd5zJEcg'>百度云, 提取码 hevc</a>, 
 4: QQ群存档: <a href='https://jq.qq.com/?_wv=1027&k=5YJFXyf'>691892901</a><br>
 
-附录α: <a href='https://www.nazorip.site/archives/44/'>QAAC音频压缩教程</a>或<a href='https://github.com/iAvoe/QAAC-Tutorial-Standalone/blob/master/%E6%95%99%E7%A8%8B.md'>Github</a><br>
+附录α: <a href='https://www.nazorip.site/archives/44/'>QAAC音频压缩教程</a> 或 <a href='https://github.com/iAvoe/QAAC-Tutorial-Standalone/blob/master/%E6%95%99%E7%A8%8B.md'>Github</a><br>
 
-附录β: <a href='https://nazorip.site/archives/169/'>ffprobe视频探针教程</a>或<a href='https://github.com/iAvoe/FFprobe-Tutorial-Standalone/blob/master/教程.md'>Github</a><br>
+附录β: <a href='https://nazorip.site/archives/169/'>ffprobe视频探针教程</a> 或 <a href='https://github.com/iAvoe/FFprobe-Tutorial-Standalone/blob/master/教程.md'>Github</a><br>
 
 附录γ: <a href='https://nazorip.site/archives/334/'>x264，libx264，x265，libx265，libkvazzar，OBS 急用版压制教程</a>或<a href='https://github.com/iAvoe/x264-x265-copypaste-tutorial-with-obs-record-setting/blob/master/教程.md'>Github</a><br>
 
-δ: 下载ffmpeg, ffprobe: <a href='http://ffmpeg.org/download.html'>官方</a>或<a href='https://ottverse.com/ffmpeg-builds'>Ottverse</a><br>
+δ: 下载ffmpeg, ffprobe: <a href='http://ffmpeg.org/download.html'>官方</a> 或 <a href='https://ottverse.com/ffmpeg-builds'>Ottverse</a><br>
 
 ε: 下载 x264/5: <a href='http://www.mediafire.com/?6lfp2jlygogwa'>LigH (x265)</a>、
 <a href='https://www.mediafire.com/?bxvu1vvld31k1'>LigH (x264)</a>、

@@ -56,11 +56,11 @@
 1: <a href='./bbenc-source'>Github directlink</a>, 
 2: <a href='https://drive.google.com/drive/folders/170tmk7yJBIz5eJuy7KXzqIgtvtDajyDu?usp=sharing'>Google drive</a>
 
-Apdx α: <a href='https://www.nazorip.site/archives/44/'>QAAC audio encoder tutorial</a>OR<a href='https://github.com/iAvoe/QAAC-Tutorial-Standalone/blob/master/%E6%95%99%E7%A8%8B.md'>Github</a> (chromium/firefox-plugin webpage translation is required)<br>
+Apdx α: <a href='https://www.nazorip.site/archives/44/'>QAAC audio encoder tutorial</a> or <a href='https://github.com/iAvoe/QAAC-Tutorial-Standalone/blob/master/%E6%95%99%E7%A8%8B.md'>Github</a> (chromium/firefox-plugin webpage translation is required)<br>
 
-Apdx β: <a href='https://nazorip.site/archives/169/'>ffprobe stream media probing tutorial</a>OR<a href='https://github.com/iAvoe/FFprobe-Tutorial-Standalone/blob/master/教程.md'>Github</a> (chromium/firefox-plugin webpage translation is required)<br>
+Apdx β: <a href='https://nazorip.site/archives/169/'>ffprobe stream media probing tutorial</a> or <a href='https://github.com/iAvoe/FFprobe-Tutorial-Standalone/blob/master/教程.md'>Github</a> (chromium/firefox-plugin webpage translation is required)<br>
 
-δ: Download ffmpeg, ffprobe: <a href='http://ffmpeg.org/download.html'>official builds</a>OR<a href='https://ottverse.com/ffmpeg-builds'>Ottverse builds</a><br>
+δ: Download ffmpeg, ffprobe: <a href='http://ffmpeg.org/download.html'>official builds</a> or <a href='https://ottverse.com/ffmpeg-builds'>Ottverse builds</a><br>
 
 ε: Download x264,  x265: <a href='http://www.mediafire.com/?6lfp2jlygogwa'>LigH (x265)</a>、
 <a href='https://www.mediafire.com/?bxvu1vvld31k1'>LigH (x264)</a>、
