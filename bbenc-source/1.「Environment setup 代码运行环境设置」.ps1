@@ -126,10 +126,10 @@ if ($procNodes -gt 1) {Write-Output "√ Detected $procNodes installed processor
 
 Write-Warning "`r`n接下来的操作会更改注册表/The following operation involves registry value alteration"
 Do {Switch (Read-Host "`r`n「User Access Control」由于每次运行PowerShell脚本都会弹出用户账户控制警告，选择/Each time running PSscripts would panic UAC, select:`r`n`r`n[A: 关闭/Disable UAC | B: 不更改/Don't make changes | C: 恢复(公用电脑)/Restore UAC (public computers)]") {
-        a {$UACops=1; Write-Output "`r`nLowering UAC level.../正在降低用户账户控制通知级别..."; $uacc=loweruaclvl} #UAC_ON=1, UAC_OFF=0
-        c {$UACops=3; Write-Output "`r`nRestoring UAC level.../正在恢复用户账户控制通知级别..."; $uacc=raiseuaclvl} #UAC_ON=1, UAC_OFF=0
-        b {$UACops=2; Write-Output "`r`nSkipped/已跳过!"}
-        default {$UACops=0; Write-Output "输入错误, 重试"}
+        a {$UACops=1; Write-Output "`r`nLowering UAC level...`r`n正在降低用户账户控制通知级别..."; $uacc=loweruaclvl} #UAC_ON=1, UAC_OFF=0
+        c {$UACops=3; Write-Output "`r`nRestoring UAC level...`r`n正在恢复用户账户控制通知级别..."; $uacc=raiseuaclvl} #UAC_ON=1, UAC_OFF=0
+        b {$UACops=2; Write-Output "`r`nSkipped`r`n已跳过!"}
+        default {$UACops=0; Write-Output " × Bad input`r`n × 输入错误, 重试"}
     }
 } While ($UACops -eq 0)
 
@@ -138,8 +138,8 @@ if     ($UACreg.EnableLUA -eq 1) {Write-Output "`r`nUAC is currently ON. `r`n用
 elseif ($UACreg.EnableLUA -eq 0) {Write-Output "`r`nUAC is currently OFF.`r`n用户账户控制通知目前已关闭."}
 
 if ($uacc -eq $UACreg.EnableLUA) {#确认用户账户控制返回结果$uacc与注册表符合. Cross referencing registry for UAC on/off status, to make sure $uacc works
-    if     (($UACops -eq 1) -and ($uacc -eq 1)) {Write-Warning "`r`nFailed to lower UAC level. Please type UAC in Start menu, and lower the warning manually...`r`n关闭用户账户控制通知失败. 请在开始菜单输入UAC，然后手动降低警告阈限."}
-    elseif (($UACops -eq 3) -and ($uacc -eq 0)) {Write-Warning "`r`nRestore UAC level failed.  Please type UAC in Start menu, and raise the warning manually...`r`n恢复用户账户控制通知失败. 请在开始菜单输入UAC，然后手动提高警告阈限."}
-} else {Write-Warning "`r`nFailed to determine UAC level. Please type UAC in Start menu, and raise/lower the warning manually `r`n获取用户账户控制通知状态失败. 请在开始菜单输入UAC，然后手动提高/降低警告阈限."}
+    if     (($UACops -eq 1) -and ($uacc -eq 1)) {Write-Warning "`r`n × Failed to lower UAC level. Please type UAC in Start menu, and lower the warning manually...`r`n关闭用户账户控制通知失败. 请在开始菜单输入UAC，然后手动降低警告阈限."}
+    elseif (($UACops -eq 3) -and ($uacc -eq 0)) {Write-Warning "`r`n × Restore UAC level failed.  Please type UAC in Start menu, and raise the warning manually...`r`n恢复用户账户控制通知失败. 请在开始菜单输入UAC，然后手动提高警告阈限."}
+} else {Write-Warning "`r`nNo operations were made, result check is skipped. `r`n未进行操作, 已跳过检测操作结果返回步骤."}
 
 pause
