@@ -12,20 +12,22 @@ Function whereisit($startPath='DESKTOP') {
     [void] [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") 
     Add-Type -AssemblyName System.Windows.Forms
     $startPath = New-Object System.Windows.Forms.OpenFileDialog -Property @{ InitialDirectory = [Environment]::GetFolderPath($startPath) } #GUI交互窗锁定到桌面文件夹
-    if ($startPath.ShowDialog() -eq "OK") {[string]$endPath = $startPath.FileName} #打开选择文件的GUI交互窗, 用if拦截误操作
-    return $endPath
+    Do {$dInput = $startPath.ShowDialog()} While ($dInput -eq "Cancel") #打开选择文件的GUI交互窗, 通过重新打开选择窗来反取消用户的取消操作
+    return $startPath.FileName
 }
 
 Function whichlocation($startPath='DESKTOP') {
-    #启用System.Windows.Forms选择文件夹的GUI交互窗
+    #启用System.Windows.Forms选择文件夹的GUI交互窗, 通过SelectedPath将GUI交互窗锁定到桌面文件夹, 效果一般
     Add-Type -AssemblyName System.Windows.Forms
-    $startPath = New-Object System.Windows.Forms.FolderBrowserDialog -Property @{ SelectedPath = [Environment]::GetFolderPath($startPath) } #GUI交互窗锁定到桌面文件夹
-    #打开选择文件的GUI交互窗, 用if拦截误操作
-    if ($startPath.ShowDialog() -eq "OK") {[string]$endPath = $startPath.SelectedPath}
+    $startPath = New-Object System.Windows.Forms.FolderBrowserDialog -Property @{ Description="选择路径用的窗口. 拖拽边角可放大以便操作"; SelectedPath=[Environment]::GetFolderPath($startPath); RootFolder='MyComputer'; ShowNewFolderButton=$true }
+    #打开选择文件的GUI交互窗, 用Do-While循环拦截误操作（取消/关闭选择窗）
+    Do {$dInput = $startPath.ShowDialog()} While ($dInput -eq "Cancel") 
     #由于选择根目录时路径变量含"\", 而文件夹时路径变量缺"\", 所以要自动判断并补上
-    if (($endPath.SubString($endPath.Length-1) -eq "\") -eq $false) {$endPath+="\"}
-    return $endPath
+    if (($startPath.SelectedPath.SubString($startPath.SelectedPath.Length-1) -eq "\") -eq $false) {$startPath.SelectedPath+="\"}
+    return $startPath.SelectedPath
 }
+
+
 #3合1大型函数, 分流了甲: 封装文件, 乙: 特殊封装, 丙: 单文件流. 甲-乙用ffprobe测, 丙用GetExtension测, 拦截无关的文件格式, 最终以多线并发的方法生成ffmpeg的-map ?:?, -c:? copy命令
 Function addcopy {
     Param ([Parameter(Mandatory=$true)]$fprbPath, [Parameter(Mandatory=$true)]$StrmPath, [Parameter(Mandatory=$true)]$mapQTY,[Parameter(Mandatory=$true)]$vcopy)

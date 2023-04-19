@@ -11,19 +11,19 @@ Function whereisit($startPath='DESKTOP') {
     [void] [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") 
     Add-Type -AssemblyName System.Windows.Forms
     $startPath = New-Object System.Windows.Forms.OpenFileDialog -Property @{ InitialDirectory = [Environment]::GetFolderPath($startPath) } #Starting path set to Desktop
-    if ($startPath.ShowDialog() -eq "OK") {[string]$endPath = $startPath.FileName} #Killing failed inputs with if statement
-    return $endPath
+    Do {$dInput = $startPath.ShowDialog()} While ($dInput -eq "Cancel") #Opens a file selection window, un-cancel cancelled user inputs (close/cancel button) by reopening selection window again
+    return $startPath.FileName
 }
 
 Function whichlocation($startPath='DESKTOP') {
     #Opens a System.Windows.Forms GUI to pick a folder/path/dir
     Add-Type -AssemblyName System.Windows.Forms
     $startPath = New-Object System.Windows.Forms.FolderBrowserDialog -Property @{ Description="Select a directory. Drag bottom corner to enlarge for convenience"; SelectedPath=[Environment]::GetFolderPath($startPath); RootFolder='MyComputer'; ShowNewFolderButton=$true }
-    #Intercepting failed inputs with if statement
-    if ($startPath.ShowDialog() -eq "OK") {[string]$endPath = $startPath.SelectedPath}
+    #Intercepting failed inputs (user presses close/cancel button) with Do-While looping
+    Do {$dInput = $startPath.ShowDialog()} While ($dInput -eq "Cancel") #Opens a path selection window
     #Root directory always have a "\" in return, whereas a folder/path/dir doesn't. Therefore an if statement is used to add "\" when needed, but comment out under single-encode mode
-    if (($endPath.SubString($endPath.Length-1) -eq "\") -eq $false) {$endPath+="\"}
-    return $endPath
+    if (($startPath.SelectedPath.SubString($startPath.SelectedPath.Length-1) -eq "\") -eq $false) {$startPath.SelectedPath+="\"}
+    return $startPath.SelectedPath
 }
 
 #「@MrNetTek」Use high-DPI rendering, to fix blurry System.Windows.Forms

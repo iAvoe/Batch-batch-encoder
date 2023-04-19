@@ -12,20 +12,21 @@ Function whereisit($startPath='DESKTOP') {
     [void] [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") 
     Add-Type -AssemblyName System.Windows.Forms
     $startPath = New-Object System.Windows.Forms.OpenFileDialog -Property @{ InitialDirectory = [Environment]::GetFolderPath($startPath) } #Starting path set to Desktop
-    if ($startPath.ShowDialog() -eq "OK") {[string]$endPath = $startPath.FileName} #Killing failed inputs with if statement
-    return $endPath
+    Do {$dInput = $startPath.ShowDialog()} While ($dInput -eq "Cancel") #Opens a file selection window, un-cancel cancelled user inputs (close/cancel button) by reopening selection window again
+    return $startPath.FileName
 }
 
 Function whichlocation($startPath='DESKTOP') {
     #Opens a System.Windows.Forms GUI to pick a folder/path/dir
     Add-Type -AssemblyName System.Windows.Forms
-    $startPath = New-Object System.Windows.Forms.FolderBrowserDialog -Property @{ SelectedPath = [Environment]::GetFolderPath($startPath) } #Starting path set to Desktop
-    #Intercepting failed inputs with if statement
-    if ($startPath.ShowDialog() -eq "OK") {[string]$endPath = $startPath.SelectedPath}
-    #Root directory always have a "\" in return, whereas a folder/path/dir doesn't. Therefore an if statement is used to add "\" when needed
-    if (($endPath.SubString($endPath.Length-1) -eq "\") -eq $false) {$endPath+="\"}
-    return $endPath
+    $startPath = New-Object System.Windows.Forms.FolderBrowserDialog -Property @{ Description="Select a directory. Drag bottom corner to enlarge for convenience"; SelectedPath=[Environment]::GetFolderPath($startPath); RootFolder='MyComputer'; ShowNewFolderButton=$true }
+    #Intercepting failed inputs (user presses close/cancel button) with Do-While looping
+    Do {$dInput = $startPath.ShowDialog()} While ($dInput -eq "Cancel") #Opens a path selection window
+    #Root directory always have a "\" in return, whereas a folder/path/dir doesn't. Therefore an if statement is used to add "\" when needed, but comment out under single-encode mode
+    if (($startPath.SelectedPath.SubString($startPath.SelectedPath.Length-1) -eq "\") -eq $false) {$startPath.SelectedPath+="\"}
+    return $startPath.SelectedPath
 }
+
 #3-in-1 large function, diverted input file to α: multiplexed file, β: non-std multiplexed file, γ: demultiplexed stream. Detect α, β with ffprobe, γ with GetExtension. Stop on error for irrevelant file types;finally generate all the required ffmpeg -map ?:? & -c:? copy options in a multicasting fashion
 Function addcopy {
     Param ([Parameter(Mandatory=$true)]$fprbPath, [Parameter(Mandatory=$true)]$StrmPath, [Parameter(Mandatory=$true)]$mapQTY,[Parameter(Mandatory=$true)]$vcopy)

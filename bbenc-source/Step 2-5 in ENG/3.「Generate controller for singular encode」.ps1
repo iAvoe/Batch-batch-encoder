@@ -1,31 +1,30 @@
 ﻿cls #「Bootstrap -」Multi-encode methods require users to manually add importing filenames
-Read-Host "[Multiple encoding mode] only specifies the path to import files to encode, which require manually adding filenames into generated controller batch`r`nx264 usually comes with lavf, unlike x265, therefore x265 usually exports .hevc raw-streams instead of .mp4. Press Enter to proceed"
-$mode="m"
-#Function namecheck([string]$inName) {
-#    $badChars = '[{0}]' -f [regex]::Escape(([IO.Path]::GetInvalidFileNameChars() -join ''))
-#    ForEach ($_ in $badChars) {if ($_ -match $inName) {return $false}}
-#    return $true
-#} #Checking if input filename compliants to Windows file naming scheme, only required by single encoding mode
+Read-Host "[Single encoding mode] Multiple encoding mode only specifies the path to import files to encode, therefore manually adding files into generated controller batch is needed`r`nx264 usually comes with lavf, unlike x265, therefore x265 usually exports .hevc raw-streams instead of .mp4. Press Enter to proceed"
+$mode="s"
+Function namecheck([string]$inName) {
+    $badChars = '[{0}]' -f [regex]::Escape(([IO.Path]::GetInvalidFileNameChars() -join ''))
+    ForEach ($_ in $badChars) {if ($_ -match $inName) {return $false}}
+    return $true
+} #Checking if input filename compliants to Windows file naming scheme, only required by single encoding mode
 
 Function whereisit($startPath='DESKTOP') {
     #Opens a System.Windows.Forms GUI to pick a file
     [void] [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") 
     Add-Type -AssemblyName System.Windows.Forms
     $startPath = New-Object System.Windows.Forms.OpenFileDialog -Property @{ InitialDirectory = [Environment]::GetFolderPath($startPath) } #Starting path set to Desktop
-    #Intercepting failed inputs with if statement
-    if ($startPath.ShowDialog() -eq "OK") {[string]$endPath = $startPath.FileName}
-    return $endPath
+    Do {$dInput = $startPath.ShowDialog()} While ($dInput -eq "Cancel") #Opens a file selection window, un-cancel cancelled user inputs (close/cancel button) by reopening selection window again
+    return $startPath.FileName
 }
 
 Function whichlocation($startPath='DESKTOP') {
     #Opens a System.Windows.Forms GUI to pick a folder/path/dir
     Add-Type -AssemblyName System.Windows.Forms
     $startPath = New-Object System.Windows.Forms.FolderBrowserDialog -Property @{ Description="Select a directory. Drag bottom corner to enlarge for convenience"; SelectedPath=[Environment]::GetFolderPath($startPath); RootFolder='MyComputer'; ShowNewFolderButton=$true }
-    #Intercepting failed inputs with if statement
-    if ($startPath.ShowDialog() -eq "OK") {[string]$endPath = $startPath.SelectedPath}
+    #Intercepting failed inputs (user presses close/cancel button) with Do-While looping
+    Do {$dInput = $startPath.ShowDialog()} While ($dInput -eq "Cancel") #Opens a path selection window
     #Root directory always have a "\" in return, whereas a folder/path/dir doesn't. Therefore an if statement is used to add "\" when needed, but comment out under single-encode mode
-    if (($endPath.SubString($endPath.Length-1) -eq "\") -eq $false) {$endPath+="\"}
-    return $endPath
+    if (($startPath.SelectedPath.SubString($startPath.SelectedPath.Length-1) -eq "\") -eq $false) {$startPath.SelectedPath+="\"}
+    return $startPath.SelectedPath
 }
 
 Function hevcparwrapper {
@@ -34,8 +33,8 @@ Function hevcparwrapper {
         a {return "--tu-intra-depth 3 --tu-inter-depth 3 --limit-tu 1 --rdpenalty 1 --me umh --merange 48 --weightb--ref 3 --max-merge 3 --early-skip --no-open-gop --min-keyint 5 --fades --bframes 8 --b-adapt 2 --radl 3 --b-intra --constrained-intra --crf 21 --crqpoffs -3 --crqpoffs -1 --rdoq-level 2 --aq-mode 4 --aq-strength 0.8 --rd 3 --limit-modes --limit-refs 1 --rskip 3 --tskip-fast --rect --amp --psy-rd 1 --splitrd-skip --qp-adaptation-range 4 --limit-sao --sao-non-deblock --deblock 0:-1 --hash 2 --allow-non-conformance"} #generalPurpose
         b {return "--tu-intra-depth 4 --tu-inter-depth 4 --limit-tu 1 --me star --merange 48 --weightb --ref 3 --max-merge 4 --no-open-gop --min-keyint 3 --keyint 310 --fades --bframes 8 --b-adapt 2 --radl 3 --constrained-intra --b-intra --crf 21.8 --qpmin 8 --crqpoffs -3 --ipratio 1.2 --pbratio 1.5 --rdoq-level 2 --aq-mode 4 --qg-size 8 --rd 3 --limit-refs 0 --rskip 0 --rect --amp --psy-rd 1.6 --deblock 0:0 --limit-sao --sao-non-deblock --selective-sao 3 --hash 2 --allow-non-conformance"} #filmCustom
         c {return "--tu-intra-depth 4 --tu-inter-depth 4 --limit-tu 1 --me star --merange 48 --weightb --ref 3 --max-merge 4 --no-open-gop --min-keyint 3 --fades --bframes 8 --b-adapt 2 --radl 3 --constrained-intra --b-intra --crf 21.8 --qpmin 8 --crqpoffs -3 --ipratio 1.2 --pbratio 1.5 --rdoq-level 2 --aq-mode 4 --aq-strength 1 --qg-size 8 --rd 3 --limit-refs 0 --rskip 0 --rect --amp --psy-rd 1 --qp-adaptation-range 3 --deblock 0:-1 --limit-sao --sao-non-deblock --selective-sao 3 --hash 2 --allow-non-conformance"} #stockFootag
-        d {return "--tu-intra-depth 4 --tu-inter-depth 4 --max-tu-size 16 --me umh --merange 48 --weightb --max-merge 4 --early-skip --ref 3 --no-open-gop --min-keyint 5 --fades --bframes 16 --b-adapt 2 --radl 3 --bframe-bias 20 --constrained-intra --b-intra --crf 22 --crqpoffs -4 --cbqpoffs -2 --ipratio 1.6 --pbratio 1.3 --cu-lossless --tskip --psy-rdoq 2.3 --rdoq-level 2 --hevc-aq --aq-strength 0.9 --qg-size 8 --rd 3 --limit-modes --limit-refs 1 --rskip 1 --rect --amp --psy-rd 1.5 --splitrd-skip --rdpenalty 2 --qp-adaptation-range 4 --deblock -1:0 --limit-sao --sao-non-deblock --hash 2 --allow-non-conformance"} #animeFansubCustom
-        e {return "--tu-intra-depth 4 --tu-inter-depth 4 --max-tu-size 4 --limit-tu 1 --me star --merange 52 --analyze-src-pics --weightb --max-merge 4 --ref 3 --no-open-gop --min-keyint 1 --fades --bframes 16 --b-adapt 2 --radl 2 --b-intra --crf 16.5 --crqpoffs -5 --cbqpoffs -2 --ipratio 1.67 --pbratio 1.33 --cu-lossless --psy-rdoq 2.5 --rdoq-level 2 --hevc-aq --aq-strength 1.4 --qg-size 8 --rd 5 --limit-refs 0 --rskip 2 --rskip-edge-threshold 3 --rect --amp --no-cutree --psy-rd 1.5 --rdpenalty 2 --qp-adaptation-range 5 --deblock -2:-2 --limit-sao --sao-non-deblock --selective-sao 1 --hash 2 --allow-non-conformance"} #animeBDRipColdwar
+        d {return "--tu-intra-depth 4 --tu-inter-depth 4 --max-tu-size 16 --me umh --merange 48 --weightb --max-merge 4 --early-skip --ref 3 --no-open-gop --min-keyint 5 --fades --bframes 16 --b-adapt 2 --radl 3 --bframe-bias 20 --constrained-intra --b-intra --crf 22 --crqpoffs -4 --cbqpoffs -2 --ipratio 1.6 --pbratio 1.3 --cu-lossless --tskip --psy-rdoq 2.3 --rdoq-level 2 --hevc-aq --aq-strength 0.9 --qg-size 8 --rd 3 --limit-modes --limit-refs 1 --rskip 1 --rect --amp --psy-rd 1.5 --splitrd-skip --rdpenalty 2 --qp-adaptation-range 4 --deblock -1:0 --limit-sao --sao-non-deblock --hash 2 --allow-non-conformance --single-sei"} #animeFansubCustom
+        e {return "--tu-intra-depth 4 --tu-inter-depth 4 --max-tu-size 4 --limit-tu 1 --me star --merange 52 --analyze-src-pics --weightb --max-merge 4 --ref 3 --no-open-gop --min-keyint 1 --fades --bframes 16 --b-adapt 2 --radl 2 --b-intra --crf 17 --crqpoffs -5 --cbqpoffs -2 --ipratio 1.67 --pbratio 1.33 --cu-lossless --psy-rdoq 2.5 --rdoq-level 2 --hevc-aq --aq-strength 1.4 --qg-size 8 --rd 5 --limit-refs 0 --rskip 0 --rect --amp --no-cutree --psy-rd 1.5 --rdpenalty 2 --qp-adaptation-range 5 --deblock -2:-2 --limit-sao --sao-non-deblock --selective-sao 1 --hash 2 --allow-non-conformance"} #animeBDRipColdwar
     }
 }
 
@@ -117,20 +116,20 @@ $exptPath = whichlocation
 Write-Output "√ Selected $exptPath`r`n"
 
 #「Bootstrap D」Locate path to export encoded files
-Read-Host "Hit Enter to proceed open a window to [locate path to export encoded files]"
+Read-Host "Hit Enter to proceed open a selection window to [locate path to export encoded files]"
 $fileEXP = whichlocation
 Write-Output "√ Selected $fileEXP`r`n"
 
 #「Bootstrap E」Step 2 already learns paths to ffmpeg & so. Therefore here the import is for files to encode. Note the variables are renamed to further stress the difference
 Write-Output "Reference: [Video file formats]https://en.wikipedia.org/wiki/Video_file_format"
-Write-Output "Step 2 already learns paths to ffmpeg & so. Here it's about to import a path with files to encode`r`n"
+Write-Output "Step 2 already learns paths to ffmpeg & so. Therefore here the import is for files to encode`r`n"
 Do {$IMPchk=$vidIMP=$vpyIMP=$avsIMP=$apmIMP=""
     Switch (Read-Host "The previously selected pipe upstream program was [A: ffmpeg | B: vspipe | C: avs2yuv | D: avs2pipemod | E: SVFI (alpha)]") {
-        a {$IMPchk="a"; Write-Output "`r`nSelected ffmpeg-----video source. Opening a window to [locate path/directory w/ files to encode]`r`nThe procedure is to import path & add filnames in generated batch later"; $vidIMP=whichlocation}
-        b {$IMPchk="b"; Write-Output "`r`nSelected vspipe------.vpy source. Opening a window to [locate path/directory w/ files to encode]`r`nThe procedure is to import path & add filnames in generated batch later"; $vpyIMP=whichlocation} #Multi-encode only, procedure is different from single-encode mode
-        c {$IMPchk="c"; Write-Output "`r`nSelected avs2yuv-----.avs source. Opening a window to [locate path/directory w/ files to encode]`r`nThe procedure is to import path & add filnames in generated batch later"; $avsIMP=whichlocation}
-        d {$IMPchk="d"; Write-Output "`r`nSelected avs2pipemod-.avs source. Opening a window to [locate path/directory w/ files to encode]`r`nThe procedure is to import path & add filnames in generated batch later"; $apmIMP=whichlocation}
-        e {$IMPchk="e"; Write-Output "`r`nSelected scfi(α)---video source. Opening a window to [locate path/directory w/ files to encode]`r`nThe procedure is to import path & add filnames in generated batch later"; $vidIMP=whichlocation}
+        a {$IMPchk="a"; Write-Output "`r`nSelected ffmpeg-----video source. Opening a window to [locate a file to encode]`r`n"; $vidIMP=whereisit} #Single-encode only, procedure is different from multi-encode mode
+        b {$IMPchk="b"; Write-Output "`r`nSelected vspipe------.vpy source. Opening a window to [locate a file to encode]`r`n"; $vpyIMP=whereisit}
+        c {$IMPchk="c"; Write-Output "`r`nSelected avs2yuv-----.avs source. Opening a window to [locate a file to encode]`r`n"; $avsIMP=whereisit}
+        d {$IMPchk="d"; Write-Output "`r`nSelected avs2pipemod-.avs source. Opening a window to [locate a file to encode]`r`n"; $apmIMP=whereisit}
+        e {$IMPchk="e"; Write-Output "`r`nSelected svfi(α)---video source. Opening a window to [locate a file to encode]`r`n"; $vidIMP=whereisit}
         default {Write-Warning "Bad input, try again"}
     }
 } While ($IMPchk -eq "")
@@ -151,6 +150,15 @@ if ($mode -eq "s") {Write-Output "`r`n√ Importing file is selected as $impEXTs
         if ($impEXTs -ne ".vpy") {Write-Warning "Imported file extension is $impEXTs instead of .vpy`r`n"} #Comment this out during multi-encode mode as no source file is imported
     } #Note: Path source: $impEXTm, File source: $impEXTs, File export: $fileEXP
 }
+
+#「Bootstrap G」Avs2pipemod requires avisynth.dll, which needs to be added to commandline
+if ($IMPchk -eq "d") {
+    Read-Host "Hit Enter to proceed open a window to [Select avisynth.dll] for Avs2pipemod, it may pop up at rear of current window"
+    $apmDLL=whereisit
+    $DLLchk=(Get-ChildItem $apmDLL).Extension #Report if imported file extension isn't .dll
+    if (($DLLchk -eq ".dll") -eq $false) {Write-Warning "File extension is $apmDLL instead of .dll"}
+    Write-Output "√ Added avs2pipemod option: $apmDLL`r`n"
+} else {$apmDLL="X:\Somewhere\avisynth.dll"}
 
 #「Bootstrap G1」Importing required avisynth.dll by Avs2pipemod
 if ($IMPchk -eq "d") {
@@ -190,7 +198,7 @@ Write-Output "√ Video file for ffprobe to analyze: $impEXTs`r`n"
 Read-Host "Hit Enter to proceed open a window to [locate ffprobe.exe]"
 $fprbPath=whereisit
 
-#「ffprobeA2」Begin analyze sample video. Due to people confuses at MKV files' NUMBER_OF_FRAMES; NUMBER_OF_FRAMES-eng & etc. tagging, some MKV files ends up not having data on NUMBER_OF_FRAMES tag (at CSV's tag 24,25), therefore by reading both and keep the non-0 value would provide fallback
+#「ffprobeA」Begin analyze sample video. Due to people confuses at MKV files' NUMBER_OF_FRAMES; NUMBER_OF_FRAMES-eng & etc. tagging, some MKV files ends up not having data on NUMBER_OF_FRAMES tag (at CSV's tag 24,25), therefore by reading both and keep the non-0 value would provide fallback
 $parsProbe = $fprbPath+" -i '$impEXTs' -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
 Invoke-Expression $parsProbe > "C:\temp_v_info.csv"
 
@@ -227,7 +235,7 @@ if ($IMPchk -eq "e") {
     $iniCxt=Get-Content $olsINI
     $iniTgt=$iniCxt | Select-String target_fps | Select-Object -ExpandProperty Line
     $iniCxt | ForEach-Object {$_ -replace $iniTgt,$olsfps}>$iniEXP
-    Write-Output "√ Replaced render config file $olsINI 's target_fps line as $olsfps,`r`n√ New render config file is created as $iniEXP"
+    Write-Output  "√ Replaced render config file $olsINI 's target_fps line as $olsfps,`r`n√ New render config file is created as $iniEXP"
 } else {$iniEXP=$olsINI}
 
 #「ffprobeC2」fetch total frame count with ffprobe, then parse to variable $x265VarA, single-encode mode only
@@ -336,7 +344,7 @@ elseif ($ENCops -eq "a") {
 Set-PSDebug -Strict
 $utf8NoBOM=New-Object System.Text.UTF8Encoding $false #export batch file w/ utf-8NoBOM text codec
 
-#Note: Inport file variable: $impEXTs; Export file variable: $fileEXP
+#Note: Import paths' variable: $impEXTm; Import file variable: $impEXTs; Export path variable: $fileEXP
 #「Initialize」$ffmpegPar-ameters variable contains no trailing spaces
 #「Limitation」$ffmpegPar-ameters can only be added after all of file-imported option ("-i")s are written, & ffmpeg option "-hwaccel" must be written before of "-i". This further increases the string reallocation work & amount of variables needed to assemble ffmpeg commandline
 #Remove option "loglevel" when debugging
@@ -361,44 +369,7 @@ if ($mode -eq "s") {
     $x265VarA=$x264VarA="$nbrframes --output `"$fileEXP$vidEXP`"" #Downstream Vars
 }
 
-#Iteration begins, carry as any axis reaches letter 27. Switch occupies temp-variable $_ which cannot be used to initialize this loop. Counts as a 3-digit twenty-hexagonal
-$ffmpegVarSChar=$vspipeVarSChar=$avsyuvVarSChar=$avsmodVarSChar=$x265VarNosChar=$x264VarNosChar=$encCallNosChar=$vidEXX=@()
-$ffmpegVarWarp=$vspipeVarWarp=$avsyuvVarWarp=$avsmodVarWarp=$x265VarWarp=$x264VarWarp=$tempMuxOut=$tempEncOut=""
-[int]$x=[int]$y=[int]$z=0
-For ($s=0; $s -lt $qty; $s++) {
-    #$x+=1 is commented out at beginning as values are being parsed to filenames, therefore placed at the trailing of loop
-    if ($x -gt 25) {$y+=1; $x=0}
-    if ($y -gt 25) {$z+=1; $y=$x=0}
-    $sChar=$validChars[$z]+$validChars[$y]+$validChars[$x]
-
-    [string]$serial=($s).ToString($zroStr) #leading zeros processor, this prevents $s from being the actual episode counter. $serial is converted int-to-string to allow placing leading 0s
-    
-    $vidEXX+=$ExecutionContext.InvokeCommand.ExpandString($vidEXP) #$vidEXP contains $serial. Expand is needed to convert $serial from string to variable. Breaking the previous single quotes' seal
-
-    $tempMuxOut=$vidEXX[$s]+".mp4" #multi-encode mode's temporary multiplex solution. $serial is used instead of $sChar
-    $tempEncOut=$vidEXX[$s]+".hevc"
-
-    $ffmpegVarSChar+="@set `"ffmpegVar"+$sChar+"=-hwaccel auto -i `"video-to-encode"+"_"+"$sChar.mkv`"`"`n"
-    $vspipeVarSChar+="@set `"vspipeVar"+$sChar+"=-i `"video-to-encode"+"_"+"$sChar.mkv`"`"`n"
-    $avsyuvVarSChar+="@set `"avsyuvVar"+$sChar+"=-i `"video-to-encode"+"_"+"$sChar.mkv`"`"`n"
-    $avsmodVarSChar+="@set `"avsmodVar"+$sChar+"=-i `"video-to-encode"+"_"+"$sChar.mkv`"`"`n"
-
-    $x265VarNosChar+="@set `"x265Var"+$sChar+"=--output `"$fileEXP$tempMuxOut`"`"`n"
-    $x264VarNosChar+="@set `"x264Var"+$sChar+"=--output `"$fileEXP$tempMuxOut`"`"`n"
-    $encCallNosChar+="call enc_$s.bat`n"
-
-    $x+=1 #The loop automatically applies $s+=1, but manual application is needed for debugging
-}
-#Harvest array datatype of ffmpeg & similar tools' generated commandlines. Each commandline supplies information needed for individual encode batch
-[string]$ffmpegVarWrap=$ffmpegVarSChar;$ffmpegVarWrap=$ffmpegVarWrap -replace " @set", "@set" #Convert back to string will result in " @set xxx", therefore replacing back to "@set xxx"
-[string]$vspipeVarWrap=$vspipeVarSChar;$vspipeVarWrap=$vspipeVarWrap -replace " @set", "@set"
-[string]$avsyuvVarWrap=$avsyuvVarSChar;$avsyuvVarWrap=$avsyuvVarWrap -replace " @set", "@set"
-[string]$avsmodVarWrap=$avsmodVarSChar;$avsmodVarWrap=$avsmodVarWrap -replace " @set", "@set"
-[string]$x265VarWrap = $x265VarNosChar;$x265VarWrap = $x265VarWrap   -replace " @set", "@set"
-[string]$x264VarWrap = $x264VarNosChar;$x264VarWrap = $x264VarWrap   -replace " @set", "@set"
-[string]$encCallWrap = $encCallNosChar;$encCallWrap = $encCallWrap   -replace " call", "call"
-
-#「Generate the controller batch」
+#「Generate ffmpeg, vspipe, avs2yuv, avspipemod controller batch」
 $ctrl_gen="REM 「Compatible with UTF-8」opt-out from ANSI code page
 REM 「Safe for with multiple runs」Achieved by set+endlocal, works both at stopping during encoding and controlling batch
 REM 「Compatible localized CLI language」Implementation failed, the batch file must run with code page 65001
@@ -410,7 +381,6 @@ chcp 65001
 setlocal
 
 REM 「Non-std exiting」Clean up used variables with taskkill /F /IM cmd.exe /T. Otherwise it may cause variable contamination
-
 @echo 「Non-std exits」cleanup with `"taskkill /F /IM cmd.exe /T`" is necessary to prevent residual variable's presence from previously ran sripts.
 @echo. && @echo --Starting multi-batch-enc workflow v2--
 
@@ -426,22 +396,22 @@ REM 「ffmpeg, vspipe, avsyuv, avs2pipemod fixed Parameters」
 
 REM 「ffmpeg, vspipe, avsyuv, avs2pipemod Variable optoins」
 
-"+$ffmpegVarWrap+"
-"+$vspipeVarWrap+"
-"+$avsyuvVarWrap+"
-"+$avsmodVarWrap+"
+@set `"ffmpegVarA=-hwaccel auto "+$ffmpegVarA+"`"
+@set `"vspipeVarA="+$vspipeVarA+"`"
+@set `"avsyuvVarA="+$avsyuvVarA+"`"
+@set `"avsmodVarA="+$avsmodVarA+"`"
 
-REM 「x264-5 fixed Parameters」
+REM 「x264/5 fixed Parameters」
 
 @set `"x265ParA="+$x265ParA+"`"
 @set `"x264ParA="+$x264ParA+"`"
 
-REM 「x264-5 Variable optoins」Comment out during debugging
+REM 「x264/5 Variable optoins」Comment out during debugging
 
-"+$x264VarWrap+"
-"+$x265VarWrap+"
+@set `"x265VarA="+$x265VarA+"`"
+@set `"x264VarA="+$x264VarA+"`"
 
-REM 「Debugging」x264-5 Variable options, comment out during normal use, variables have no trailing spaces
+REM 「Debugging」x264/5 Variable options, comment out during normal use, variables have no trailing spaces
 
 REM @set `"x265VarA=--crf 23 ... --output ...`"
 REM @set `"x265VarB=--crf 26 ... --output ...`"
@@ -450,17 +420,17 @@ REM @set `"x264VarA=--crf 26 ... --output ...`"
 
 REM 「Encoding」Use commenting or deleting encode batches to skip undesired encode tasks
 
-"+$encCallWrap+"
+call enc_0S.bat
 
 REM 「Finish」Perserve CMD prompt after finish, use /k instead of -k could skip printing of Windows build information
 
 endlocal
 cmd -k"
 
-if ($IMPchk -eq "a") {$exptPath+="4A.M.「Controller」.bat"
-} elseif ($IMPchk -eq "b") {$exptPath+="4B.M.「Controller」.bat"
-} elseif ($IMPchk -eq "c") {$exptPath+="4C.M.「Controller」.bat"
-} elseif ($IMPchk -eq "d") {$exptPath+="4D.M.「Controller」.bat"}
+if ($IMPchk -eq "a") {$exptPath+="4A.S.「Controller」.bat"
+} elseif ($IMPchk -eq "b") {$exptPath+="4B.S.「Controller」.bat"
+} elseif ($IMPchk -eq "c") {$exptPath+="4C.S.「Controller」.bat"
+} elseif ($IMPchk -eq "d") {$exptPath+="4D.S.「Controller」.bat"}
 
 Write-Output "`r`nGenerating $exptPath"
 [IO.File]::WriteAllLines($exptPath, $ctrl_gen, $utf8NoBOM) #Force exporting utf-8NoBOM text codec

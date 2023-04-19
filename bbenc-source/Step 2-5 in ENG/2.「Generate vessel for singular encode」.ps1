@@ -11,21 +11,21 @@ Function whereisit($startPath='DESKTOP') {
     [void] [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") 
     Add-Type -AssemblyName System.Windows.Forms
     $startPath = New-Object System.Windows.Forms.OpenFileDialog -Property @{ InitialDirectory = [Environment]::GetFolderPath($startPath) } #Starting path set to Desktop
-    #Intercepting failed inputs with if statement
-    if ($startPath.ShowDialog() -eq "OK") {[string]$endPath = $startPath.FileName}
-    return $endPath
+    Do {$dInput = $startPath.ShowDialog()} While ($dInput -eq "Cancel") #Opens a file selection window, un-cancel cancelled user inputs (close/cancel button) by reopening selection window again
+    return $startPath.FileName
 }
 
 Function whichlocation($startPath='DESKTOP') {
     #Opens a System.Windows.Forms GUI to pick a folder/path/dir
     Add-Type -AssemblyName System.Windows.Forms
     $startPath = New-Object System.Windows.Forms.FolderBrowserDialog -Property @{ Description="Select a directory. Drag bottom corner to enlarge for convenience"; SelectedPath=[Environment]::GetFolderPath($startPath); RootFolder='MyComputer'; ShowNewFolderButton=$true }
-    #Intercepting failed inputs with if statement
-    if ($startPath.ShowDialog() -eq "OK") {[string]$endPath = $startPath.SelectedPath}
+    #Intercepting failed inputs (user presses close/cancel button) with Do-While looping
+    Do {$dInput = $startPath.ShowDialog()} While ($dInput -eq "Cancel") #Opens a path selection window
     #Root directory always have a "\" in return, whereas a folder/path/dir doesn't. Therefore an if statement is used to add "\" when needed, but comment out under single-encode mode
-    if (($endPath.SubString($endPath.Length-1) -eq "\") -eq $false) {$endPath+="\"}
-    return $endPath
+    if (($startPath.SelectedPath.SubString($startPath.SelectedPath.Length-1) -eq "\") -eq $false) {$startPath.SelectedPath+="\"}
+    return $startPath.SelectedPath
 }
+
 #「@MrNetTek」Use high-DPI rendering, to fix blurry System.Windows.Forms
 Add-Type -TypeDefinition @'
 using System.Runtime.InteropServices;
@@ -66,7 +66,7 @@ if ($mode -eq "m") {
     } else {[string]$zroStr="0"}
 }
 #「Bootstrap C」Locate path to export batch files
-Read-Host "`r`nHit Enter to proceed open a window that locates [path for exporting batch files], it may pop up at rear of current window."
+Read-Host "-----Welcome-----`r`nHit Enter to proceed open a selection window that locates [path for exporting batch files]...`r`nThis selection window might pop up at rear of current PowerShell instance."
 $exptPath = whichlocation
 Write-Output "√ Selected $exptPath`r`n"
 
