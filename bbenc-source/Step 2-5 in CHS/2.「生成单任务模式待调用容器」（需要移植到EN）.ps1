@@ -7,7 +7,7 @@ Function namecheck([string]$inName) {
 } #检测文件名是否符合Windows命名规则, 大批量版不需要
 
 Function whereisit($startPath='DESKTOP') {
-    #启用System.Windows.Forms选择文件的GUI交互窗
+    #启用System.Windows.Forms选择文件的GUI交互窗, 通过SelectedPath将GUI交互窗锁定到桌面文件夹, 效果一般
     [void] [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") 
     Add-Type -AssemblyName System.Windows.Forms
     $startPath = New-Object System.Windows.Forms.OpenFileDialog -Property @{ InitialDirectory = [Environment]::GetFolderPath($startPath) } #GUI交互窗锁定到桌面文件夹
@@ -16,7 +16,7 @@ Function whereisit($startPath='DESKTOP') {
 }
 
 Function whichlocation($startPath='DESKTOP') {
-    #启用System.Windows.Forms选择文件夹的GUI交互窗, 通过SelectedPath将GUI交互窗锁定到桌面文件夹, 效果一般
+    #启用System.Windows.Forms选择文件夹的GUI交互窗
     Add-Type -AssemblyName System.Windows.Forms
     $startPath = New-Object System.Windows.Forms.FolderBrowserDialog -Property @{ Description="选择路径用的窗口. 拖拽边角可放大以便操作"; SelectedPath=[Environment]::GetFolderPath($startPath); RootFolder='MyComputer'; ShowNewFolderButton=$true }
     #打开选择文件的GUI交互窗, 用Do-While循环拦截误操作（取消/关闭选择窗）
@@ -24,6 +24,38 @@ Function whichlocation($startPath='DESKTOP') {
     #由于选择根目录时路径变量含"\", 而文件夹时路径变量缺"\", 所以要自动判断并补上
     if (($startPath.SelectedPath.SubString($startPath.SelectedPath.Length-1) -eq "\") -eq $false) {$startPath.SelectedPath+="\"}
     return $startPath.SelectedPath
+}
+
+Function settmpoutputname([string]$mode) {
+    $DebugPreference="Continue" #function里不能用Write-Output/Host,或" "来输出交互信息, 所以用Write-Debug
+
+    Do {Switch (Read-Host "选择导出临时封装的文件名[A: 从现有文件复制 | B: 手动填写]") {
+            a { Write-Debug "√ 已打开[复制文件名]的选择窗"
+                $vidEXP=whereisit
+                $vidEXP=[io.path]::GetFileNameWithoutExtension($vidEXP)
+                if ($mode -eq "m") {$vidEXP+='_$serial'} #!使用单引号防止$serial变量被激活
+                Write-Debug "`r`n大批量模式下, 选项A会在末尾添加序号`r`n"
+            }
+            b { if ($mode -eq "m") {#大批量模式
+                    Do {$vidEXP=Read-Host "`r`n填写文件名(无后缀), 大批量模式下要求于集数变化处填 `$serial, 并隔开`$serial后的英文字母, 两个方括号间要隔开. 如[YYDM-11FANS] [Yuru Yuri 2]`$serial[BDRIP 720P]"
+                        $chkme =namecheck($vidEXP)
+                        if  (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false)) {Write-Warning "文件名中缺少变量`$serial, 输入了空值, 或拦截了不可用字符/ | \ < > : ? * `""}
+                    } While (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false))
+                }
+                if ($mode -eq "s") {#单文件模式
+                    Do {$vidEXP=Read-Host "`r`n填写文件名(无后缀), 两个方括号间要隔开. 如 [YYDM-11FANS] [Yuru Yuri 2]01[BDRIP 720P]"
+                        $chkme =namecheck($vidEXP)
+                        if  (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false)) {Write-Warning "单文件模式下文件名中含变量`$serial; 输入了空值; 或拦截了不可用字符/ | \ < > : ? * `""}
+                    } While (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false))
+                }
+                #[string]$serial=($s).ToString($zroStr) #赋值示例. 用于下面的for循环(提供变量$s)
+                #$vidEXP=$ExecutionContext.InvokeCommand.ExpandString($vidEXP) #下面的for循环中, 用户输入的变量只能通过Expand方法才能作为变量激活$serial
+            }
+            default {Write-Warning "× 输入错误, 重试"}
+        }
+    } While ($vidEXP -eq "")
+    Write-Debug "√ 写入了导出文件名 $vidEXP`r`n"
+    return $vidEXP
 }
 
 #「@MrNetTek」高DPI显示渲染模式的System.Windows.Forms
@@ -45,6 +77,8 @@ Write-Output "压制分场隔行视频 - x265: --tff/--bff; - x264: --interlaced
 Write-Output "VSpipe      [.vpy] --y4m               - | x265.exe --y4m - --output"
 Write-Output "avs2yuv     [.avs] -csp<串> -depth<整> - | x265.exe --input-res <串> --fps <整/小/分数> - --output"
 Write-Output "avs2pipemod [.avs] -y4mp                 | x265.exe --y4m - --output`r`n"
+Write-Output "可手动在脚本中更改`$MUXops=[`r`n| a: 写入临时封装为MP4的命令(默认)`r`n| b: 写入<A>, 并且删除未封装流`r`n| c: 写入<A>但注释掉(选择不封装MKV时默认)]`r`n"
+$MUXops="a"
 
 #「启动A」生成1~n个"enc_[序号].bat"单文件版不需要
 if ($mode -eq "m") {
@@ -101,46 +135,20 @@ Write-Output "√ 选择了 $encEXT`r`n"
 [string]$vidEXP=[string]$serial=[string]$MUXplan=""
 
 if ($ENCops -eq "a") {
+    $MUXplan="a"
     Do {Switch (Read-Host "Select [ A: 后面要用MKV封装 (增加一步hevc封装MKV所需的ffmpeg后门操作 - 生成临时MP4）`r`n | B: 后面不用MKV封装 ]") {
-            a {$MUXplan="a"} b {$MUXplan="b"; $MUXops="c"} Default {Write-Warning "`r`n × 输入错误，重试"}
+            a { #$MUXops="a" 已在前面的代码中赋值
+                Read-Host "将打开[导出临时封装文件]的路径选择窗, 因为ffmpeg禁止封装hevc/avc流到MKV. 可能会在窗口底层弹出. 按Enter继续"
+                $fileEXP = whichlocation 
+                Write-Output "√ 选择的路径为 $fileEXP`r`n"
+
+                $vidEXP = settmpoutputname($mode) #设置导出文件名
+            }
+            b       {$MUXplan="b"; $MUXops="c"}
+            Default {Write-Warning "`r`n × 输入错误，重试"}
         }#MUXops C: 写入注释掉的MUXwrt A
     } While ($MUXplan -eq "")
 }
-
-if ($MUXplan -eq "a") {
-    Read-Host "将打开[导出临时封装文件]的路径选择窗, 因为ffmpeg禁止封装hevc/avc流到MKV. 可能会在窗口底层弹出. 按Enter继续"
-    $fileEXP = whichlocation 
-    Write-Output "√ 选择的路径为 $fileEXP`r`n"
-
-    Do {Switch (Read-Host "选择导出临时封装的文件名[A: 从现有文件复制 | B: 手动填写]") {
-            a { Write-Output "已打开[复制文件名]的选择窗"
-                $vidEXP=whereisit
-                $vidEXP=[io.path]::GetFileNameWithoutExtension($vidEXP)
-                if ($mode -eq "m") {$vidEXP+='_$serial'} #!使用单引号防止$serial变量被激活
-                Write-Output "`r`n大批量模式下, 选项A会在末尾添加序号`r`n"
-            }
-            b { if ($mode -eq "m") {#大批量模式用
-                    Do {$vidEXP=Read-Host "`r`n填写文件名(无后缀), 大批量模式下要求于集数变化处填 `$serial, 并隔开`$serial后的英文字母, 两个方括号间要隔开. 如[YYDM-11FANS] [Yuru Yuri 2]`$serial[BDRIP 720P]"
-                        $chkme=namecheck($vidEXP)
-                        if  (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false)) {Write-Warning "文件名中缺少变量`$serial, 输入了空值, 或拦截了不可用字符/ | \ < > : ? * `""}
-                    } While (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false))
-                }
-                if ($mode -eq "s") {#单文件模式用
-                    Do {$vidEXP=Read-Host "`r`n填写文件名(无后缀), 两个方括号间要隔开. 如 [YYDM-11FANS] [Yuru Yuri 2]01[BDRIP 720P]"
-                        $chkme=namecheck($vidEXP)
-                        if  (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false)) {Write-Warning "单文件模式下文件名中含变量`$serial; 输入了空值; 或拦截了不可用字符/ | \ < > : ? * `""}
-                    } While (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false))
-                }
-                #[string]$serial=($s).ToString($zroStr) #赋值示例. 用于下面的for循环(提供变量$s)
-                #$vidEXP=$ExecutionContext.InvokeCommand.ExpandString($vidEXP) #下面的for循环中, 用户输入的变量只能通过Expand方法才能作为变量激活$serial
-            }
-            default {Write-Warning "× 输入错误, 重试"}
-        }
-    } While ($vidEXP -eq "")
-    Write-Output "√ 写入了导出文件名 $vidEXP`r`n"
-    Write-Output "注: 可手动在脚本中更改`$MUXops=[`r`n| a: 写入临时封装为MP4的命令(默认)`r`n| b: 写入<A>, 并且删除未封装流`r`n| c: 写入<A>但注释掉(选择不封装MKV时默认)]`r`n"
-    $MUXops="a"
-} #关闭ENCops的if选项
 
 $utf8NoBOM=New-Object System.Text.UTF8Encoding $false #导出utf-8NoBOM文本编码hack
 $tempEncOut=$vidEXP+".hevc" #此处和大批量版完全不同, 对照参考失效
@@ -327,7 +335,7 @@ REM Var被用于引用动态数据，如输入输出路径和根据源视频自�
 
 "+$ENCwrt+"
 
-REM 「临时封装部分」x265下游线路下启用
+REM 「临时封装部分」x265下游线路下会自动被调用
 
 "+$MUXwrt+"
 

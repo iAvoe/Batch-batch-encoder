@@ -27,6 +27,41 @@ Function whichlocation($startPath='DESKTOP') {
     return $startPath.SelectedPath
 }
 
+Function setencoutputname ([string]$mode, [string]$switchOPS) {
+    $DebugPreference="Continue" #function里不能用Write-Output/Host,或" "来输出交互信息, 所以用Write-Debug
+
+    Switch ($switchOPS) { #函数中不支持「Switch + Readhost " $变量名 "」，所以把原本由Switch问的问题在进入函数前就要回答，只把答案导入进函数中
+        a { Write-Debug "已打开[复制文件名]的选择窗"
+            $vidEXP=whereisit
+            $chkme=namecheck($vidEXP)
+            $vidEXP=[io.path]::GetFileNameWithoutExtension($vidEXP)
+            if ($mode -eq "m") {$vidEXP+='_$serial'} #!使用单引号防止$serial变量被激活
+            Write-Debug "大批量模式下选项A会在末尾添加序号, 文件名尾会多出`"_`"`r`n"
+        } b {
+            Write-Debug "`r`nPowerShell默认紧挨的方括号为一般表达式, 如[xx][yy]间要隔开"
+            if ($mode -eq "m") {#大批量模式用
+                Do {$vidEXP=Read-Host "`r`n填写文件名(无后缀), 大批量模式下要于集数变化处填 `$serial, 并隔开`$serial后的英文字母, 两个方括号间要隔开. 如 [Zzz] Memories – `$serial (BDRip 1764x972 HEVC)"
+                    $chkme=namecheck($vidEXP)
+                    if  (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false)) {Write-Warning "文件名中缺少变量`$serial, 输入了空值, 或拦截了不可用字符/ | \ < > : ? * `""}
+                } While (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false))
+            }
+            if ($mode -eq "s") {#单文件模式用
+                Do {$vidEXP=Read-Host "`r`n填写文件名(无后缀), 两个方括号间要隔开. 如 [Zzz] Memories – 01 (BDRip 1764x972 HEVC)"
+                    $chkme=namecheck($vidEXP)
+                    if  (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false)) {Write-Warning "单文件模式下文件名中含变量`$serial; 输入了空值; 或拦截了不可用字符/ | \ < > : ? * `""}
+                } While (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false))
+            }
+            #[string]$serial=($s).ToString($zroStr) #赋值示例. 用于下面的for循环(提供变量$s)
+            #$vidEXP=$ExecutionContext.InvokeCommand.ExpandString($vidEXP) #下面的for循环中, 用户输入的变量只能通过Expand方法才能作为变量激活$serial
+        } default {
+            if ($mode -eq "m") {$vidEXP+='_$serial'} #!使用单引号防止$serial变量被激活
+            #相比于settmpoutputname, 此函数不存在空值输入，所以default状态下就是原始的$vidEXP文件名
+        }
+    }
+    Write-Debug "√ 写入了导出文件名 $vidEXP`r`n"
+    return $vidEXP
+}
+
 Function hevcparwrapper {
     Param ([Parameter(Mandatory=$true)]$PICKops)
     Switch ($PICKops) {
@@ -74,7 +109,7 @@ Function poolscalc{
 }
 
 Function framescalc{
-    Param ([Parameter(Mandatory=$true)]$fcountCSV, [Parameter(Mandatory=$true)]$fcountAUX)
+    Param ([Parameter(Mandatory=$true)]$fcountCSV, [Parameter(Mandatory=$false)]$fcountAUX)
     $DebugPreference="Continue" #Cannot use Write-Output/Host or " " inside a Function as it would trigger a value return, modify Write-Debug instead
     if     ($fcountCSV -match "^\d+$") {Write-Debug "√ 检测到MPEGtag视频总帧数"; return "--frames "+$fcountCSV}
     elseif ($fcountAUX -match "^\d+$") {Write-Debug "√ 检测到MKV-tag视频总帧数"; return "--frames "+$fcountAUX}
@@ -132,6 +167,7 @@ Do {$IMPchk=$vidIMP=$vpyIMP=$avsIMP=$apmIMP=""
         e {$IMPchk="e"; Write-Output "`r`n选了SVFI(alpha)-视频源. 已打开[定位源]的文件选窗"; $vidIMP=whereisit}
         default {Write-Warning "输入错误, 重试"}
     }
+    if (($vidIMP+$vpyIMP+$avsIMP+$apmIMP).Contains(".exe")) {Write-Error "× 该输入不是导入上游方案，而是要编码的源"; $IMPchk=""}
 } While ($IMPchk -eq "")
 
 #「启动F1」整合并反馈选取的路径/文件
@@ -156,11 +192,11 @@ if ($IMPchk -eq "d") {
     Read-Host "将为Avs2pipemod打开[选择avisynth.dll]的路径选择窗, 可能会在窗口底层弹出. 按Enter继续"
     $apmDLL=whereisit
     $DLLchk=(Get-ChildItem $apmDLL).Extension #检查文件后缀是否为.dll并报错
-    if (($DLLchk -eq ".dll") -eq $false) {Write-Warning "文件后缀名是 $apmDLL 而非 .dll"}
+    if (($DLLchk -eq ".dll") -eq $false) {Write-Warning "文件后缀名是 $apmDLL 而非 .dll `r`n"}
     Write-Output "√ 已添加avs2pipemod参数: $apmDLL`r`n"
 } else {
     $apmDLL="X:\Somewhere\avisynth.dll"
-    Write-Output "未选择Avs2pipemod线路, AVS动态链接库路径将临时设为 $apmDLL"
+    Write-Output "未选择Avs2pipemod线路, AVS动态链接库路径将临时设为 $apmDLL `r`n"
 }
 #「启动G2」SVFI需要的文件
 if ($IMPchk -eq "e") {
@@ -172,7 +208,7 @@ if ($IMPchk -eq "e") {
     Write-Output "√ 已添加SVFI参数: $olsINI`r`n"
 } else {
     $olsINI="X:\Somewhere\SVFI-render-customize.ini"
-    Write-Output "未选择SVFI线路, 配置文件路径将临时设为 $olsINI"
+    Write-Output "未选择SVFI线路, 配置文件路径将临时设为 $olsINI `r`n"
 }
 
 #「启动H」四种情况下需要专门导入视频给ffprobe检测: VS(1), AVS(2), 大批量模式(1)
@@ -183,26 +219,40 @@ if (($mode -eq "m") -or (($IMPchk -ne "a") -and ($IMPchk -ne "e"))) {
         if ((Read-Host "[检查]输入的文件 $impEXTs 是否为视频 [Y: 确认操作 | N: 更换源]") -eq "y") {$continue="y"; Write-Output "继续"} else {Write-Output "重试"}
     } While ($continue -eq "n")
 } else {$impEXTs=$vidIMP}
-Write-Output "√ 将导入视频到ffprobe进行检测: $impEXTs`r`n"
+if ($impEXTs.Contains(".mov")) {
+    $is_mov=$true;  Write-Output "√ 导入视频 $impEXTs 的封装格式为MOV`r`n"
+} else {
+    $is_mov=$false; Write-Output "√ 导入视频 $impEXTs 的封装格式非MOV`r`n"
+}
 
 #「启动I」定位ffprobe
 Read-Host "将打开[定位ffprobe.exe]的选择窗. 按Enter继续"
 $fprbPath=whereisit
 
 #「ffprobeA2」开始检测片源, 由于mkv有给不同视频流标注多种视频总帧数的tag功能, 导致封装视频的人会错标 NUMBER_OF_FRAMES 成 NUMBER_OF_FRAMES-eng (两者分别占据csv的第24,25号), 所以同时尝试读取两者, 缺少任意一值则X位中显示另一值, 所以只检测X位
-$parsProbe = $fprbPath+" -i '$impEXTs' -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
-Invoke-Expression $parsProbe > "C:\temp_v_info.csv"
-
-#例: $parsProbe = "D:\ffprobe.exe -i `"F:\Asset\Video\BDRip私种\[Beatrice-Raws] Anne Happy [BDRip 1920x1080 x264 FLAC]\[Beatrice-Raws] Anne Happy 01 [BDRip 1920x1080 x264 FLAC].mkv`" -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
-#例: $parsProbe = "D:\ffprobe.exe -i `"N:\SolLevante_HDR10_r2020_ST2084_UHD_24fps_1000nit.mov`" -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
-#Invoke-Expression $parsProbe > "C:\temp_v_info.csv"
-#Notepad "C:\temp_v_info.csv"
-
+#             由于MOV封装格式下区别于MP4，MKV的stream_tags，所以全部无效
 #「ffprobeB2」用CSV读取模块映射array数据, 由于源文件没有所以添加目录A~F, 由于ffprobe生成的CSV不能直接导入进变量, 并且为方便debug(Remove-Item换成Notepad), 所以创建了中间文件
-$ffprobeCSV = Import-Csv "C:\temp_v_info.csv" -Header A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,AA
-Remove-Item "C:\temp_v_info.csv" #由于多数Windows系统只有C盘, 所以临时生成CSV在C盘
+#             由于stream作为标题会被写入CSV，所以自动忽略A项
+#             例: $parsProbe = "D:\ffprobe.exe -i `"F:\Asset\Video\BDRip私种\[Beatrice-Raws] Anne Happy [BDRip 1920x1080 x264 FLAC]\[Beatrice-Raws] Anne Happy 01 [BDRip 1920x1080 x264 FLAC].mkv`" -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
+#             例: $parsProbe = "D:\ffprobe.exe -i `"N:\SolLevante_HDR10_r2020_ST2084_UHD_24fps_1000nit.mov`" -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
+#                 Invoke-Expression $parsProbe > "C:\temp_v_info.csv"
+#                 Notepad "C:\temp_v_info.csv"
+Switch ($is_mov) {
+    $true {
+        [String]$parsProbe = $fprbPath+" -i `"$impEXTs`" -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries -of csv"
+        Invoke-Expression $parsProbe > "C:\temp_v_info_is_mov.csv" #由于多数Windows系统只有C盘, 所以临时生成CSV在C盘
+        $ffprobeCSV = Import-Csv "C:\temp_v_info_is_mov.csv" -Header A,B,C,D,E,F,G,H,I
+    }
+    $false{
+        [String]$parsProbe = $fprbPath+" -i `"$impEXTs`" -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
+        Invoke-Expression $parsProbe > "C:\temp_v_info.csv"        #由于多数Windows系统只有C盘, 所以临时生成CSV在C盘
+        $ffprobeCSV = Import-Csv "C:\temp_v_info.csv" -Header A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,AA
+    }
+}
+if     (Test-Path "C:\temp_v_info.csv")        {Remove-Item "C:\temp_v_info.csv"}
+elseif (Test-Path "C:\temp_v_info_is_mov.csv") {Remove-Item "C:\temp_v_info_is_mov.csv"}
 
-#「ffprobeB3」根据视频帧数自动填写x265的--subme
+#「ffprobeB3」根据视频帧数自动填写x265的--subme，H=第8个$ffprobeCSV序列值
 $x265subme=x265submecalc -CSVfps $ffprobeCSV.H
 Write-Output "√ 已添加x265参数: $x265subme"
 
@@ -213,7 +263,7 @@ Write-Output "√ 已添加x264/5参数: $keyint"
 $WxH="--input-res "+$ffprobeCSV.B+"x"+$ffprobeCSV.C+""
 $color_mtx="--colormatrix "+$ffprobeCSV.F
 $trans_chrctr="--transfer "+$ffprobeCSV.G
-if ($ffprobeCSV.F -eq "unknown") {$avc_mtx="--colormatrix undef"} else {$avc_mtx=$color_mtx} #x264: ×--colormatrix unknown √--colormatrix undef
+if ($ffprobeCSV.F -eq "unknown") {$avc_mtx="--colormatrix undef"} else {$avc_mtx=$color_mtx}    #x264: ×--colormatrix unknown √--colormatrix undef
 if ($ffprobeCSV.G -eq "unknown") {$avc_tsf="--colormatrix undef"} else {$avc_tsf=$trans_chrctr} #x264: ×--transfer unknown    √--transfer undef
 $fps="--fps "+$ffprobeCSV.H
 $fmpgfps="-r "+$ffprobeCSV.H
@@ -231,6 +281,7 @@ if ($IMPchk -eq "e") {
 
 #「ffprobeC2」ffprobe获取视频总帧数并赋值到$x264/5VarA中, 唯单文件版可用
 if ($mode -eq "s") {$nbrFrames=framescalc -fcountCSV $ffprobeCSV.I -fcountAUX $ffprobeCSV.AA}
+
 if ($nbrFrames -ne "") {Write-Output "√ 已添加x264/5参数: $nbrFrames"}
 else {Write-Warning "× 总帧数的数据被删, 将留空x264/5参数--frames, 缺点是不再显示ETA（预计完成时间）"}
 
@@ -246,6 +297,9 @@ Do {Switch ($ffprobeCSV.D) {
         yuv444p     {Write-Output "检测到源的色彩空间==[yuv444p 8bit ]"; $avsCSP="-csp i444"; $avsD="-depth 8";  $encCSP="--input-csp i444"; $encD="--input-depth 8";  $ffmpegCSP="-pix_fmt yuv444p"}
         yuv444p10le {Write-Output "检测到源的色彩空间==[yuv444p 10bit]"; $avsCSP="-csp i444"; $avsD="-depth 10"; $encCSP="--input-csp i444"; $encD="--input-depth 10"; $ffmpegCSP="-pix_fmt yuv444p10le"}
         yuv444p12le {Write-Output "仅x265支持的色彩空间[yuv444p 12bit]"; $avsCSP="-csp i444"; $avsD="-depth 12"; $encCSP="--input-csp i444"; $encD="--input-depth 12"; $ffmpegCSP="-pix_fmt yuv444p12le"}
+        yuv444p     {Write-Output "检测到源的色彩空间==[yuv444p 8bit ]"; $avsCSP="-csp i444"; $avsD="-depth 8";  $encCSP="--input-csp i444"; $encD="--input-depth 8";  $ffmpegCSP="-pix_fmt yuv444p"}
+        yuva444p10le{Write-Output "检测到源的色彩空间==[yuva444p 10bit]";$avsCSP="-csp i444"; $avsD="-depth 10"; $encCSP="--input-csp i444"; $encD="--input-depth 10"; $ffmpegCSP="-pix_fmt yuva444p10le"; "？ 该色彩空间可能不兼容"}
+        yuva444p12le{Write-Output "仅x265支持的色彩空间[yuva444p 12bit]";$avsCSP="-csp i444"; $avsD="-depth 12"; $encCSP="--input-csp i444"; $encD="--input-depth 12"; $ffmpegCSP="-pix_fmt yuva444p12le"; "？ 该色彩空间可能不兼容"}
         gray        {Write-Output "检测到源的色彩空间==[yuv400p 8bit ]"; $avsCSP="-csp i400"; $avsD="-depth 8";  $encCSP="--input-csp i400"; $encD="--input-depth 8";  $ffmpegCSP="-pix_fmt gray"}
         gray10le    {Write-Output "检测到源的色彩空间==[yuv400p 10bit]"; $avsCSP="-csp i400"; $avsD="-depth 10"; $encCSP="--input-csp i400"; $encD="--input-depth 10"; $ffmpegCSP="-pix_fmt gray10le"}
         gray12le    {Write-Output "仅x265支持的色彩空间[yuv400p 12bit]"; $avsCSP="-csp i400"; $avsD="-depth 12"; $encCSP="--input-csp i400"; $encD="--input-depth 12"; $ffmpegCSP="-pix_fmt gray12le"}
@@ -270,33 +324,13 @@ Write-Output "√ 选择了 $encEXT`r`n"
 
 #「启动K」选择导出压制结果文件名的多种方式, 集数变量$serial于下方的循环中实现序号叠加, 单文件模式不需要集数变量
 $vidEXP=[io.path]::GetFileNameWithoutExtension($impEXTs)
-Switch (Read-Host "`r`n选择导出压制结果的文件名. 注意PowerShell默认紧挨的方括号为一般表达式, 如[随便][什么]之间要隔开`r`n[A: 选择文件并拷贝 | B: 手动填写 | C: $vidEXP]") {
-    a { Write-Output "已打开[复制文件名]的选择窗"
-        $vidEXP=whereisit
-        $chkme=namecheck($vidEXP)
-        $vidEXP=[io.path]::GetFileNameWithoutExtension($vidEXP)
-        if ($mode -eq "m") {$vidEXP+='_$serial'} #!使用单引号防止$serial变量被激活
-        Write-Output "大批量模式下选项B, C会在末尾添加序号, 所以文件名尾会多出`"_`"`r`n"
-    } b {
-        if ($mode -eq "m") {#大批量模式用
-            Do {$vidEXP=Read-Host "`r`n填写文件名(无后缀), 大批量模式下要于集数变化处填 `$serial, 并隔开`$serial后的英文字母, 两个方括号间要隔开. 如 [Zzz] Memories – `$serial (BDRip 1764x972 HEVC)"
-                $chkme=namecheck($vidEXP)
-                if  (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false)) {Write-Warning "文件名中缺少变量`$serial, 输入了空值, 或拦截了不可用字符/ | \ < > : ? * `""}
-            } While (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false))
-        }
-        if ($mode -eq "s") {#单文件模式用
-            Do {$vidEXP=Read-Host "`r`n填写文件名(无后缀), 两个方括号间要隔开. 如 [Zzz] Memories – 01 (BDRip 1764x972 HEVC)"
-                $chkme=namecheck($vidEXP)
-                if  (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false)) {Write-Warning "单文件模式下文件名中含变量`$serial; 输入了空值; 或拦截了不可用字符/ | \ < > : ? * `""}
-            } While (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false))
-        }
-        #[string]$serial=($s).ToString($zroStr) #赋值示例. 用于下面的for循环(提供变量$s)
-        #$vidEXP=$ExecutionContext.InvokeCommand.ExpandString($vidEXP) #下面的for循环中, 用户输入的变量只能通过Expand方法才能作为变量激活$serial
-    } default {
-        if ($mode -eq "m") {$vidEXP+='_$serial'} #!使用单引号防止$serial变量被激活
-    }
-}
-Write-Output "√ 写入了导出文件名 $vidEXP`r`n"
+Do {$switchOPS=""
+    $switchOPS=Read-Host "`r`n选择导出压制结果的文件名`r`n[A: 选择文件并拷贝 | B: 手动填写 | C: $vidEXP]"
+    if  (($switchOPS -ne "a") -and ($switchOPS -ne "b") -and ($switchOPS -ne "c")) {Write-Error "× 输入错误，重试"}
+} While (($switchOPS -ne "a") -and ($switchOPS -ne "b") -and ($switchOPS -ne "c"))
+    
+if (($switchOPS -eq "a") -or ($switchOPS -eq "b")) {$vidEXP = setencoutputname($mode, $switchOPS)}
+else {Write-Output "√ 写入了导出文件名 $vidEXP`r`n"}
 
 #「启动L, M」1: 根据选择x264/5来决定输出.hevc/.mp4. 2: x265下据cpu核心数量, 节点数量添加pme/pools
 if ($ENCops -eq "b") {
@@ -407,7 +441,7 @@ REM 「x264-5固定参数」
 @set `"x265ParA="+$x265ParA+"`"
 @set `"x264ParA="+$x264ParA+"`"
 
-REM 「x264-5变化参数」测试时注释掉. 因莫名其妙的错误, 这段话必须和下面命令隔一行
+REM 「x264-5变化参数」测试时注释掉
 
 @set `"x265VarA="+$x265VarA+"`"
 @set `"x264VarA="+$x264VarA+"`"
