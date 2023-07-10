@@ -1,5 +1,6 @@
 ﻿cls #「启动-」大批量版生成的主控缺失文件名, 所以要提醒
-Read-Host "[单任务模式]大批量模式下, 生成的主控里没有导入用的文件名, 因此需要手动逐个填写导入文件名`r`nx264一般自带lavf, x265一般不带, 因此x265输出文件后缀一般是未封装成.mp4的.hevc. 按Enter继续"
+Read-Host "[单任务模式]大批量模式下, 生成的主控里没有导入用的文件名, 因此需要手动逐个填写导入文件名
+x264一般内置lavf, x265一般不带, 不内置lavf库的编码器需要通过ffmpeg等上游pipe端工具导入视频流，输出未封装的流. 按Enter继续"
 $mode="s"
 Function namecheck([string]$inName) {
     $badChars = '[{0}]' -f [regex]::Escape(([IO.Path]::GetInvalidFileNameChars() -join ''))
@@ -298,8 +299,8 @@ Do {Switch ($ffprobeCSV.D) {
         yuv444p10le {Write-Output "检测到源的色彩空间==[yuv444p 10bit]"; $avsCSP="-csp i444"; $avsD="-depth 10"; $encCSP="--input-csp i444"; $encD="--input-depth 10"; $ffmpegCSP="-pix_fmt yuv444p10le"}
         yuv444p12le {Write-Output "仅x265支持的色彩空间[yuv444p 12bit]"; $avsCSP="-csp i444"; $avsD="-depth 12"; $encCSP="--input-csp i444"; $encD="--input-depth 12"; $ffmpegCSP="-pix_fmt yuv444p12le"}
         yuv444p     {Write-Output "检测到源的色彩空间==[yuv444p 8bit ]"; $avsCSP="-csp i444"; $avsD="-depth 8";  $encCSP="--input-csp i444"; $encD="--input-depth 8";  $ffmpegCSP="-pix_fmt yuv444p"}
-        yuva444p10le{Write-Output "检测到源的色彩空间==[yuva444p 10bit]";$avsCSP="-csp i444"; $avsD="-depth 10"; $encCSP="--input-csp i444"; $encD="--input-depth 10"; $ffmpegCSP="-pix_fmt yuva444p10le"; "？ 该色彩空间可能不兼容"}
-        yuva444p12le{Write-Output "仅x265支持的色彩空间[yuva444p 12bit]";$avsCSP="-csp i444"; $avsD="-depth 12"; $encCSP="--input-csp i444"; $encD="--input-depth 12"; $ffmpegCSP="-pix_fmt yuva444p12le"; "？ 该色彩空间可能不兼容"}
+        yuva444p10le{Write-Output "检测到源的色彩空间==[yuv444p 10bit]"; $avsCSP="-csp i444"; $avsD="-depth 10"; $encCSP="--input-csp i444"; $encD="--input-depth 10"; $ffmpegCSP="-pix_fmt yuv444p10le"; "？ 该色彩空间可能不兼容"}
+        yuva444p12le{Write-Output "仅x265支持的色彩空间[yuv444p 12bit]"; $avsCSP="-csp i444"; $avsD="-depth 12"; $encCSP="--input-csp i444"; $encD="--input-depth 12"; $ffmpegCSP="-pix_fmt yuv444p12le"; "？ 该色彩空间可能不兼容"}
         gray        {Write-Output "检测到源的色彩空间==[yuv400p 8bit ]"; $avsCSP="-csp i400"; $avsD="-depth 8";  $encCSP="--input-csp i400"; $encD="--input-depth 8";  $ffmpegCSP="-pix_fmt gray"}
         gray10le    {Write-Output "检测到源的色彩空间==[yuv400p 10bit]"; $avsCSP="-csp i400"; $avsD="-depth 10"; $encCSP="--input-csp i400"; $encD="--input-depth 10"; $ffmpegCSP="-pix_fmt gray10le"}
         gray12le    {Write-Output "仅x265支持的色彩空间[yuv400p 12bit]"; $avsCSP="-csp i400"; $avsD="-depth 12"; $encCSP="--input-csp i400"; $encD="--input-depth 12"; $ffmpegCSP="-pix_fmt gray12le"}
@@ -390,9 +391,14 @@ $avsmodParA="`"$apmDLL`" -y4mp" #注: avs2pipemod使用"| -"而非其他工具�
 $olsargParA="-c `"$iniEXP`" --pipe-out" #注: svfi不支持y4m pipe格式
 
 #「初始化」x264/5固定参数
-if ($IMPchk -eq "e") {$y4m=""; Write-Output "√ 由于SVFI不支持yuv for mpeg pipe格式, 所以x264, x265参数设定为使用raw pipe格式"} else {$y4m="--y4m"}
-$x265ParA="$encD $x265subme $color_mtx $trans_chrctr $fps $WxH $encCSP $pme $pools $keyint $x265ParWrap $y4m -"
-$x264ParA="$encD $avc_mtx $avc_tsf $fps $WxH $encCSP $keyint $x264ParWrap $y4m -"
+if ($IMPchk -eq "e") {
+    $x265y4m=$x264y4m=""; Write-Output "√ 由于SVFI不支持yuv for mpeg pipe格式, 所以x264, x265参数设定为使用raw pipe格式"
+} else {
+    $x265y4m="--y4m"
+    $x264y4m="--demuxer y4m" #x264，x265的书写格式不同
+}
+$x265ParA="$encD $x265subme $color_mtx $trans_chrctr $fps $WxH $encCSP $pme $pools $keyint $x265ParWrap $x265y4m -"
+$x264ParA="$encD $avc_mtx $avc_tsf $fps $WxH $encCSP $keyint $x264ParWrap $x264y4m -"
 $x265ParA=$x265ParA -replace "  ", " " #由于某些情况下只能生成空的参数变量, 所以会导致双空格出现, 但保留也不影响运行
 $x264ParA=$x264ParA -replace "  ", " "
 
