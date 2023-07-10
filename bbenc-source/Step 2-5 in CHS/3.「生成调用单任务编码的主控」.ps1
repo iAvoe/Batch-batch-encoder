@@ -323,7 +323,7 @@ Do {$ENCops=$x265Path=$x264Path=""
 $encEXT=$x265Path+$x264Path
 Write-Output "√ 选择了 $encEXT`r`n"
 
-#「启动K」选择导出压制结果文件名的多种方式, 集数变量$serial于下方的循环中实现序号叠加, 单文件模式不需要集数变量
+#「启动K1」选择导出压制结果文件名的多种方式, 集数变量$serial于下方的循环中实现序号叠加, 单文件模式不需要集数变量
 $vidEXP=[io.path]::GetFileNameWithoutExtension($impEXTs)
 Do {$switchOPS=""
     $switchOPS=Read-Host "`r`n选择导出压制结果的文件名`r`n[A: 选择文件并拷贝 | B: 手动填写 | C: $vidEXP]"
@@ -332,6 +332,14 @@ Do {$switchOPS=""
     
 if (($switchOPS -eq "a") -or ($switchOPS -eq "b")) {$vidEXP = setencoutputname($mode, $switchOPS)}
 else {Write-Output "√ 写入了导出文件名 $vidEXP`r`n"}
+
+#「启动K2」x264线路下，选择导出压制结果的后缀名（x265线路下默认.hevc）
+if       ($ENCops -eq "b") {$vidFMT=""
+    Do {Switch (Read-Host "`r`n「x264线路」选择导出压制结果的文件后缀名/格式`r`n[A: MKV | B: MP4 | C: FLV]") {
+            a {$vidFMT=".mkv"} b {$vidFMT=".mp4"} c {$vidFMT=".flv"} Default {Write-Error "× 输入错误，重试"}
+        }
+    } While ($vidFMT -eq "")
+} elseif ($ENCops -eq "a") {$vidFMT=".hevc"}
 
 #「启动L, M」1: 根据选择x264/5来决定输出.hevc/.mp4. 2: x265下据cpu核心数量, 节点数量添加pme/pools
 if ($ENCops -eq "b") {
@@ -405,7 +413,7 @@ $x264ParA=$x264ParA -replace "  ", " "
 #「初始化」ffmpeg, vspipe, avs2yuv, avs2pipemod, one_line_shot_args变化参数, 大批量版需要单独计算每个视频的文件名所以不能直接赋值
 if ($mode -eq "s") {
     $ffmpegVarA=$vspipeVarA=$avsyuvVarA=$avsmodVarA=$olsargVarA="-i `"$impEXTs`"" #上游变化参数
-    $x265VarA=$x264VarA="$nbrframes --output `"$fileEXP$vidEXP`"" #下游变化参数
+    $x265VarA=$x264VarA="$nbrframes --output `"$fileEXP$vidEXP$vidFMT`"" #下游变化参数
 }
 
 #「生成ffmpeg, vspipe, avs2yuv, avspipemod主控批处理」

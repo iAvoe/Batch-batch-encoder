@@ -77,7 +77,7 @@ Write-Output "压制分场隔行视频 - x265: --tff/--bff; - x264: --interlaced
 Write-Output "VSpipe      [.vpy] --y4m               - | x265.exe --y4m - --output"
 Write-Output "avs2yuv     [.avs] -csp<串> -depth<整> - | x265.exe --input-res <串> --fps <整/小/分数> - --output"
 Write-Output "avs2pipemod [.avs] -y4mp                 | x265.exe --y4m - --output`r`n"
-Write-Output "可手动在脚本中更改`$MUXops=[`r`n| a: 写入临时封装为MP4的命令(默认)`r`n| b: 写入<A>, 并且删除未封装流`r`n| c: 写入<A>但注释掉(选择不封装MKV时默认)]`r`n"
+Write-Output "x265线路下，可手动在脚本中更改`$MUXops=[`r`n| a: 压制后封装(x265线路下默认)`r`n| b: 压制后封装并删除未封装流`r`n| c: 仅压制(封装命令注释掉，x264线路时自动选择)]`r`n"
 $MUXops="a"
 
 #「启动A」生成1~n个"enc_[序号].bat"单文件版不需要
@@ -132,46 +132,53 @@ Write-Output "√ 选择了 $encEXT`r`n"
 [string]$MUXwrt=[string]$tempGen=[string]$sChar=""
 
 #「启动F」定位导出临时MP4封装的路径, x264有libav所以用$ENCops排除并直接导出MP4. 步骤3才会定义导出压制文件路径
-[string]$vidEXP=[string]$serial=[string]$MUXplan=""
+[string]$vidEXP=[string]$serial=[string]$MUXhevc=""
 
-if ($ENCops -eq "a") {
-    $MUXplan="a"
-    Do {Switch (Read-Host "Select [ A: 后面要用MKV封装 (增加一步hevc封装MKV所需的ffmpeg后门操作 - 生成临时MP4）`r`n | B: 后面不用MKV封装 ]") {
-            a { #$MUXops="a" 已在前面的代码中赋值
+if ($ENCops -eq "a") {$MUXhevc="a" #x265线路，需要考虑是否生成临时MP4
+    Do {Switch (Read-Host "Select [ A: 后面要用ffmpeg封装MKV (ffmpeg需生成临时MP4，再封装MKV）`r`n | B: 后面不用MKV封装 - 只生成.hevc流 ]") {
+            a   { 
+                # "MUXops A/B" 在顶部代码中赋值，可手动修改
                 Read-Host "将打开[导出临时封装文件]的路径选择窗, 因为ffmpeg禁止封装hevc/avc流到MKV. 可能会在窗口底层弹出. 按Enter继续"
-                $fileEXP = whichlocation 
-                Write-Output "√ 选择的路径为 $fileEXP`r`n"
+                $EXPpath = whichlocation 
+                Write-Output "√ 选择的路径为 $EXPpath`r`n"
 
                 $vidEXP = settmpoutputname($mode) #设置导出文件名
-            }
-            b       {$MUXplan="b"; $MUXops="c"}
-            Default {Write-Warning "`r`n × 输入错误，重试"}
-        }#MUXops C: 写入注释掉的MUXwrt A
-    } While ($MUXplan -eq "")
-}
 
-$utf8NoBOM=New-Object System.Text.UTF8Encoding $false #导出utf-8NoBOM文本编码hack
-$tempEncOut=$vidEXP+".hevc" #此处和大批量版完全不同, 对照参考失效
+                $tempEncOut=$vidEXP+".mp4"  #x265线路下的编码导出路径+文件名
+            } b {
+                $MUXhevc="b"; $MUXops="c"   #后面不用MKV封装，"MUXops C" 写入注释掉的MUXwrt A
+
+                $tempEncOut=$vidEXP+".hevc" #x265线路下的编码导出路径+文件名
+            }
+            Default {Write-Warning "`r`n × 输入错误，重试"}
+        }
+    } While ($MUXhevc -eq "")
+} elseif ($ENCops -eq "b") {$MUXops="c"}  #x264线路，不需要生成临时封装文件
+  
 $tempMuxOut=$vidEXP+".mp4"
 
 #单任务封装模式下的临时封装ffmpeg参数+x265, x264线路切换. $MUXwrt在上方已经初始化, 所以默认是""
 #单任务模式下没有$sChar变量
-if ($ENCops -eq "a") {$ENCwrt="$impEXT %ffmpegVarA% %ffmpegParA% - | $x265Path %x265ParA% %x265VarA%"}
-elseif ($ENCops -eq "b") {$ENCwrt="$impEXT %ffmpegVarA% %ffmpegParA% - | $x264Path %x264ParA% %x264VarA%"}
+if     ($ENCops -eq "a") {$ENCwrt="$impEXT %ffmpegVarA% %ffmpegParA% - | $encEXT %x265ParA% %x265VarA%"}
+elseif ($ENCops -eq "b") {$ENCwrt="$impEXT %ffmpegVarA% %ffmpegParA% - | $encEXT %x264ParA% %x264VarA%"}
 else {Write-Error "× 失败: 未选择编码器"; pause; exit}
 
-if ($MUXops -eq "a") {$MUXwrt="$impEXT %ffmpegVarA% %ffmpegParB% `"$fileEXP$tempEncOut`"
-::del `"$fileEXP$tempMuxOut`""}
-elseif ($MUXops -eq "b") {$MUXwrt="$impEXT %ffmpegVarA% %ffmpegParB% `"$fileEXP$tempEncOut`"
-del `"$fileEXP$tempMuxOut`""}
-elseif ($MUXops -eq "c") {$MUXwrt="::$impEXT %ffmpegVarA% %ffmpegParB% `"$fileEXP$tempEncOut`"
-::del `"$fileEXP$tempMuxOut`""}
-else {Write-Error "× 崩溃: 不认识变量`$MUXops的值"; pause; exit}
+#手动在顶部更改`$MUXops=[`r`n| a: 压制后封装(x265线路下默认)`r`n| b: 压制后封装并删除未封装流`r`n| c: 仅压制(封装命令注释掉，x264线路时自动选择)]
+if       ($MUXops -eq "a") {$MUXwrt="$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$tempEncOut`"
+::del `"$EXPpath$tempMuxOut`""
+} elseif ($MUXops -eq "b") {$MUXwrt="$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$tempEncOut`"
+del `"$EXPpath$tempMuxOut`""
+} elseif ($MUXops -eq "c") {$MUXwrt="::$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$tempEncOut`"
+::del `"$EXPpath$tempMuxOut`""
+} else {
+    Write-Error "× 崩溃: 请修复变量`$MUXops的值[A|B|C]"; pause; exit
+}
 
 #[string]$banner=[string]$cVO=[string]$fVO=[string]$xVO=[string]$aVO=""
 [string]$trueExpPath="" #trueExpPath即完整导出路径, 由导出路径$exptPath和文件名enc_[数字].bat组成, 同时以防加号分隔变量$exptPath和文本enc_输出到文件名
 
 #单任务封装模式下的文件输出功能
+$utf8NoBOM=New-Object System.Text.UTF8Encoding $false #导出utf-8NoBOM文本编码hack
 Switch ($IMPchk) { a { #ffmpeg
 
     Write-Output "  正在生成enc_0S.bat"
@@ -195,7 +202,7 @@ REM Var被用于引用动态数据，如输入输出路径和根据源视频自�
 
 "+$ENCwrt+"
 
-REM 「临时封装部分」x265下游线路会自动调用
+REM 「临时封装部分」x265下游，MUXops [A|B]是调用，x264下游以及MUXops [C]时注释掉
 
 "+$MUXwrt+"
 
@@ -230,7 +237,7 @@ REM Var被用于引用动态数据，如输入输出路径和根据源视频自�
 
 "+$ENCwrt+"
 
-REM 「临时封装部分」x265下游线路会自动调用
+REM 「临时封装部分」x265下游，MUXops [A|B]是调用，x264下游以及MUXops [C]时注释掉
 
 "+$MUXwrt+"
 
@@ -265,7 +272,7 @@ REM Var被用于引用动态数据，如输入输出路径和根据源视频自�
 
 "+$ENCwrt+"
 
-REM 「临时封装部分」x265下游线路会自动调用
+REM 「临时封装部分」x265下游，MUXops [A|B]是调用，x264下游以及MUXops [C]时注释掉
 
 "+$MUXwrt+"
 
@@ -300,7 +307,7 @@ REM Var被用于引用动态数据，如输入输出路径和根据源视频自�
 
 "+$ENCwrt+"
 
-REM 「临时封装部分」x265下游线路会自动调用
+REM 「临时封装部分」x265下游，MUXops [A|B]是调用，x264下游以及MUXops [C]时注释掉
 
 "+$MUXwrt+"
 
@@ -335,7 +342,7 @@ REM Var被用于引用动态数据，如输入输出路径和根据源视频自�
 
 "+$ENCwrt+"
 
-REM 「临时封装部分」x265下游线路会自动调用
+REM 「临时封装部分」x265下游，MUXops [A|B]是调用，x264下游以及MUXops [C]时注释掉
 
 "+$MUXwrt+"
 
