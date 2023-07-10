@@ -409,13 +409,14 @@ if ($mode -eq "s") {
 }
 
 #「生成ffmpeg, vspipe, avs2yuv, avspipemod主控批处理」
-$ctrl_gen="REM 「兼容 UTF-8文件名」弃用ANSI文本编码格式
+$ctrl_gen="
+chcp 65001
+REM 「兼容 UTF-8文件名」弃用ANSI文本编码格式
 REM 「要求 变量回收」set+endlocal, 在编码bat中停止也触发清理
 REM UTF-8文本编码, 关闭命令输入显示, 5秒倒数
 
 @echo off
 timeout 5
-chcp 65001
 setlocal
 
 REM 「非正常退出时」用taskkill /F /IM cmd.exe /T才能清理打开的批处理, 否则重复使用可会乱码
