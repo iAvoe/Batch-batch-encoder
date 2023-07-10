@@ -153,8 +153,8 @@ Write-Output "√ 选择的路径为 $exptPath`r`n"
 
 #「启动D」定位导出压制结果用路径
 Read-Host "将打开[导出压制文件]的路径选择窗, 可能会在窗口底层弹出. 按Enter继续"
-$fileEXP = whichlocation
-Write-Output "选择的路径为 $fileEXP`r`n"
+$fileEXPpath = whichlocation
+Write-Output "选择的路径为 $fileEXPpath`r`n"
 
 #「启动E」导入原文件, 注意步骤2中已经导入了ffmpeg等工具的路径. 所以步骤3只导入源. 注意变量也为此而改了名
 Write-Output "参考[视频文件类型]https://en.wikipedia.org/wiki/Video_file_format"
@@ -185,7 +185,7 @@ if ($mode -eq "s") {Write-Output "`r`n√ 选择的文件为 $impEXTs`r`n"
         if ($impEXTs -ne ".avs") {Write-Warning "文件后缀名是 $impEXTs 而非 .avs`r`n"} #if选项用于防止ffmpeg线路下输入了空值$impEXTs
     } elseif ($IMPchk -eq "b") {#「启动F4」vspipe线路检查文件后缀名是否正常
         if ($impEXTs -ne ".vpy") {Write-Warning "文件后缀名是 $impEXTs 而非 .vpy`r`n"} #大批量模式下输入的是路径所以失效
-    } #注: 导入路径: $impEXTm, 导入文件: $impEXTs, 导出路径: $fileEXP
+    } #注: 导入路径: $impEXTm, 导入文件: $impEXTs, 导出路径: $fileEXPpath
 }
 
 #「启动G1」Avs2pipemod需要的文件
@@ -335,7 +335,7 @@ else {Write-Output "√ 写入了导出文件名 $vidEXP`r`n"}
 
 #「启动K2」x264线路下，选择导出压制结果的后缀名（x265线路下默认.hevc）
 if       ($ENCops -eq "b") {$vidFMT=""
-    Do {Switch (Read-Host "`r`n「x264线路」选择导出压制结果的文件后缀名/格式`r`n[A: MKV | B: MP4 | C: FLV]") {
+    Do {Switch (Read-Host "「x264线路」选择导出压制结果的文件后缀名/格式`r`n[A: MKV | B: MP4 | C: FLV]`r`n") {
             a {$vidFMT=".mkv"} b {$vidFMT=".mp4"} c {$vidFMT=".flv"} Default {Write-Error "× 输入错误，重试"}
         }
     } While ($vidFMT -eq "")
@@ -343,7 +343,6 @@ if       ($ENCops -eq "b") {$vidFMT=""
 
 #「启动L, M」1: 根据选择x264/5来决定输出.hevc/.mp4. 2: x265下据cpu核心数量, 节点数量添加pme/pools
 if ($ENCops -eq "b") {
-    $nameIn+=".mp4"
     Do {$PICKops=$x264ParWrap=""
         Switch (Read-Host "选择x264压制参数预设 [A: 高画质高压缩 | B: 剪辑素材存档]") {
             a {$x264ParWrap=avcparwrapper -PICKops "a"; Write-Output "`r`n√ 选择了高画质高压缩预设"}
@@ -354,7 +353,6 @@ if ($ENCops -eq "b") {
     Write-Output "√ 已定义x264压制参数: $x264ParWrap"
 }
 elseif ($ENCops -eq "a") {
-    $nameIn+=".hevc"
     $pme=$pool=""
     $procNodes=0
     [int]$cores=(wmic cpu get NumberOfCores)[2]
@@ -388,7 +386,7 @@ elseif ($ENCops -eq "a") {
 Set-PSDebug -Strict
 $utf8NoBOM=New-Object System.Text.UTF8Encoding $false #导出utf-8NoBOM文本编码用
 
-#注: 导入路径: $impEXTm, 导入文件: $impEXTs 导出路径: $fileEXP
+#注: 导入路径: $impEXTm, 导入文件: $impEXTs 导出路径: $fileEXPpath
 #「初始化」$ffmpegPar(固定参数变量)的末尾不带空格
 #「限制」$ffmpegPar-ameters不能写在输入文件命令(-i)前面, ffmpeg参数 "-hwaccel"不能写在输入文件后面. 导致了字符串重组的流程变复杂, 及更多字符串变量的参与
 $ffmpegParA="$ffmpegCSP $fmpgfps -loglevel 16 -y -hide_banner -an -f yuv4mpegpipe -strict unofficial" #步骤2已添加pipe参数"- | -", 所以此处省略
@@ -413,7 +411,7 @@ $x264ParA=$x264ParA -replace "  ", " "
 #「初始化」ffmpeg, vspipe, avs2yuv, avs2pipemod, one_line_shot_args变化参数, 大批量版需要单独计算每个视频的文件名所以不能直接赋值
 if ($mode -eq "s") {
     $ffmpegVarA=$vspipeVarA=$avsyuvVarA=$avsmodVarA=$olsargVarA="-i `"$impEXTs`"" #上游变化参数
-    $x265VarA=$x264VarA="$nbrframes --output `"$fileEXP$vidEXP$vidFMT`"" #下游变化参数
+    $x265VarA=$x264VarA="$nbrframes --output `"$fileEXPpath$vidEXP$vidFMT`"" #下游变化参数
 }
 
 #「生成ffmpeg, vspipe, avs2yuv, avspipemod主控批处理」
