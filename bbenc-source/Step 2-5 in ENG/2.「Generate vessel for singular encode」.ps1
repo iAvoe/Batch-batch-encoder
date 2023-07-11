@@ -33,18 +33,18 @@ Function settmpoutputname([string]$mode) {
             a { Write-Debug "√ Opening a selection window to [get filename from a file]"
                 $vidEXP=whereisit
                 $vidEXP=[io.path]::GetFileNameWithoutExtension($vidEXP)
-                if ($mode -eq "m") {$vidEXP+='_$serial'} #!使用单引号防止$serial变量被激活
+                if ($mode -eq "m") {$vidEXP+='_$serial'} #! Using single quotes in codeline here to prevent variable `$serial from being executed
                 Write-Debug "`r`nIn multi-encode mode, choosing A will add a trailing counter in filename`r`n"
             }
             b { if ($mode -eq "m") {#Multi-encoding mode
-                    Do {$vidEXP=Read-Host "`r`nSpecify the filename without extension. Under multi-encode mode, specify episode counter `$serial in desired location`r`n`$serial should be padded from trailing alphabets.`r`nSpace is needed inbetween 2 square brackets e.g., [YYDM-11FANS] [Yuru Yuri 2]`$serial[BDRIP 720P]"
-                        $chkme =namecheck($vidEXP)
+                    Do {[string]$vidEXP=Read-Host "`r`nSpecify filename w/out extension (multi-encode mode)  `r`n1. Specify episode counter `$serial in desired location`r`n2. `$serial should be padded from trailing alphabets.`r`n3. Space is needed inbetween 2 square brackets`r`n  e.g., [YYDM-11FANS] [Yuru Yuri 2]`$serial[BDRIP 720P]"
+                        $chkme=namecheck($vidEXP)
                         if  (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false)) {Write-Warning "Missing variable `$serial under multi-encode mode; No value entered, Or intercepted illegal characters / | \ < > : ? * `""}
                     } While (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false))
                 }
                 if ($mode -eq "s") {# Single encoding mode
-                    Do {$vidEXP=Read-Host "`r`nSpecify the filename without extension`r`nSpace is needed inbetween 2 square brackets e.g., [YYDM-11FANS] [Yuru Yuri 2]01[BDRIP 720P]"
-                        $chkme =namecheck($vidEXP)
+                    Do {[string]$vidEXP=Read-Host "`r`nSpecify filename w/out extension (single encoding mode)`r`nSpace is needed inbetween 2 square brackets`r`ne.g., [YYDM-11FANS] [Yuru Yuri 2]01[BDRIP 720P]"
+                        $chkme=namecheck($vidEXP)
                         if  (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false)) {Write-Warning "Detecting variable `$serial in single-encode mode; No value entered, Or intercepted illegal characters / | \ < > : ? * `""}
                     } While (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false))
                 }
