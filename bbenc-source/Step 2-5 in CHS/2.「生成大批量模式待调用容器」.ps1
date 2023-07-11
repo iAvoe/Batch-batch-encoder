@@ -175,7 +175,7 @@ For ($s=0; $s -lt $qty; $s++) {
     $tmpStrmOut=$vidEXX+$sChar+".hevc" #临时待封装流的赋值方案（Stream    Output - 导出待封装流）
     $tempMuxOut=$vidEXX+$sChar+".mp4"  #临时封装文件的赋值方案（Multiplex Output - 导出已封装流）
 
-     #大批量封装模式下的临时封装ffmpeg参数. 此处和单文件模式下实现原理不同. $MUXwrt在循环开始前已初始化
+    #手动在顶部更改`$MUXops的值，x264线路下自动选C所以该代码块无效
     if       ($MUXops -eq "a") {$MUXwrt = "$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$vidEXP.hevc`"
     ::del `"$EXPpath$vidEXP.hevc`""
     } elseif ($MUXops -eq "b") {$MUXwrt = "$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$vidEXP.hevc`"

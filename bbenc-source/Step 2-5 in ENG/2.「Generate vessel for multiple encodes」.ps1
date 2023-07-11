@@ -184,16 +184,17 @@ For ($s=0; $s -lt $qty; $s++) {
     $tmpStrmOut=$vidEXX+$sChar+".hevc" #multi-encode mode's temporary multiplex solution
     $tempMuxOut=$vidEXX+$sChar+".mp4"
 
-     #ffmpeg options to multiplex temporary MP4s under multi-encode mode. Implemented differently from single encode mode. $MUXwrt was initialized before loops starts
-    if ($MUXops -eq "a") {$MUXwrt="$impEXT %ffmpegVarA% %ffmpegParB% `"$fileEXP$tempMuxOut`"
-::del `"$fileEXP$tmpStrmOut`""}
-    elseif ($MUXops -eq "b") {$MUXwrt="$impEXT %ffmpegVarA% %ffmpegParB% `"$fileEXP$tempMuxOut`"
-del `"$fileEXP$tmpStrmOut`""}
-    elseif ($MUXops -eq "c") {$MUXwrt="::$impEXT %ffmpegVarA% %ffmpegParB% `"$fileEXP$tempMuxOut`"
-::del `"$fileEXP$tmpStrmOut`""}
-    else {Write-Error "× Script broken: incorrect `$MUXops value"; pause; exit}
+    #Manually change `$MUXops specified on top, C is auto-selected under x264 downstream
+    if       ($MUXops -eq "a") {$MUXwrt = "$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$vidEXP.hevc`"
+    ::del `"$EXPpath$vidEXP.hevc`""
+    } elseif ($MUXops -eq "b") {$MUXwrt = "$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$vidEXP.hevc`"
+    del `"$EXPpath$vidEXP.hevc`""
+    } elseif ($MUXops -eq "c") {$MUXwrt="::$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$vidEXP.hevc`"
+    ::del `"$EXPpath$vidEXP.hevc`""
+    } else {
+        Write-Error "× Script broken: incorrect `$MUXops value"; pause; exit
+    }
     
-
     #x265, x264 routing under multiple-encoding mode. Implemented differently from single encode mode. $MUXwrt was initialized before loops starts
     #Single encode mode doesn't have variable $sChar
     if ($ENCops -eq "a") {$ENCwrt="$impEXT %ffmpegVar$sChar% %ffmpegParA% - | $x265Path %x265ParA% %x265Var$sChar%"}
