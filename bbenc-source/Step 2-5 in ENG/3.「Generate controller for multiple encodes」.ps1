@@ -409,7 +409,7 @@ if ($mode -eq "s") {
 }
 
 #Iteration begins, carry as any axis reaches letter 27. Switch occupies temp-variable $_ which cannot be used to initialize this loop. Counts as a 3-digit twenty-hexagonal
-$ffmpegVarSChar=$vspipeVarSChar=$avsyuvVarSChar=$avsmodVarSChar=$x265VarNosChar=$x264VarNosChar=$encCallNosChar=$vidEXX=@()
+$ffmpegVarSChar=$vspipeVarSChar=$avsyuvVarSChar=$avsmodVarSChar=$olsargVarSChar=$x265VarNosChar=$x264VarNosChar=$encCallNosChar=$vidEXX=@()
 $ffmpegVarWarp=$vspipeVarWarp=$avsyuvVarWarp=$avsmodVarWarp=$x265VarWarp=$x264VarWarp=$tempMuxOut=$tempEncOut=""
 [int]$x=[int]$y=[int]$z=0
 For ($s=0; $s -lt $qty; $s++) {
@@ -419,7 +419,6 @@ For ($s=0; $s -lt $qty; $s++) {
     $sChar=$validChars[$z]+$validChars[$y]+$validChars[$x]
 
     [string]$serial=($s).ToString($zroStr) #leading zeros processor, this prevents $s from being the actual episode counter. $serial is converted int-to-string to allow placing leading 0s
-    
     $vidEXX+=$ExecutionContext.InvokeCommand.ExpandString($vidEXP) #$vidEXP contains $serial. Expand is needed to convert $serial from string to variable. Breaking the previous single quotes' seal
 
     $tempMuxOut=$vidEXX[$s]+".mp4" #multi-encode mode's temporary multiplex solution. $serial is used instead of $sChar
@@ -429,6 +428,7 @@ For ($s=0; $s -lt $qty; $s++) {
     $vspipeVarSChar+="@set `"vspipeVar"+$sChar+"=-i `"video-to-encode"+"_"+"$sChar.mkv`"`"`n"
     $avsyuvVarSChar+="@set `"avsyuvVar"+$sChar+"=-i `"video-to-encode"+"_"+"$sChar.mkv`"`"`n"
     $avsmodVarSChar+="@set `"avsmodVar"+$sChar+"=-i `"video-to-encode"+"_"+"$sChar.mkv`"`"`n"
+    $olsargVarSChar+="@set `"avsmodVar"+$sChar+"=-i `"video-to-encode"+"_"+"$sChar.mkv`" -t bbenc_run_$sChar`"`n"
 
     $x265VarNosChar+="@set `"x265Var"+$sChar+"=--output `"$fileEXPpath$tempMuxOut`"`"`n"
     $x264VarNosChar+="@set `"x264Var"+$sChar+"=--output `"$fileEXPpath$tempMuxOut`"`"`n"
