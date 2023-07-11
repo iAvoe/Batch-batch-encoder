@@ -133,28 +133,28 @@ Write-Output "√ 选择了 $encEXT`r`n"
 #         由步骤3定义导出压制文件的路径，文件名和后缀名
 [string]$vidEXP=[string]$serial=[string]$MUXhevc=""
 
-if ($ENCops -eq "a") {$MUXhevc="a" #x265线路，需要考虑是否生成临时MP4
+if ($ENCops -eq "a") {
     Do {Switch (Read-Host "Select [ A: 后面要用ffmpeg封装MKV (ffmpeg需生成临时MP4，再封装MKV）`r`n | B: 后面不用MKV封装 - 只生成.hevc流 ]") {
-            a   { 
-                # "MUXops A/B" 在顶部代码中赋值，可手动修改
+            a { $MUXhevc="a" #x265线路，需要考虑是否生成临时MP4
+                             #"MUXops A/B" 在顶部代码中赋值，可手动修改
                 Read-Host "将打开[导出临时封装文件]的路径选择窗, 可能会在窗口底层弹出. 按Enter继续"
                 $EXPpath = whichlocation 
                 Write-Output "√ 选择的路径为 $EXPpath`r`n"
-
                 $vidEXP = settmpoutputname($mode) #设置导出文件名
-
-                $tempMuxOut=$vidEXP+".mp4"  #x265线路下的编码导出路径+文件名
-            } b {
-                $MUXhevc="b"; $MUXops="c"   #后面不用MKV封装，"MUXops C" 写入注释掉的MUXwrt A
-
-                $tempMuxOut=$vidEXP+".hevc" #x265线路下的编码导出路径+文件名
+                }
+            b{ $MUXhevc="b"
+                $MUXops ="c"#后面不用MKV封装，"MUXops C" 写入注释掉的MUXwrt A
             }
-            Default {Write-Warning "`r`n × 输入错误，重试"}
+            Default {
+                Write-Warning "`r`n × 输入错误，重试"
+                $MUXhevc=""
+            }
         }
     } While ($MUXhevc -eq "")
-} elseif ($ENCops -eq "b") {$MUXops="c"}  #x264线路，不需要生成临时封装文件
-  
-$tmpStrmOut=$vidEXP+".mp4" #大批量封装模式下的临时封装赋值方案
+} elseif ($ENCops -eq "b") {#x264线路
+    $MUXhevc="b"            #不需要生成临时封装文件
+    $MUXops="c"
+}
 
 #「三维for循环轴」通过$validChars[x]+$validChars[y]+$validChars[z]实现
 #这里进行的计算相当于数学上的进位. 当x轴被填满后y轴+1并清除x, 当y轴填满后z轴+1并清除x和y
@@ -176,13 +176,15 @@ For ($s=0; $s -lt $qty; $s++) {
     $tempMuxOut=$vidEXX+$sChar+".mp4"  #临时封装文件的赋值方案（Multiplex Output - 导出已封装流）
 
      #大批量封装模式下的临时封装ffmpeg参数. 此处和单文件模式下实现原理不同. $MUXwrt在循环开始前已初始化
-    if     ($MUXops -eq "a") {$MUXwrt  ="$impEXT %ffmpegVarA% %ffmpegParB% `"$fileEXP$tempMuxOut`"
-::del `"$fileEXP$tmpStrmOut`""}
-    elseif ($MUXops -eq "b") {$MUXwrt = "$impEXT %ffmpegVarA% %ffmpegParB% `"$fileEXP$tempMuxOut`"
-del `"$fileEXP$tmpStrmOut`""}
-    elseif ($MUXops -eq "c") {$MUXwrt="::$impEXT %ffmpegVarA% %ffmpegParB% `"$fileEXP$tempMuxOut`"
-::del `"$fileEXP$tmpStrmOut`""}
-    else {Write-Error "× 崩溃: 不认识变量`$MUXops的值"; pause; exit}
+    if       ($MUXops -eq "a") {$MUXwrt = "$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$vidEXP.hevc`"
+    ::del `"$EXPpath$vidEXP.hevc`""
+    } elseif ($MUXops -eq "b") {$MUXwrt = "$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$vidEXP.hevc`"
+    del `"$EXPpath$vidEXP.hevc`""
+    } elseif ($MUXops -eq "c") {$MUXwrt="::$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$vidEXP.hevc`"
+    ::del `"$EXPpath$vidEXP.hevc`""
+    } else {
+        Write-Error "`r`n× 崩溃: 请修复变量`$MUXops的值[A|B|C]"; pause; exit
+    }
 
     #大批量封装模式下的x265, x264线路切换. 此处和单文件模式下实现原理不同. $MUXwrt在循环开始前已初始化
     #单任务模式下没有$sChar变量
@@ -190,14 +192,12 @@ del `"$fileEXP$tmpStrmOut`""}
     elseif ($ENCops -eq "b") {$ENCwrt="$impEXT %ffmpegVar$sChar% %ffmpegParA% - | $x264Path %x264ParA% %x264Var$sChar%"}
     else {Write-Error "× 失败: 未选择编码器"; pause; exit}
 
-[string]$banner=[string]$trueExpPath=[string]$cVO=[string]$fVO=[string]$xVO=[string]$aVO="" #trueExpPath即完整导出路径, 由导出路径$exptPath和文件名enc_[数字].bat组成, 同时以防加号分隔变量$exptPath和文本enc_输出到文件名
+    [string]$trueExpPath=[string]$cVO=[string]$fVO=[string]$xVO=[string]$aVO="" #trueExpPath即完整导出路径, 由导出路径$exptPath和文件名enc_[数字].bat组成, 同时以防加号分隔变量$exptPath和文本enc_输出到文件名
 
-    Switch ($IMPchk) { a { #ffmpeg
-
-        $banner = "-----------Starting encode "+$sChar+"-----------"
-        Write-Output "  正在生成enc_$s.bat (ffmpeg)"
-        
-        $enc_gen="REM 「标题」
+    $banner = "-----------Starting encode "+$sChar+"-----------"
+    Write-Output "  正在生成enc_$s.bat (上游路线 $impEXT)"
+    
+    $enc_gen="REM 「标题」
 
 @echo.
 @echo "+$banner+"
@@ -206,6 +206,18 @@ REM 「debug部分」正常使用时注释掉
 REM @echo %ffmpegParA%
 REM @echo %ffmpegVarA%
 REM @echo %ffmpegVar"+$sChar+"%
+REM @echo %vspipeParA%
+REM @echo %vspipeVarA%
+REM @echo %vspipeVar"+$sChar+"%
+REM @echo %avsyuvParA%
+REM @echo %avsyuvVarA%
+REM @echo %avsyuvVar"+$sChar+"%
+REM @echo %avsmodVarParA%
+REM @echo %avsmodVarVarA%
+REM @echo %avsmodVarVar"+$sChar+"%
+REM @echo %olsargParA%
+REM @echo %olsargVarA%
+REM @echo %olsargVar"+$sChar+"%
 REM @echo %x265ParA%
 REM @echo %x265VarA%
 REM @echo %x265Var"+$sChar+"%
@@ -231,168 +243,6 @@ if %ERRORLEVEL%==3 cmd /k
 if %ERRORLEVEL%==2 pause
 if %ERRORLEVEL%==1 endlocal && exit /b"
 
-    } b { #vspipe
-
-        $banner = "-----------Starting encode "+$sChar+"-----------"
-        Write-Output "  正在生成enc_$s.bat (VSPipe)"
-        
-        $enc_gen="REM 「标题」
-
-@echo.
-@echo "+$banner+"
-
-REM 「debug部分」正常使用时注释掉
-REM @echo %vspipeParA%
-REM @echo %vspipeVarA%
-REM @echo %vspipeVar"+$sChar+"%
-REM @echo %x265ParA%
-REM @echo %x265VarA%
-REM @echo %x265Var"+$sChar+"%
-REM @echo %x264ParA%
-REM @echo %x264VarA%
-REM @echo %x264Var"+$sChar+"%
-REM pause
-
-REM 「压制部分」debug时注释掉
-REM Var被用于引用动态数据，如输入输出路径和根据源视频自动调整的部分参数值
-
-"+$ENCwrt+"
-
-REM 「临时封装部分」x265下游，MUXops [A|B]时调用，x264下游以及MUXops [C]时注释掉
-
-"+$MUXwrt+"
-
-REM 「选择续y/暂n/止z」5秒后自动y, 除外字符被choice命令屏蔽, 暂停代表仍可继续.
-
-choice /C YNZ /T 5 /D Y /M `" Continue? (Sleep=5; Default: Y, Pause: N, Stop: Z)`"
-
-if %ERRORLEVEL%==3 cmd /k
-if %ERRORLEVEL%==2 pause
-if %ERRORLEVEL%==1 endlocal && exit /b"
-
-    } c { #avs2yuv
-
-        $banner = "-----------Starting encode "+$sChar+"-----------"
-        Write-Output "  正在生成enc_$s.bat (avs2yuv)"
-        
-        $enc_gen="REM 「标题」
-
-@echo.
-@echo "+$banner+"
-
-REM 「debug部分」正常使用时注释掉
-REM @echo %avsyuvParA%
-REM @echo %avsyuvVarA%
-REM @echo %avsyuvVar"+$sChar+"%
-REM @echo %x265ParA%
-REM @echo %x265VarA%
-REM @echo %x265Var"+$sChar+"%
-REM @echo %x264ParA%
-REM @echo %x264VarA%
-REM @echo %x264Var"+$sChar+"%
-REM pause
-
-REM 「压制部分」debug时注释掉
-REM Var被用于引用动态数据，如输入输出路径和根据源视频自动调整的部分参数值
-
-"+$ENCwrt+"
-
-REM 「临时封装部分」x265下游，MUXops [A|B]时调用，x264下游以及MUXops [C]时注释掉
-
-"+$MUXwrt+"
-
-REM 「选择续y/暂n/止z」5秒后自动y, 除外字符被choice命令屏蔽, 暂停代表仍可继续.
-
-choice /C YNZ /T 5 /D Y /M `" Continue? (Sleep=5; Default: Y, Pause: N, Stop: Z)`"
-
-if %ERRORLEVEL%==3 cmd /k
-if %ERRORLEVEL%==2 pause
-if %ERRORLEVEL%==1 endlocal && exit /b"
-
-        $trueExpPath=$exptPath+"enc_"+$s+".bat" #增加一道变量赋值, 以防加号分隔变量$exptPath和文本enc_输出到文件名
-        #Out-File -InputObject $enc_gen -FilePath $trueExpPath -Encoding utf8
-        [IO.File]::WriteAllLines($trueExpPath, $enc_gen, $utf8NoBOM) #强制导出utf-8NoBOM编码
-
-    } d { #avs2pipemod
-        
-        $banner = "-----------Starting encode "+$sChar+"-----------"
-        Write-Output "  正在生成enc_$s.bat (avs2pipemod)"
-        
-        $enc_gen="REM 「标题」
-
-@echo.
-@echo "+$banner+"
-
-REM 「debug部分」正常使用时注释掉
-REM @echo %avsmodVarParA%
-REM @echo %avsmodVarVarA%
-REM @echo %avsmodVarVar"+$sChar+"%
-REM @echo %x265ParA%
-REM @echo %x265VarA%
-REM @echo %x265Var"+$sChar+"%
-REM @echo %x264ParA%
-REM @echo %x264VarA%
-REM @echo %x264Var"+$sChar+"%
-REM pause
-
-REM 「压制部分」debug时注释掉
-REM Var被用于引用动态数据，如输入输出路径和根据源视频自动调整的部分参数值
-
-"+$ENCwrt+"
-
-REM 「临时封装部分」x265下游，MUXops [A|B]时调用，x264下游以及MUXops [C]时注释掉
-
-"+$MUXwrt+"
-
-REM 「选择续y/暂n/止z」5秒后自动y, 除外字符被choice命令屏蔽, 暂停代表仍可继续.
-
-choice /C YNZ /T 5 /D Y /M `" Continue? (Sleep=5; Default: Y, Pause: N, Stop: Z)`"
-
-if %ERRORLEVEL%==3 cmd /k
-if %ERRORLEVEL%==2 pause
-if %ERRORLEVEL%==1 endlocal && exit /b"
-
-} e { #SVFI
-    
-        $banner = "-----------Starting encode "+$sChar+"-----------"
-        Write-Output "  正在生成enc_$s.bat (SVFI)"
-    
-        $enc_gen="REM 「标题」
-
-@echo.
-@echo "+$banner+"
-
-REM 「debug部分」正常使用时注释掉
-REM @echo %olsargParA%
-REM @echo %olsargVarA%
-REM @echo %olsargVar"+$sChar+"%
-REM @echo %x265ParA%
-REM @echo %x265VarA%
-REM @echo %x265Var"+$sChar+"%
-REM @echo %x264ParA%
-REM @echo %x264VarA%
-REM @echo %x264Var"+$sChar+"%
-REM pause
-
-REM 「压制部分」debug时注释掉
-REM Var被用于引用动态数据，如输入输出路径和根据源视频自动调整的部分参数值
-
-"+$ENCwrt+"
-
-REM 「临时封装部分」x265下游，MUXops [A|B]时调用，x264下游以及MUXops [C]时注释掉
-
-"+$MUXwrt+"
-
-REM 「选择续y/暂n/止z」5秒后自动y, 除外字符被choice命令屏蔽, 暂停代表仍可继续.
-
-choice /C YNZ /T 5 /D Y /M `" Continue? (Sleep=5; Default: Y, Pause: N, Stop: Z)`"
-
-if %ERRORLEVEL%==3 cmd /k
-if %ERRORLEVEL%==2 pause
-if %ERRORLEVEL%==1 endlocal && exit /b"
-
-        }#关闭Switch选项
-    }#关闭Switch
 
     $trueExpPath=$exptPath+"enc_"+$s+".bat" #增加一道变量赋值, 以防加号分隔变量$exptPath和文本enc_输出到文件名
     #Out-File -InputObject $enc_gen -FilePath $trueExpPath -Encoding utf8

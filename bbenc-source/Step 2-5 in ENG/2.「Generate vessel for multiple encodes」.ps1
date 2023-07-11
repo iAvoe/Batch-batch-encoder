@@ -145,7 +145,9 @@ if ($ENCops -eq "a") {
 
                 $vidEXP = settmpoutputname($mode) #Configure file output name for the temporary MP4
 
-            }b{ $MUXhevc="b"
+                $tempMuxOut=$vidEXP+".mp4"  #x265线路下的编码导出路径+文件名
+            }b{ 
+                $MUXhevc="b"
                 $MUXops ="c"#Generate a commented-out multiplexing command
             }
             Default {
@@ -158,6 +160,8 @@ if ($ENCops -eq "a") {
     $MUXhevc="b"            #no temporary MP4 files are needed
     $MUXops="c"             #generate a commented-out multiplexing command
 }
+
+$utf8NoBOM=New-Object System.Text.UTF8Encoding $false #export batch file w/ utf-8NoBOM text codec
 
 $tmpStrmOut=$vidEXP+".hevc" #Path, filename & extension of temporary .hevc stream output (Stream Output - export stream to MUXwrt commandline)
 $tempMuxOut=$vidEXP+".mp4"  #Path, filename & extension of temporary MP4 file multiplexed (This get commented out when Switch above is not A)
@@ -196,8 +200,7 @@ del `"$fileEXP$tmpStrmOut`""}
     elseif ($ENCops -eq "b") {$ENCwrt="$impEXT %ffmpegVar$sChar% %ffmpegParA% - | $x264Path %x264ParA% %x264Var$sChar%"}
     else {Write-Error "× Failure: missing selection of video encoding program"; pause; exit}
 
-    [string]$banner=[string]$trueExpPath=[string]$cVO=[string]$fVO=[string]$xVO=[string]$aVO="" #trueExpPath is the actual variable used to export temporary MP4s, to not write "+"s into exporting files, as $exptPath cannot be connecting to enc_ without a "+"
-    $utf8NoBOM=New-Object System.Text.UTF8Encoding $false #export batch file w/ utf-8NoBOM text codec
+    [string]$trueExpPath=[string]$cVO=[string]$fVO=[string]$xVO=[string]$aVO="" #trueExpPath is the actual variable used to export temporary MP4s, to not write "+"s into exporting files, as $exptPath cannot be connecting to enc_ without a "+"
 
     $banner = "-----------Starting encode "+$sChar+"-----------"
     Write-Output "  Generating enc_$s.bat (Upstream $impEXT)"

@@ -136,15 +136,13 @@ Write-Output "√ 选择了 $encEXT`r`n"
 if ($ENCops -eq "a") {
     Do {Switch (Read-Host "Select [ A: 后面要用ffmpeg封装MKV (ffmpeg需生成临时MP4，再封装MKV）`r`n | B: 后面不用MKV封装 - 只生成.hevc流 ]") {
             a { $MUXhevc="a" #x265线路，需要考虑是否生成临时MP4
-
-                # "MUXops A/B" 在顶部代码中赋值，可手动修改
+                             #"MUXops A/B" 在顶部代码中赋值，可手动修改
                 Read-Host "将打开[导出临时封装文件]的路径选择窗, 可能会在窗口底层弹出. 按Enter继续"
                 $EXPpath = whichlocation 
                 Write-Output "√ 选择的路径为 $EXPpath`r`n"
-
                 $vidEXP = settmpoutputname($mode) #设置导出文件名
-
-            }b{ $MUXhevc="b"
+                }
+            b{ $MUXhevc="b"
                 $MUXops ="c"#后面不用MKV封装，"MUXops C" 写入注释掉的MUXwrt A
             }
             Default {
@@ -158,22 +156,19 @@ if ($ENCops -eq "a") {
     $MUXops="c"
 }
 
-$tmpStrmOut=$vidEXP+".hevc" #临时待封装流的赋值方案（Stream Output - 导出待封装流）
-$tempMuxOut=$vidEXP+".hevc" #x265线路下的编码导出路径+文件名
-
 #单任务封装模式下的临时封装ffmpeg参数+x265, x264线路切换. $MUXwrt在上方已经初始化, 所以默认是""
 #单任务模式下没有$sChar变量
 if     ($ENCops -eq "a") {$ENCwrt="$impEXT %ffmpegVarA% %ffmpegParA% - | $encEXT %x265ParA% %x265VarA%"}
 elseif ($ENCops -eq "b") {$ENCwrt="$impEXT %ffmpegVarA% %ffmpegParA% - | $encEXT %x264ParA% %x264VarA%"}
 else                     {Write-Error "× 失败: 未选择编码器"; pause; exit}
 
-#手动在顶部更改`$MUXops的值，x264线路下自动选C
-if       ($MUXops -eq "a") {$MUXwrt = "$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$tempMuxOut`"
-::del `"$EXPpath$tmpStrmOut`""
-} elseif ($MUXops -eq "b") {$MUXwrt = "$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$tempMuxOut`"
-del `"$EXPpath$tmpStrmOut`""
-} elseif ($MUXops -eq "c") {$MUXwrt="::$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$tempMuxOut`"
-::del `"$EXPpath$tmpStrmOut`""
+#手动在顶部更改`$MUXops的值，x264线路下自动选C所以该代码块无效
+if       ($MUXops -eq "a") {$MUXwrt = "$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$vidEXP.hevc`"
+::del `"$EXPpath$vidEXP.hevc`""
+} elseif ($MUXops -eq "b") {$MUXwrt = "$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$vidEXP.hevc`"
+del `"$EXPpath$vidEXP.hevc`""
+} elseif ($MUXops -eq "c") {$MUXwrt="::$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$vidEXP.hevc`"
+::del `"$EXPpath$vidEXP.hevc`""
 } else {
     Write-Error "`r`n× 崩溃: 请修复变量`$MUXops的值[A|B|C]"; pause; exit
 }
