@@ -1,10 +1,10 @@
 ﻿cls #Dev's Github: https://github.com/iAvoe
-$mode="s"
+$mode="s" #Signular encoding mode
 Function namecheck([string]$inName) {
     $badChars = '[{0}]' -f [regex]::Escape(([IO.Path]::GetInvalidFileNameChars() -join ''))
     ForEach ($_ in $badChars) {if ($_ -match $inName) {return $false}}
     return $true
-} #Checking if input filename compliants to Windows file naming scheme
+} #Checking if input filename compliants to Windows file naming scheme, not needed in multiple encoding mode
 
 Function whereisit($startPath='DESKTOP') {
     #Opens a System.Windows.Forms GUI to pick a file
@@ -26,6 +26,38 @@ Function whichlocation($startPath='DESKTOP') {
     return $startPath.SelectedPath
 }
 
+Function settmpoutputname([string]$mode) {
+    $DebugPreference="Continue" #Write-Output/Host does not work in a function, using Write-Debug instead
+
+    Do {Switch (Read-Host "Choose [A: Copy from a file | B: Input] as the temporary MP4's filename") {
+            a { Write-Debug "√ Opening a selection window to [get filename from a file]"
+                $vidEXP=whereisit
+                $vidEXP=[io.path]::GetFileNameWithoutExtension($vidEXP)
+                if ($mode -eq "m") {$vidEXP+='_$serial'} #!使用单引号防止$serial变量被激活
+                Write-Debug "`r`nIn multi-encode mode, choosing A will add a trailing counter in filename`r`n"
+            }
+            b { if ($mode -eq "m") {#Multi-encoding mode
+                    Do {$vidEXP=Read-Host "`r`nSpecify the filename without extension. Under multi-encode mode, specify episode counter `$serial in desired location`r`n`$serial should be padded from trailing alphabets.`r`nSpace is needed inbetween 2 square brackets e.g., [YYDM-11FANS] [Yuru Yuri 2]`$serial[BDRIP 720P]"
+                        $chkme =namecheck($vidEXP)
+                        if  (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false)) {Write-Warning "Missing variable `$serial under multi-encode mode; No value entered, Or intercepted illegal characters / | \ < > : ? * `""}
+                    } While (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false))
+                }
+                if ($mode -eq "s") {# Single encoding mode
+                    Do {$vidEXP=Read-Host "`r`nSpecify the filename without extension`r`nSpace is needed inbetween 2 square brackets e.g., [YYDM-11FANS] [Yuru Yuri 2]01[BDRIP 720P]"
+                        $chkme =namecheck($vidEXP)
+                        if  (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false)) {Write-Warning "Detecting variable `$serial in single-encode mode; No value entered, Or intercepted illegal characters / | \ < > : ? * `""}
+                    } While (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false))
+                }
+                #[string]$serial=($s).ToString($zroStr) #Example of parsing leading zeros to $serial. Used in for loop below (supplies variable $s)
+                #$vidEXP=$ExecutionContext.InvokeCommand.ExpandString($vidEXP) #Activating $serial as a variable with expand string method. Used in for loop below
+            }
+            default {Write-Warning "× Bad input, try again`r`n"}
+        }
+    } While ($vidEXP -eq "")
+    Write-Debug "√ Added exporting filename $vidEXP`r`n"
+    return $vidEXP
+}
+
 #「@MrNetTek」Use high-DPI rendering, to fix blurry System.Windows.Forms
 Add-Type -TypeDefinition @'
 using System.Runtime.InteropServices;
@@ -45,6 +77,8 @@ Write-Output "Encode interlaced source with x265: --tff/--bff; x264: --interlace
 Write-Output "VSpipe      [.vpy] --y4m                    - | x265.exe --y4m - --output"
 Write-Output "avs2yuv     [.avs] -csp<string> -depth<int> - | x265.exe --input-res <string> --fps <int/float/fraction> - --output"
 Write-Output "avs2pipemod [.avs] -y4mp                      | x265.exe --y4m - --output`r`n"
+Write-Output "Under x265 downstream, manually changing preference `$MUXops=[`r`n| a: Muxtiplex after encode (default)`r`n| b: Multiplex & delete raw hevc stream after encode`r`n| c: Encode only (comment multiplex commandline out, auto-selected under x264 downstream)]`r`n"
+$MUXops="a"
 
 #「Bootstrap A」Generate 1~n amount of "enc_[numbers].bat". Not needed in singular encode mode
 if ($mode -eq "m") {
@@ -71,17 +105,17 @@ $exptPath = whichlocation
 Write-Output "√ Selected $exptPath`r`n"
 
 #「Bootstrap D」Choose upstream program of file pipe, y4m pipe & ffprobe analysis were both used for info-gathering fallback. Only Step 3 chooses video file to import
-Do {$IMPchk=$fmpgPath=$vprsPath=$avsyPath=$avspPath=$svfiPath=""
+Do {$impEXT=$fmpgPath=$vprsPath=$avsyPath=$avspPath=$svfiPath=""
     Switch (Read-Host "Choose an upstream pipe program [A: ffmpeg | B: vspipe | C: avs2yuv | D: avs2pipemod | E: SVFI]") {
-        a {$IMPchk="a"; Write-Output "`r`nChoosing ffmpeg------route A. Opening a selection window to [locate ffmpeg.exe]"; $fmpgPath=whereisit}
-        b {$IMPchk="b"; Write-Output "`r`nChoosing vspipe------route B. Opening a selection window to [locate vspipe.exe]"; $vprsPath=whereisit}
-        c {$IMPchk="c"; Write-Output "`r`nChoosing avs2yuv-----route C. Opening a selection window to [locate avs2yuv.avs]"; $avsyPath=whereisit}
-        d {$IMPchk="d"; Write-Output "`r`nChoosing avs2pipemod-route D. Opening a selection window to [locate avs2pipemod.exe]"; $avspPath=whereisit}
-        e {$IMPchk="e"; Write-Output "`r`nChoosing svfi--------route E. Opening a selection window to [locate one_line_shot_args.exe]`r`ni.e. under Steam distro: X:\SteamLibrary\steamapps\common\SVFI\one_line_shot_args.exe"; $svfiPath=whereisit}
+        a {Write-Output "`r`nChoosing ffmpeg------route A. Opening a selection window to [locate ffmpeg.exe]";      $fmpgPath=whereisit}
+        b {Write-Output "`r`nChoosing vspipe------route B. Opening a selection window to [locate vspipe.exe]";      $vprsPath=whereisit}
+        c {Write-Output "`r`nChoosing avs2yuv-----route C. Opening a selection window to [locate avs2yuv.avs]";     $avsyPath=whereisit}
+        d {Write-Output "`r`nChoosing avs2pipemod-route D. Opening a selection window to [locate avs2pipemod.exe]"; $avspPath=whereisit}
+        e {Write-Output "`r`nChoosing svfi--------route E. Opening a selection window to [locate one_line_shot_args.exe]`r`ni.e. under Steam distro: X:\SteamLibrary\steamapps\common\SVFI\one_line_shot_args.exe"; $svfiPath=whereisit}
         default {Write-Output "Bad input, try again"}
     }
-} While ($IMPchk -eq "")
-$impEXT=$fmpgPath+$vprsPath+$avsyPath+$avspPath+$svfiPath
+    $impEXT=$fmpgPath+$vprsPath+$avsyPath+$avspPath+$svfiPath
+} While ($impEXT -eq "")
 Write-Output "`r`n√ Selected $impEXT`r`n"
 
 #「Bootstrap E」Choose downstream program of file pipe, x264 or x265
@@ -95,79 +129,62 @@ Do {$ENCops=$x265Path=$x264Path=""
 $encEXT=$x265Path+$x264Path
 Write-Output "`r`n√ Selected $encEXT`r`n"
 
-[string]$MUXwrt=[string]$tempGen=[string]$sChar=""
-
-#「Bootstrap F」Locate path to export temporary multiplexed MP4 files for x265. x264 usually has libav & therefore filtered by $ENCops. Only Step 3 locates the path to export encoded files
-[string]$vidEXP=[string]$serial=[string]$MUXplan=""
+#「Bootstrap F」Locate path to export temporary multiplexed MP4 files for x265. x264 usually has libav & therefore filtered by $ENCops
+#               Step 3 locates the path to export encoded files
+[string]$vidEXP=[string]$serial=[string]$MUXhevc=""
 
 if ($ENCops -eq "a") {
-    Do {Switch (Read-Host "Select [ A: I'm planning to use MKV container format later (Start a hevc-to-MKV workaround process for ffmpeg by generating temporary MP4 files)`r`n | B: I'm not planning to use MKV format later ]") {
-            a {$MUXplan="a"} b {$MUXplan="b"; $MUXops="c"} Default {Write-Warning "`r`n × Bad input, please try again"}
-        }#MUXops C: Print commented-out version of MUXwrt A
-    } While ($MUXplan -eq "")
+    Do {Switch (Read-Host "Select [ A: I'm planning to use MKV container format later (A hevc-to-MKV workaround process for ffmpeg by generating temporary MP4 files)`r`n | B: I'm not planning to use MKV format later ]") {
+            a { $MUXhevc="a" #x265 downstream, consideration of whether to generate temporary MP4 is needed
+
+                # "MUXops A/B" has been assigned on top, specified manually
+                Read-Host "Hit Enter to proceed open a window that locates [path to export temporary MP4 files]...`r`nThis selection window might pop up at rear of current PowerShell instance"
+                $EXPpath = whichlocation
+                Write-Output "√ Selected $EXPpath`r`n"
+
+                $vidEXP = settmpoutputname($mode) #Configure file output name for the temporary MP4
+
+            }b{ $MUXhevc="b"
+                $MUXops ="c"#Generate a commented-out multiplexing command
+            }
+            Default {
+                Write-Warning "`r`n× Bad input, try again`r`n"
+                $MUXhevc=""
+            }
+        }
+    } While ($MUXhevc -eq "")
+} elseif ($ENCops -eq "b") {#x264 downstream
+    $MUXhevc="b"            #no temporary MP4 files are needed
+    $MUXops="c"             #generate a commented-out multiplexing command
 }
 
-if ($MUXplan -eq "a") {
-    Read-Host "Hit Enter to proceed open a window that locates [path to export temporary MP4 files]...`r`nThis selection window might pop up at rear of current PowerShell instance"
-    $fileEXP = whichlocation 
-    Write-Output "√ Selected $fileEXP`r`n"
-
-    Do {Switch (Read-Host "Choose [A: Copy from a file | B: Input] as the temporary MP4's filename") {
-            a { Write-Output "Opening a selection window to [get filename from a file]"
-                $vidEXP=whereisit
-                $vidEXP=[io.path]::GetFileNameWithoutExtension($vidEXP)
-                if ($mode -eq "m") {$vidEXP+='_$serial'} #!Using single quotes to prevent variable expansion of $serial
-                Write-Output "`r`nIn multi-encode mode, choosing A will add a trailing counter in filename`r`n"
-            }
-            b { if ($mode -eq "m") {#Multi-encoding mode
-                    Do {$vidEXP=Read-Host "`r`nSpecify the filename without extension. Under multi-encode mode, specify episode counter `$serial in desired location`r`n`$serial should be padded from trailing alphabets.`r`nSpace is needed inbetween 2 square brackets e.g., [YYDM-11FANS] [Yuru Yuri 2]`$serial[BDRIP 720P]"
-                        $chkme=namecheck($vidEXP)
-                        if  (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false)) {Write-Warning "Missing variable `$serial under multi-encode mode; No value entered, Or intercepted illegal characters / | \ < > : ? * `""}
-                    } While (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false))
-                }
-                if ($mode -eq "s") {#Single-encoding mode
-                    Do {$vidEXP=Read-Host "`r`nSpecify the filename without extension`r`nSpace is needed inbetween 2 square brackets e.g., [YYDM-11FANS] [Yuru Yuri 2]01[BDRIP 720P]"
-                        $chkme=namecheck($vidEXP)
-                        if  (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false)) {Write-Warning "Detecting variable `$serial in single-encode mode; No value entered, Or intercepted illegal characters / | \ < > : ? * `""}
-                    } While (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false))
-                }
-                #[string]$serial=($s).ToString($zroStr) #Example of parsing leading zeros to $serial. Used in for loop below (supplies variable $s)
-                #$vidEXP=$ExecutionContext.InvokeCommand.ExpandString($vidEXP) #Activating $serial as a variable with expand string method. Used in for loop below
-            }
-            default {Write-Warning "× Bad input, try again`r`n"}
-        }
-    } While ($vidEXP -eq "")
-    Write-Output "√ Added exporting filename $vidEXP`r`n"
-    Write-Output "Note: you can manually edit option `$MUXops=[`r`n| a: Write command to export temp-MP4 files (default)`r`n| b: write <A> & delete source file after multiplex`r`n| c: write <A>, but comment it out (automatically selected when workaround is skipped)`r`n"
-    $MUXops="a"
-} #Closing if statement from $ENCops
-
-$utf8NoBOM=New-Object System.Text.UTF8Encoding $false #export batch file w/ utf-8NoBOM text codec
-$tempEncOut=$vidEXP+".hevc" #Here is the difference from multi-encode mode
-$tempMuxOut=$vidEXP+".mp4"
+$tmpStrmOut=$vidEXP+".hevc" #Path, filename & extension of temporary .hevc stream output (Stream Output - export stream to MUXwrt commandline)
+$tempMuxOut=$vidEXP+".mp4"  #Path, filename & extension of temporary MP4 file multiplexed (This get commented out when Switch above is not A)
 
 #single-encode mode's temporary MP4 multiplex ffmpeg options, under x264, x265 routing. $MUXwrt was initialized as "" above
 #single-encode mode doesn't have variable $sChar
-if ($ENCops -eq "a") {$ENCwrt="$impEXT %ffmpegVarA% %ffmpegParA% - | $x265Path %x265ParA% %x265VarA%"}
+if     ($ENCops -eq "a") {$ENCwrt="$impEXT %ffmpegVarA% %ffmpegParA% - | $x265Path %x265ParA% %x265VarA%"}
 elseif ($ENCops -eq "b") {$ENCwrt="$impEXT %ffmpegVarA% %ffmpegParA% - | $x264Path %x264ParA% %x264VarA%"}
-else {Write-Error "× Failure: missing selection of video encoding program"; pause; exit}
+else                     {Write-Error "× Failure: missing selection of video encoding program"; pause; exit}
 
-if ($MUXops -eq "a") {$MUXwrt="$impEXT %ffmpegVarA% %ffmpegParB% `"$fileEXP$tempEncOut`"
-::del `"$fileEXP$tempMuxOut`""}
-elseif ($MUXops -eq "b") {$MUXwrt="$impEXT %ffmpegVarA% %ffmpegParB% `"$fileEXP$tempEncOut`"
-del `"$fileEXP$tempMuxOut`""}
-elseif ($MUXops -eq "c") {$MUXwrt="::$impEXT %ffmpegVarA% %ffmpegParB% `"$fileEXP$tempEncOut`"
-::del `"$fileEXP$tempMuxOut`""}
-else {Write-Error "× Script broken: bad `$MUXops value"; pause; exit}
+#Manually change `$MUXops specified on top, C is auto-selected under x264 downstream
+if ($MUXops -eq "a") {$MUXwrt="$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$tempMuxOut`"
+::del `"$EXPpath$tmpStrmOut`""
+} elseif ($MUXops -eq "b") {$MUXwrt="$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$tempMuxOut`"
+del `"$EXPpath$tmpStrmOut`""
+} elseif ($MUXops -eq "c") {$MUXwrt="::$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$tempMuxOut`"
+::del `"$EXPpath$tmpStrmOut`""
+} else {
+    Write-Error "`r`n× Script broken: bad `$MUXops value [A|B|C], please correct manually"; pause; exit
+}
 
 #[string]$banner=[string]$cVO=[string]$fVO=[string]$xVO=[string]$aVO=""
 [string]$trueExpPath="" #trueExpPath is the actual variable used to export temporary MP4s, to not write "+"s into exporting files, as $exptPath cannot be connecting to enc_ without a "+"
 
-Switch ($IMPchk) { a { #ffmpeg
-
-    Write-Output "  Generating enc_0S.bat"
-
-    $enc_gen="REM 「Title」
+#export batch file w/ utf-8NoBOM text codec
+$utf8NoBOM=New-Object System.Text.UTF8Encoding $false 
+Write-Output "`r`n... Generating enc_0S.bat`r`n"
+$enc_gen="REM 「Title」
 
 @echo.
 @echo -----------Starting encode 001-----------
@@ -175,144 +192,12 @@ Switch ($IMPchk) { a { #ffmpeg
 REM 「Debug」Comment out during normal usage
 REM @echo %ffmpegParA%
 REM @echo %ffmpegVarA%
-REM @echo %x265ParA%
-REM @echo %x265VarA%
-REM @echo %x264ParA%
-REM @echo %x264VarA%
-REM pause
-
-REM 「Encode」Comment out during debugging
-REM Var is used to specify dynamic values such as input-output and tuned-by-source options
-
-"+$ENCwrt+"
-
-REM 「Temp-MP4-mux」Works with x265 (pipe downstream)
-
-"+$MUXwrt+"
-
-REM Choose「y:Continue/n:Pause/z:END」Continuing after 5s sleep, false input are blocked by choice statement, pause allows continue.
-
-choice /C YNZ /T 5 /D Y /M `" Continue? (Sleep=5; Default: Y, Pause: N, Stop: Z)`"
-
-if %ERRORLEVEL%==3 cmd /k
-if %ERRORLEVEL%==2 pause
-if %ERRORLEVEL%==1 endlocal && exit /b"
-
-} b { #vspipe
-    
-    Write-Output "  Generating enc_0S.bat"
-    
-    $enc_gen="REM 「Title」
-
-@echo.
-@echo -----------Starting encode 001-----------
-
-REM 「Debug」Comment out during normal usage
 REM @echo %vspipeParA%
 REM @echo %vspipeVarA%
-REM @echo %x265ParA%
-REM @echo %x265VarA%
-REM @echo %x264ParA%
-REM @echo %x264VarA%
-REM pause
-
-REM 「Encode」Comment out during debugging
-REM Var is used to specify dynamic values such as input-output and tuned-by-source options
-
-"+$ENCwrt+"
-
-REM 「Temp-MP4-mux」Works with x265 (downstream of pipe)
-
-"+$MUXwrt+"
-
-REM Choose「y:Continue/n:Pause/z:END」Continuing after 5s sleep, false input are blocked by choice statement, pause allows continue.
-
-choice /C YNZ /T 5 /D Y /M `" Continue? (Sleep=5; Default: Y, Pause: N, Stop: Z)`"
-
-if %ERRORLEVEL%==3 cmd /k
-if %ERRORLEVEL%==2 pause
-if %ERRORLEVEL%==1 endlocal && exit /b"
-
-} c { #avs2yuv
-
-    Write-Output "`r`nGenerating enc_0S.bat"
-    
-    $enc_gen="REM 「Title」
-
-@echo.
-@echo -----------Starting encode 001-----------
-
-REM 「Debug」Comment out during normal usage
 REM @echo %avsyuvParA%
 REM @echo %avsyuvVarA%
-REM @echo %x265ParA%
-REM @echo %x265VarA%
-REM @echo %x264ParA%
-REM @echo %x264VarA%
-REM pause
-
-REM 「Encode」Comment out during debugging
-REM Var is used to specify dynamic values such as input-output and tuned-by-source options
-
-"+$ENCwrt+"
-
-REM 「Temp-MP4-mux」Works with x265 (downstream of pipe)
-
-"+$MUXwrt+"
-
-REM Choose「y:Continue/n:Pause/z:END」Continuing after 5s sleep, false input are blocked by choice statement, pause allows continue.
-
-choice /C YNZ /T 5 /D Y /M `" Continue? (Sleep=5; Default: Y, Pause: N, Stop: Z)`"
-
-if %ERRORLEVEL%==3 cmd /k
-if %ERRORLEVEL%==2 pause
-if %ERRORLEVEL%==1 endlocal && exit /b"
-
-} d { #avs2pipemod
-    
-    Write-Output "  Generating enc_0S.bat"
-    
-    $enc_gen="REM 「Title」
-
-@echo.
-@echo -----------Starting encode 001-----------
-
-REM 「Debug」Comment out during normal usage
-REM @echo %avsmodVarParA%
-REM @echo %avsmodVarVarA%
-REM @echo %x265ParA%
-REM @echo %x265VarA%
-REM @echo %x264ParA%
-REM @echo %x264VarA%
-REM pause
-
-REM 「Encode」Comment out during debugging
-REM Var is used to specify dynamic values such as input-output and tuned-by-source options
-
-"+$ENCwrt+"
-
-REM 「Temp-MP4-mux」Works with x265 (downstream of pipe)
-
-"+$MUXwrt+"
-
-REM Choose「y:Continue/n:Pause/z:END」Continuing after 5s sleep, false input are blocked by choice statement, pause allows continue.
-
-choice /C YNZ /T 5 /D Y /M `" Continue? (Sleep=5; Default: Y, Pause: N, Stop: Z)`"
-
-if %ERRORLEVEL%==3 cmd /k
-if %ERRORLEVEL%==2 pause
-if %ERRORLEVEL%==1 endlocal && exit /b"
-
-} e { #SVFI
-    
-    Write-Output "  Generating enc_0S.bat"
-    
-    $enc_gen="REM 「Title」
-
-@echo.
-@echo -----------Starting encode 001-----------
-
-REM 「Debug」Comment out during normal usage
+REM @echo %avsmodParA%
+REM @echo %avsmodVarA%
 REM @echo %olsargParA%
 REM @echo %olsargVarA%
 REM @echo %x265ParA%
@@ -338,12 +223,9 @@ if %ERRORLEVEL%==3 cmd /k
 if %ERRORLEVEL%==2 pause
 if %ERRORLEVEL%==1 endlocal && exit /b"
 
-    }#Closing Switch selection
-}#Closing Switch statement
-
 $trueExpPath=$exptPath+"enc_0S.bat" #Another variable assignment is needed to not write "+"s into exporting files, as $exptPath cannot be connecting to enc_ without a +
 #Out-File -InputObject $enc_gen -FilePath $trueExpPath -Encoding utf8
 [IO.File]::WriteAllLines($trueExpPath, $enc_gen, $utf8NoBOM) #Force exporting utf-8NoBOM text codec
 
-Write-Output "Task completed"
+Write-Output "Completed, as long as up-downstream remains the same, any controller batch generated by step 3 could always use enc_0S.bat / enc_X.bat"
 pause

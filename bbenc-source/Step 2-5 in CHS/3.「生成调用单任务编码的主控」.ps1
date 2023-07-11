@@ -168,17 +168,20 @@ Do {$IMPchk=$vidIMP=$vpyIMP=$avsIMP=$apmIMP=""
         e {$IMPchk="e"; Write-Output "`r`n选了SVFI(alpha)-视频源. 已打开[定位源]的文件选窗"; $vidIMP=whereisit}
         default {Write-Warning "输入错误, 重试"}
     }
-    if (($vidIMP+$vpyIMP+$avsIMP+$apmIMP).Contains(".exe")) {Write-Error "× 该输入不是导入上游方案，而是要编码的源"; $IMPchk=""}
+    if (($vidIMP+$vpyIMP+$avsIMP+$apmIMP).Contains(".exe")) {
+        Write-Error "× 该输入不是导入上游方案，而是要编码的源"
+        $IMPchk=""
+    }
 } While ($IMPchk -eq "")
 
 #「启动F1」整合并反馈选取的路径/文件
 $impEXTs=$vidIMP+$vpyIMP+$avsIMP+$apmIMP
 if ($mode -eq "m") {Write-Output "`r`n√ 选择的路径为 $impEXTm`r`n"}
 if ($mode -eq "s") {Write-Output "`r`n√ 选择的文件为 $impEXTs`r`n"
-    if (($impEXTs -eq "") -eq $true) {Write-Error "× 没有导入任何文件"; pause; exit}
+    if ($impEXTs -eq "") {Write-Error "× 没有导入任何文件"; pause; exit}
     else {#「启动F2」单文件模式下生成默认导出文件名, 而需获取文件名与后缀的方法. 由于变量污染问题摒弃了Get-ChildItem
         $impEXTs=[io.path]::GetExtension($impEXTs)
-        $impFNM=[io.path]::GetFileNameWithoutExtension($impEXTs)
+        $impFNM =[io.path]::GetFileNameWithoutExtension($impEXTs)
     }
     #「启动F3」avs2yuv, avs2pipemod线路检查文件后缀名是否正常
     if (($IMPchk -eq "d") -or ($IMPchk -eq "c")) {
@@ -211,7 +214,6 @@ if ($IMPchk -eq "e") {
     $olsINI="X:\Somewhere\SVFI-render-customize.ini"
     Write-Output "未选择SVFI线路, 配置文件路径将临时设为 $olsINI `r`n"
 }
-
 #「启动H」四种情况下需要专门导入视频给ffprobe检测: VS(1), AVS(2), 大批量模式(1)
 if (($mode -eq "m") -or (($IMPchk -ne "a") -and ($IMPchk -ne "e"))) {
     Do {$continue="n"
@@ -220,6 +222,7 @@ if (($mode -eq "m") -or (($IMPchk -ne "a") -and ($IMPchk -ne "e"))) {
         if ((Read-Host "[检查]输入的文件 $impEXTs 是否为视频 [Y: 确认操作 | N: 更换源]") -eq "y") {$continue="y"; Write-Output "继续"} else {Write-Output "重试"}
     } While ($continue -eq "n")
 } else {$impEXTs=$vidIMP}
+
 if ($impEXTs.Contains(".mov")) {
     $is_mov=$true;  Write-Output "√ 导入视频 $impEXTs 的封装格式为MOV`r`n"
 } else {
@@ -282,7 +285,6 @@ if ($IMPchk -eq "e") {
 
 #「ffprobeC2」ffprobe获取视频总帧数并赋值到$x264/5VarA中, 唯单文件版可用
 if ($mode -eq "s") {$nbrFrames=framescalc -fcountCSV $ffprobeCSV.I -fcountAUX $ffprobeCSV.AA}
-
 if ($nbrFrames -ne "") {Write-Output "√ 已添加x264/5参数: $nbrFrames"}
 else {Write-Warning "× 总帧数的数据被删, 将留空x264/5参数--frames, 缺点是不再显示ETA（预计完成时间）"}
 
@@ -298,9 +300,8 @@ Do {Switch ($ffprobeCSV.D) {
         yuv444p     {Write-Output "检测到源的色彩空间==[yuv444p 8bit ]"; $avsCSP="-csp i444"; $avsD="-depth 8";  $encCSP="--input-csp i444"; $encD="--input-depth 8";  $ffmpegCSP="-pix_fmt yuv444p"}
         yuv444p10le {Write-Output "检测到源的色彩空间==[yuv444p 10bit]"; $avsCSP="-csp i444"; $avsD="-depth 10"; $encCSP="--input-csp i444"; $encD="--input-depth 10"; $ffmpegCSP="-pix_fmt yuv444p10le"}
         yuv444p12le {Write-Output "仅x265支持的色彩空间[yuv444p 12bit]"; $avsCSP="-csp i444"; $avsD="-depth 12"; $encCSP="--input-csp i444"; $encD="--input-depth 12"; $ffmpegCSP="-pix_fmt yuv444p12le"}
-        yuv444p     {Write-Output "检测到源的色彩空间==[yuv444p 8bit ]"; $avsCSP="-csp i444"; $avsD="-depth 8";  $encCSP="--input-csp i444"; $encD="--input-depth 8";  $ffmpegCSP="-pix_fmt yuv444p"}
-        yuva444p10le{Write-Output "检测到源的色彩空间==[yuv444p 10bit]"; $avsCSP="-csp i444"; $avsD="-depth 10"; $encCSP="--input-csp i444"; $encD="--input-depth 10"; $ffmpegCSP="-pix_fmt yuv444p10le"; "？ 该色彩空间可能不兼容"}
-        yuva444p12le{Write-Output "仅x265支持的色彩空间[yuv444p 12bit]"; $avsCSP="-csp i444"; $avsD="-depth 12"; $encCSP="--input-csp i444"; $encD="--input-depth 12"; $ffmpegCSP="-pix_fmt yuv444p12le"; "？ 该色彩空间可能不兼容"}
+        yuva444p10le{Write-Output "检测到源的色彩空间==[yuv444p 10bit]"; $avsCSP="-csp i444"; $avsD="-depth 10"; $encCSP="--input-csp i444"; $encD="--input-depth 10"; $ffmpegCSP="-pix_fmt yuv444p10le"}
+        yuva444p12le{Write-Output "仅x265支持的色彩空间[yuv444p 12bit]"; $avsCSP="-csp i444"; $avsD="-depth 12"; $encCSP="--input-csp i444"; $encD="--input-depth 12"; $ffmpegCSP="-pix_fmt yuv444p12le"}
         gray        {Write-Output "检测到源的色彩空间==[yuv400p 8bit ]"; $avsCSP="-csp i400"; $avsD="-depth 8";  $encCSP="--input-csp i400"; $encD="--input-depth 8";  $ffmpegCSP="-pix_fmt gray"}
         gray10le    {Write-Output "检测到源的色彩空间==[yuv400p 10bit]"; $avsCSP="-csp i400"; $avsD="-depth 10"; $encCSP="--input-csp i400"; $encD="--input-depth 10"; $ffmpegCSP="-pix_fmt gray10le"}
         gray12le    {Write-Output "仅x265支持的色彩空间[yuv400p 12bit]"; $avsCSP="-csp i400"; $avsD="-depth 12"; $encCSP="--input-csp i400"; $encD="--input-depth 12"; $ffmpegCSP="-pix_fmt gray12le"}
@@ -312,7 +313,7 @@ Do {Switch ($ffprobeCSV.D) {
 if ($ffmpegCSP -ne $null) {Write-Output "√ 已添加ffmpeg参数: $ffmpegCSP`r`n√ 已添加avs2yuv参数: $avsCSP $avsD`r`n"}
 if ($avsCSP -eq "-csp AUTO") {Write-Warning "avs2yuv可能不兼容nv12/nv16色彩空间"}
 
-#「启动J」选择程序. x264或x265
+#「启动J」选择下游程序. x264或x265
 Do {$ENCops=$x265Path=$x264Path=""
     Switch (Read-Host "选择pipe下游程序 [A: x265/hevc | B: x264/avc]") {
         a {$ENCops="a"; Write-Output "`r`n选择了x265--A线路. 已打开[定位x265.exe]的选窗"; $x265Path=whereisit}
@@ -321,7 +322,7 @@ Do {$ENCops=$x265Path=$x264Path=""
     }
 } While ($ENCops -eq "")
 $encEXT=$x265Path+$x264Path
-Write-Output "√ 选择了 $encEXT`r`n"
+Write-Output "√ 选择了 $encEXT `r`n"
 
 #「启动K1」选择导出压制结果文件名的多种方式, 集数变量$serial于下方的循环中实现序号叠加, 单文件模式不需要集数变量
 $vidEXP=[io.path]::GetFileNameWithoutExtension($impEXTs)
@@ -434,6 +435,7 @@ REM 「ffmpeg debug」删-loglevel 16
 REM 「-thread_queue_size过小」加-thread_queue_size<压制平均码率kbps+1000>, 但最好换ffmpeg
 
 REM 「ffmpeg, vspipe, avsyuv, avs2pipemod固定参数」
+REM 修改为批量编码时，需要确认视频格式（如-pix_fmt，-r）不变，否则应运行步骤3另建一个主控
 
 @set `"ffmpegParA="+$ffmpegParA+"`"
 @set `"vspipeParA="+$vspipeParA+"`"
@@ -442,6 +444,7 @@ REM 「ffmpeg, vspipe, avsyuv, avs2pipemod固定参数」
 @set `"olsargParA="+$olsargParA+"`"
 
 REM 「ffmpeg, vspipe, avsyuv, avs2pipemod变化参数」
+REM 可以通过在对应线路增加@set `"ffmpegVarX=-i `"X:\视频2.mp4`"`"的命令来进行批量编码
 
 @set `"ffmpegVarA=-hwaccel auto "+$ffmpegVarA+"`"
 @set `"vspipeVarA="+$vspipeVarA+"`"
@@ -450,6 +453,7 @@ REM 「ffmpeg, vspipe, avsyuv, avs2pipemod变化参数」
 @set `"olsargVarA="+$olsargVarA+"`"
 
 REM 「x264-5固定参数」
+REM 可以通过增加@set `"x264ParX=...`"的命令来进行批量编码
 
 @set `"x265ParA="+$x265ParA+"`"
 @set `"x264ParA="+$x264ParA+"`"
@@ -467,6 +471,7 @@ REM @set `"x264VarA=--crf 23 ... --output ...`"
 REM @set `"x264VarA=--crf 26 ... --output ...`"
 
 REM 「编码部分」用注释或删除编码批处理跳过不需要的编码
+REM 可以通过在对应线路增加call enc_x.bat的命令来进行批量的编码
 
 call enc_0S.bat
 
