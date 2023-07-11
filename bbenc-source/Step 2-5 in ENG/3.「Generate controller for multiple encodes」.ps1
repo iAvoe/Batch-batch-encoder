@@ -32,12 +32,11 @@ Function setencoutputname ([string]$mode, [string]$switchOPS) {
 
     Switch ($switchOPS) { #Switch with Read-Host doesn't work in Functions, therefore this question is asked & answered before entering this Function at K1-2
         a { Write-Debug "Opening a window that [copy filename on selection], it may pop up at rear of current window."
-
             $vidEXP=whereisit
             $chkme=namecheck($vidEXP)
             $vidEXP=[io.path]::GetFileNameWithoutExtension($vidEXP)
             if ($mode -eq "m") {$vidEXP+='_$serial'} #! Using single quotes in codeline here to prevent variable `$serial from being executed
-                Write-Debug "`r`nIn multi-encode mode, choosing A will add a trailing counter in filename`r`n"
+            Write-Debug "`r`nIn multi-encode mode, choosing A will add a trailing counter in filename`r`n"
         } b {
             if ($mode -eq "m") {#Multi-encoding mode
                 Do {$vidEXP=Read-Host "`r`nSpecify filename w/out extension (multi-encode mode)  `r`n1. Specify episode counter `$serial in desired location`r`n2. `$serial should be padded from trailing alphabets.`r`n3. Space is needed inbetween 2 square brackets`r`n  e.g., [YYDM-11FANS] [Yuru Yuri 2]`$serial[BDRIP 720P]; [Zzz] Memories – `$serial (BDRip 1764x972 HEVC)"
@@ -156,7 +155,7 @@ Write-Output "√ Selected $fileEXPpath`r`n"
 
 #「Bootstrap E」Step 2 already learns paths to ffmpeg & so. Therefore here the import is for files to encode. Note the variables are renamed to further stress the difference
 Write-Output "Reference: [Video file formats]https://en.wikipedia.org/wiki/Video_file_format`r`nStep 2 already learns paths to ffmpeg & so. Here it's about to import a path with files to encode`r`n"
-$impEXTm=$IMPchk="" #impEXTm: Multu-encode mode's sourcefile import mode (path to files only)，IMPchk: upper-stream source type
+$impEXTm=$IMPchk="" #impEXTm: Multi-encode mode's sourcefile import mode (path only), IMPchk: upper-stream source type
 Do {Switch (Read-Host "The previously selected pipe upstream program was [A: ffmpeg | B: vspipe | C: avs2yuv | D: avs2pipemod | E: SVFI (alpha)]") {
         a {Write-Output "`r`nSelected ffmpeg-----video source. Opening a window to [locate path/directory w/ files to encode]`r`nThe procedure is to import path & add filnames in generated batch later"; $impEXTs=whichlocation; $IMPchk="a"}
         b {Write-Output "`r`nSelected vspipe------.vpy source. Opening a window to [locate path/directory w/ files to encode]`r`nThe procedure is to import path & add filnames in generated batch later"; $impEXTs=whichlocation; $IMPchk="b"}
@@ -277,7 +276,7 @@ if ($IMPchk -eq "e") {
 } else {$iniEXP=$olsINI}
 
 #「ffprobeC2」fetch total frame count with ffprobe, then parse to variable $x265VarA, single-encode mode only
-if ($mode -eq "s") {$nbrFrames=framescalc -fcountCSV $ffprobeCSV.I -fcountAUX $ffprobeCSV.AA}
+if ($mode -eq "s")     {$nbrFrames=framescalc -fcountCSV $ffprobeCSV.I -fcountAUX $ffprobeCSV.AA}
 if ($nbrFrames -ne "") {Write-Output "√ Added x264/5 option: $nbrFrames"}
 else {Write-Warning "× Total frame count tag is missing, Leaving blank on x264/5 option --frames, the drawback is ETA information will be missing during encoding (estimation of finish time)"}
 

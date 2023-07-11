@@ -1,6 +1,5 @@
 ﻿cls #「启动-」大批量版生成的主控缺失文件名, 所以要提醒
-Read-Host "[单任务模式]大批量模式下, 生成的主控里没有导入用的文件名, 因此需要手动逐个填写导入文件名
-x264一般内置lavf, x265一般不带, 不内置lavf库的编码器需要通过ffmpeg等上游pipe端工具导入视频流，输出未封装的流. 按Enter继续"
+Read-Host "[单任务模式]大批量模式下, 生成的主控里没有导入用的文件名, 因此需要手动逐个填写导入文件名`r`nx264一般内置lavf, x265一般不带, 不内置lavf库的编码器需要通过ffmpeg等上游pipe端工具导入视频流，输出未封装的流. 按Enter继续"
 $mode="s"
 Function namecheck([string]$inName) {
     $badChars = '[{0}]' -f [regex]::Escape(([IO.Path]::GetInvalidFileNameChars() -join ''))
@@ -155,8 +154,7 @@ $fileEXPpath = whichlocation
 Write-Output "选择的路径为 $fileEXPpath`r`n"
 
 #「启动E」导入原文件, 注意步骤2中已经导入了ffmpeg等工具的路径. 所以步骤3只导入源. 注意变量也为此而改了名
-Write-Output "参考[视频文件类型]https://en.wikipedia.org/wiki/Video_file_format"
-Write-Output "由于步骤2已填写ffmpeg, vspipe, avs2yuv, avs2pipemod的所在路径, 所以步骤3中选择的是待压制文件`r`n"
+Write-Output "参考[视频文件类型]https://en.wikipedia.org/wiki/Video_file_format`r`n由于步骤2已填写ffmpeg, vspipe, avs2yuv, avs2pipemod的所在路径, 所以步骤3中选择的是待压制文件`r`n"
 Do {$IMPchk=$vidIMP=$vpyIMP=$avsIMP=$apmIMP=""
     Switch (Read-Host "之前选择的pipe上游方案是[A: ffmpeg | B: vspipe | C: avs2yuv | D: avs2pipemod | E: SVFI (alpha)]") {
         a {$IMPchk="a"; Write-Output "`r`n选择了ffmpeg----视频源. 已打开[定位源]的文件选窗"; $vidIMP=whereisit}
@@ -166,10 +164,7 @@ Do {$IMPchk=$vidIMP=$vpyIMP=$avsIMP=$apmIMP=""
         e {$IMPchk="e"; Write-Output "`r`n选了SVFI(alpha)-视频源. 已打开[定位源]的文件选窗"; $vidIMP=whereisit}
         default {Write-Warning "输入错误, 重试"}
     }
-    if (($vidIMP+$vpyIMP+$avsIMP+$apmIMP).Contains(".exe")) {
-        Write-Error "× 该输入不是导入上游方案，而是要编码的源"
-        $IMPchk=""
-    }
+    if (($vidIMP+$vpyIMP+$avsIMP+$apmIMP).Contains(".exe")) {$IMPchk=""; Write-Error "`r`n× 该输入不是导入上游方案，而是要编码的源"}
 } While ($IMPchk -eq "")
 
 #「启动F1」整合并反馈选取的路径/文件
@@ -188,7 +183,6 @@ if ($mode -eq "s") {Write-Output "`r`n√ 选择的文件为 $impEXTs`r`n"
         if ($impEXTs -ne ".vpy") {Write-Warning "文件后缀名是 $impEXTs 而非 .vpy`r`n"} #大批量模式下输入的是路径所以失效
     } #注: 导入路径: $impEXTm, 导入文件: $impEXTs, 导出路径: $fileEXPpath
 }
-
 #「启动G1」Avs2pipemod需要的文件
 if ($IMPchk -eq "d") {
     Read-Host "将为Avs2pipemod打开[选择avisynth.dll]的路径选择窗, 可能会在窗口底层弹出. 按Enter继续"
@@ -282,7 +276,7 @@ if ($IMPchk -eq "e") {
 } else {$iniEXP=$olsINI}
 
 #「ffprobeC2」ffprobe获取视频总帧数并赋值到$x264/5VarA中, 唯单文件版可用
-if ($mode -eq "s") {$nbrFrames=framescalc -fcountCSV $ffprobeCSV.I -fcountAUX $ffprobeCSV.AA}
+if ($mode -eq "s")     {$nbrFrames=framescalc -fcountCSV $ffprobeCSV.I -fcountAUX $ffprobeCSV.AA}
 if ($nbrFrames -ne "") {Write-Output "√ 已添加x264/5参数: $nbrFrames"}
 else {Write-Warning "× 总帧数的数据被删, 将留空x264/5参数--frames, 缺点是不再显示ETA（预计完成时间）"}
 

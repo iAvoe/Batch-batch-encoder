@@ -28,37 +28,35 @@ Function whichlocation($startPath='DESKTOP') {
 }
 
 Function setencoutputname ([string]$mode, [string]$switchOPS) {
-    $DebugPreference="Continue" #function里不能用Write-Output/Host,或" "来输出交互信息, 所以用Write-Debug
+    $DebugPreference="Continue" #Write-Output/Host does not work in a function, using Write-Debug instead
 
-    Switch ($switchOPS) { #函数中不支持「Switch + Readhost " $变量名 "」，所以把原本由Switch问的问题在进入函数前就要回答，只把答案导入进函数中
-        a { Write-Debug "已打开[复制文件名]的选择窗"
+    Switch ($switchOPS) { #Switch with Read-Host doesn't work in Functions, therefore this question is asked & answered before entering this Function at K1-2
+        a { Write-Debug "Opening a window that [copy filename on selection], it may pop up at rear of current window."
             $vidEXP=whereisit
             $chkme=namecheck($vidEXP)
             $vidEXP=[io.path]::GetFileNameWithoutExtension($vidEXP)
-            if ($mode -eq "m") {$vidEXP+='_$serial'} #!使用单引号防止$serial变量被激活
-            Write-Debug "大批量模式下选项A会在末尾添加序号, 文件名尾会多出`"_`"`r`n"
+            if ($mode -eq "m") {$vidEXP+='_$serial'} #! Using single quotes in codeline here to prevent variable `$serial from being executed
+            Write-Debug "`r`nIn multi-encode mode, choosing A will add a trailing counter in filename`r`n"
         } b {
-            Write-Debug "`r`nPowerShell默认紧挨的方括号为一般表达式, 如[xx][yy]间要隔开"
-            if ($mode -eq "m") {#大批量模式用
-                Do {$vidEXP=Read-Host "`r`n填写文件名(无后缀), 大批量模式下要于集数变化处填 `$serial, 并隔开`$serial后的英文字母, 两个方括号间要隔开. 如 [Zzz] Memories – `$serial (BDRip 1764x972 HEVC)"
+            if ($mode -eq "m") {#Multi-encoding mode
+                Do {$vidEXP=Read-Host "`r`nSpecify filename w/out extension (multi-encode mode)  `r`n1. Specify episode counter `$serial in desired location`r`n2. `$serial should be padded from trailing alphabets.`r`n3. Space is needed inbetween 2 square brackets`r`n  e.g., [YYDM-11FANS] [Yuru Yuri 2]`$serial[BDRIP 720P]; [Zzz] Memories – `$serial (BDRip 1764x972 HEVC)"
                     $chkme=namecheck($vidEXP)
                     if  (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false)) {Write-Warning "文件名中缺少变量`$serial, 输入了空值, 或拦截了不可用字符/ | \ < > : ? * `""}
                 } While (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false))
             }
-            if ($mode -eq "s") {#单文件模式用
-                Do {$vidEXP=Read-Host "`r`n填写文件名(无后缀), 两个方括号间要隔开. 如 [Zzz] Memories – 01 (BDRip 1764x972 HEVC)"
+            if ($mode -eq "s") {#Single encoding mode
+                Do {$vidEXP=Read-Host "`r`nSpecify filename w/out extension (multi-encode mode)  `r`n1. Specify episode counter `$serial in desired location`r`n2. `$serial should be padded from trailing alphabets.`r`n3. Space is needed inbetween 2 square brackets`r`n  e.g., [YYDM-11FANS] [Yuru Yuri 2]`$serial[BDRIP 720P]; [Zzz] Memories – `$serial (BDRip 1764x972 HEVC)"
                     $chkme=namecheck($vidEXP)
-                    if  (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false)) {Write-Warning "单文件模式下文件名中含变量`$serial; 输入了空值; 或拦截了不可用字符/ | \ < > : ? * `""}
+                    if  (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false)) {Write-Warning "Missing variable `$serial under multi-encode mode; No value entered, Or intercepted illegal characters / | \ < > : ? * `""}
                 } While (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false))
             }
-            #[string]$serial=($s).ToString($zroStr) #赋值示例. 用于下面的for循环(提供变量$s)
-            #$vidEXP=$ExecutionContext.InvokeCommand.ExpandString($vidEXP) #下面的for循环中, 用户输入的变量只能通过Expand方法才能作为变量激活$serial
-        } default {
-            if ($mode -eq "m") {$vidEXP+='_$serial'} #!使用单引号防止$serial变量被激活
-            #相比于settmpoutputname, 此函数不存在空值输入，所以default状态下就是原始的$vidEXP文件名
+                #[string]$serial=($s).ToString($zroStr) #Example of parsing leading zeros to $serial. Used in for loop below (supplies variable $s)
+                #$vidEXP=$ExecutionContext.InvokeCommand.ExpandString($vidEXP) #Activating $serial as a variable with expand string method. Used in for loop below
+        } default {#Compared to settmpoutputname, this Function won't encounter empty input, therefore Switch-default corresponds to the input file's own name
+            if ($mode -eq "m") {$vidEXP+='_$serial'} #! Using single quotes in codeline here to prevent variable `$serial from being executed
         }
     }
-    Write-Debug "√ 写入了导出文件名 $vidEXP`r`n"
+    Write-Debug "`r`n√ Added exporting filename $vidEXP`r`n"
     return $vidEXP
 }
 
@@ -156,17 +154,17 @@ $fileEXP = whichlocation
 Write-Output "√ Selected $fileEXP`r`n"
 
 #「Bootstrap E」Step 2 already learns paths to ffmpeg & so. Therefore here the import is for files to encode. Note the variables are renamed to further stress the difference
-Write-Output "Reference: [Video file formats]https://en.wikipedia.org/wiki/Video_file_format"
-Write-Output "Step 2 already learns paths to ffmpeg & so. Therefore here the import is for files to encode`r`n"
-Do {$IMPchk=$vidIMP=$vpyIMP=$avsIMP=$apmIMP=""
+Write-Output "Reference: [Video file formats]https://en.wikipedia.org/wiki/Video_file_format`r`nStep 2 already learns paths to ffmpeg & so. Therefore here the import is for files to encode`r`n"
+Do {$IMPchk=$vidIMP=$vpyIMP=$avsIMP=$apmIMP="" #Single-encode mode's source file import mode (file directly), IMPchk: upper-stream source type
     Switch (Read-Host "The previously selected pipe upstream program was [A: ffmpeg | B: vspipe | C: avs2yuv | D: avs2pipemod | E: SVFI (alpha)]") {
-        a {$IMPchk="a"; Write-Output "`r`nSelected ffmpeg-----video source. Opening a window to [locate a file to encode]`r`n"; $vidIMP=whereisit} #Single-encode only, procedure is different from multi-encode mode
+        a {$IMPchk="a"; Write-Output "`r`nSelected ffmpeg-----video source. Opening a window to [locate a file to encode]`r`n"; $vidIMP=whereisit}
         b {$IMPchk="b"; Write-Output "`r`nSelected vspipe------.vpy source. Opening a window to [locate a file to encode]`r`n"; $vpyIMP=whereisit}
         c {$IMPchk="c"; Write-Output "`r`nSelected avs2yuv-----.avs source. Opening a window to [locate a file to encode]`r`n"; $avsIMP=whereisit}
         d {$IMPchk="d"; Write-Output "`r`nSelected avs2pipemod-.avs source. Opening a window to [locate a file to encode]`r`n"; $apmIMP=whereisit}
         e {$IMPchk="e"; Write-Output "`r`nSelected svfi(α)---video source. Opening a window to [locate a file to encode]`r`n"; $vidIMP=whereisit}
         default {Write-Warning "Bad input, try again"}
     }
+    if (($vidIMP+$vpyIMP+$avsIMP+$apmIMP).Contains(".exe")) {$IMPchk=""; Write-Error "`r`n× This is a encoding source file import, you are importing an executable instead"}
 } While ($IMPchk -eq "")
 
 #「Bootstrap F1」Aggregate and feedback user's selected path
@@ -185,16 +183,6 @@ if ($mode -eq "s") {Write-Output "`r`n√ Importing file is selected as $impEXTs
         if ($impEXTs -ne ".vpy") {Write-Warning "Imported file extension is $impEXTs instead of .vpy`r`n"} #Comment this out during multi-encode mode as no source file is imported
     } #Note: Path source: $impEXTm, File source: $impEXTs, File export: $fileEXP
 }
-
-#「Bootstrap G」Avs2pipemod requires avisynth.dll, which needs to be added to commandline
-if ($IMPchk -eq "d") {
-    Read-Host "Hit Enter to proceed open a window to [Select avisynth.dll] for Avs2pipemod, it may pop up at rear of current window"
-    $apmDLL=whereisit
-    $DLLchk=(Get-ChildItem $apmDLL).Extension #Report if imported file extension isn't .dll
-    if (($DLLchk -eq ".dll") -eq $false) {Write-Warning "File extension is $apmDLL instead of .dll"}
-    Write-Output "√ Added avs2pipemod option: $apmDLL`r`n"
-} else {$apmDLL="X:\Somewhere\avisynth.dll"}
-
 #「Bootstrap G1」Importing required avisynth.dll by Avs2pipemod
 if ($IMPchk -eq "d") {
     Read-Host "Hit Enter to proceed open a window to [Select avisynth.dll] for Avs2pipemod, it may pop up at rear of current window"
@@ -218,7 +206,6 @@ if ($IMPchk -eq "e") {
     $olsINI="X:\Somewhere\SVFI-render-customize.ini"
     Write-Output "Skipped selection procedure for SVFI, config ini file will be set to $olsINI"
 }
-
 #「Bootstrap H」Importing a video file for ffprobe to check under 4 circs: VS(1) route, AVS(2) routes, multi-encoding mode(1)
 if (($mode -eq "m") -or (($IMPchk -ne "a") -and ($IMPchk -ne "e"))) {
     Do {$continue="n"
@@ -227,24 +214,39 @@ if (($mode -eq "m") -or (($IMPchk -ne "a") -and ($IMPchk -ne "e"))) {
         if ((Read-Host "[Assure] type of file input $impEXTs is video [Y: Confirm | N: Cancel and re-input]") -eq "y") {$continue="y"; Write-Output "Continue"} else {Write-Output "Rework"}
     } While ($continue -eq "n")
 } else {$impEXTs=$vidIMP}
-Write-Output "√ Video file for ffprobe to analyze: $impEXTs`r`n"
+
+if ($impEXTs.Contains(".mov")) {
+    $is_mov=$true;  Write-Output "√ 导入视频 $impEXTs 的封装格式为MOV`r`n"
+} else {
+    $is_mov=$false; Write-Output "√ 导入视频 $impEXTs 的封装格式非MOV`r`n"
+}
 
 #「Bootstrap I」Locate ffprobe
 Read-Host "Hit Enter to proceed open a window to [locate ffprobe.exe]"
 $fprbPath=whereisit
 
-#「ffprobeA」Begin analyze sample video. Due to people confuses at MKV files' NUMBER_OF_FRAMES; NUMBER_OF_FRAMES-eng & etc. tagging, some MKV files ends up not having data on NUMBER_OF_FRAMES tag (at CSV's tag 24,25), therefore by reading both and keep the non-0 value would provide fallback
-$parsProbe = $fprbPath+" -i '$impEXTs' -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
-Invoke-Expression $parsProbe > "C:\temp_v_info.csv"
-
-#i.e.: $parsProbe = "D:\ffprobe.exe -i `"F:\Asset\Video\BDRipPT\[Beatrice-Raws] Anne Happy [BDRip 1920x1080 x264 FLAC]\[Beatrice-Raws] Anne Happy 01 [BDRip 1920x1080 x264 FLAC].mkv`" -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
-#i.e.: $parsProbe = "D:\ffprobe.exe -i `"N:\SolLevante_HDR10_r2020_ST2084_UHD_24fps_1000nit.mov`" -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
-#Invoke-Expression $parsProbe > "C:\temp_v_info.csv"
-#Notepad "C:\temp_v_info.csv"
-
-#「ffprobeB」Read with Import-CSV module and map them as an array, header is needed as ffprobe generates headless CSV by default A~F, A file is created because there is currently no method to parse value wihtout exporting CSV to file, and for debugging (swap Remove-Item to Notepad) purpose
-$ffprobeCSV = Import-Csv "C:\temp_v_info.csv" -Header A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,AA
-Remove-Item "C:\temp_v_info.csv" #File is saved to C drive because most Windows PC has only has 1 logical disk
+#「ffprobeA2」Begin analyze sample video. #「ffprobeA2」Due to people tends to use MKV files' NUMBER_OF_FRAMES; NUMBER_OF_FRAMES-eng & etc. tagging, some MKV files ends up not having data on NUMBER_OF_FRAMES tag (at CSV's tag 24,25), therefore a fallback operation by readong all of these values is needed
+#             And due to the differently implemented MOV container, the stream_tags are completly unusable and causes errors
+#「ffprobeB2」Read with Import-CSV module and map them as an array, header is needed as ffprobe generates headless CSV by default A~F, A file is created because there is currently no method to parse value wihtout exporting CSV to file, and for debugging (swap Remove-Item to Notepad) purpose
+#             Due to ffprobe writes the title "stream" at beginning of CSV, the header A is automatically ignored and the rest value are +1 in order
+#             e.g.: $parsProbe = "D:\ffprobe.exe -i `"F:\Asset\Video\BDRip私种\[Beatrice-Raws] Anne Happy [BDRip 1920x1080 x264 FLAC]\[Beatrice-Raws] Anne Happy 01 [BDRip 1920x1080 x264 FLAC].mkv`" -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
+#             e.g.: $parsProbe = "D:\ffprobe.exe -i `"N:\SolLevante_HDR10_r2020_ST2084_UHD_24fps_1000nit.mov`" -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
+#                   Invoke-Expression $parsProbe > "C:\temp_v_info.csv"
+#                   Notepad "C:\temp_v_info.csv"
+Switch ($is_mov) {
+    $true {
+        [String]$parsProbe = $fprbPath+" -i `"$impEXTs`" -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries -of csv"
+        Invoke-Expression $parsProbe > "C:\temp_v_info_is_mov.csv" #由于多数Windows系统只有C盘, 所以临时生成CSV在C盘
+        $ffprobeCSV = Import-Csv "C:\temp_v_info_is_mov.csv" -Header A,B,C,D,E,F,G,H,I
+    }
+    $false{
+        [String]$parsProbe = $fprbPath+" -i `"$impEXTs`" -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
+        Invoke-Expression $parsProbe > "C:\temp_v_info.csv"        #由于多数Windows系统只有C盘, 所以临时生成CSV在C盘
+        $ffprobeCSV = Import-Csv "C:\temp_v_info.csv" -Header A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,AA
+    }
+}
+if     (Test-Path "C:\temp_v_info.csv")        {Remove-Item "C:\temp_v_info.csv"}
+elseif (Test-Path "C:\temp_v_info_is_mov.csv") {Remove-Item "C:\temp_v_info_is_mov.csv"}
 
 #「ffprobeB3」Filling x265's option --subme
 $x265subme=x265submecalc -CSVfps $ffprobeCSV.H
@@ -274,7 +276,7 @@ if ($IMPchk -eq "e") {
 } else {$iniEXP=$olsINI}
 
 #「ffprobeC2」fetch total frame count with ffprobe, then parse to variable $x265VarA, single-encode mode only
-if ($mode -eq "s") {$nbrFrames=framescalc -fcountCSV $ffprobeCSV.I -fcountAUX $ffprobeCSV.AA}
+if ($mode -eq "s")     {$nbrFrames=framescalc -fcountCSV $ffprobeCSV.I -fcountAUX $ffprobeCSV.AA}
 if ($nbrFrames -ne "") {Write-Output "√ Added x264/5 option: $nbrFrames"}
 else {Write-Warning "× Total frame count tag is missing, Leaving blank on x264/5 option --frames, the drawback is ETA information will be missing during encoding (estimation of finish time)"}
 
@@ -290,6 +292,8 @@ Do {Switch ($ffprobeCSV.D) {
         yuv444p     {Write-Output "Detecting colorspace & bitdepth[yuv444p 8bit ]"; $avsCSP="-csp i444"; $avsD="-depth 8";  $encCSP="--input-csp i444"; $encD="--input-depth 8";  $ffmpegCSP="-pix_fmt yuv444p"}
         yuv444p10le {Write-Output "Detecting colorspace & bitdepth[yuv444p 10bit]"; $avsCSP="-csp i444"; $avsD="-depth 10"; $encCSP="--input-csp i444"; $encD="--input-depth 10"; $ffmpegCSP="-pix_fmt yuv444p10le"}
         yuv444p12le {Write-Output "x265-only colorspace & bitdepth[yuv444p 12bit]"; $avsCSP="-csp i444"; $avsD="-depth 12"; $encCSP="--input-csp i444"; $encD="--input-depth 12"; $ffmpegCSP="-pix_fmt yuv444p12le"}
+        yuva444p10le{Write-Output "Detecting colorspace & bitdepth[yuv444p 10bit]"; $avsCSP="-csp i444"; $avsD="-depth 10"; $encCSP="--input-csp i444"; $encD="--input-depth 10"; $ffmpegCSP="-pix_fmt yuv444p10le"}
+        yuva444p12le{Write-Output "x265-only colorspace & bitdepth[yuv444p 12bit]"; $avsCSP="-csp i444"; $avsD="-depth 12"; $encCSP="--input-csp i444"; $encD="--input-depth 12"; $ffmpegCSP="-pix_fmt yuv444p12le"}
         gray        {Write-Output "Detecting colorspace & bitdepth[yuv400p 8bit ]"; $avsCSP="-csp i400"; $avsD="-depth 8";  $encCSP="--input-csp i400"; $encD="--input-depth 8";  $ffmpegCSP="-pix_fmt gray"}
         gray10le    {Write-Output "Detecting colorspace & bitdepth[yuv400p 10bit]"; $avsCSP="-csp i400"; $avsD="-depth 10"; $encCSP="--input-csp i400"; $encD="--input-depth 10"; $ffmpegCSP="-pix_fmt gray10le"}
         gray12le    {Write-Output "x265-only colorspace & bitdepth[yuv400p 12bit]"; $avsCSP="-csp i400"; $avsD="-depth 12"; $encCSP="--input-csp i400"; $encD="--input-depth 12"; $ffmpegCSP="-pix_fmt gray12le"}
