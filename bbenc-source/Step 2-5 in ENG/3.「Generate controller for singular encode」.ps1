@@ -314,40 +314,28 @@ Do {$ENCops=$x265Path=$x264Path=""
     }
 } While ($ENCops -eq "")
 $encEXT=$x265Path+$x264Path
-Write-Output "√ Selected $encEXT"
+Write-Output "√ Selected $encEXT`r`n"
 
-#「Bootstrap K」Select multiple ways of specifying exporting filenames, episode variable $serial works at lower loop structure
+#「Bootstrap K1」Select multiple ways of specifying exporting filenames, episode variable $serial works at lower loop structure
 $vidEXP=[io.path]::GetFileNameWithoutExtension($impEXTs)
-Switch (Read-Host "`r`nChoose how to specify filename of encoding exports [A: Copy from an existing file | B: Input manually | C: $vidEXP]`r`nNote that PowerShell misinterprets square brackets next to eachother, e.g., [some][text]. Space inbetween them is required") {
-    a { Write-Output "Opening a selection window to [get filename from a file]"
-        $vidEXP=whereisit
-        $chkme=namecheck($vidEXP)
-        $vidEXP=[io.path]::GetFileNameWithoutExtension($vidEXP)
-        if ($mode -eq "m") {$vidEXP+='_$serial'} #!Using single quotes to prevent variable expansion of $serial
-    } b {
-        if ($mode -eq "m") {#Multi-encoding mode
-            Do {$vidEXP=Read-Host "`r`nSpecify filename to export (no extension). Place episode conter `$serial in desired location.`r`n`r`n`$serial should be padded from trailing alphabets. e.g., [Zzz] Memories – `$serial (BDRip 1764x972 HEVC)"
-                $chkme=namecheck($vidEXP)
-                if  (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false)) {Write-Warning "Missing variable `$serial under multi-encode mode; No value entered; Or intercepted illegal characters / | \ < > : ? * `""}
-            } While (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false))
+Do {$switchOPS=""
+    $switchOPS=Read-Host "`r`nChoose how to specify filename of encoding exports`r`n[A: Copy from a file | B: Input manually  | C: $vidEXP]"
+    if  (($switchOPS -ne "a") -and ($switchOPS -ne "b") -and ($switchOPS -ne "c")) {Write-Error "`r`n× Bad input, try again"}
+} While (($switchOPS -ne "a") -and ($switchOPS -ne "b") -and ($switchOPS -ne "c"))
+    
+if (($switchOPS -eq "a") -or ($switchOPS -eq "b")) {$vidEXP = setencoutputname($mode, $switchOPS)}
+else {Write-Output "√ Added exporting filename $vidEXP`r`n"}
+
+#「Bootstrap K2」Select container file export format for x264 downstream（Default .hevc for x265 downstream）
+if       ($ENCops -eq "b") {$vidFMT=""
+    Do {Switch (Read-Host "「x264 downstream」Select container format for file export`r`n[A: MKV | B: MP4 | C: FLV]`r`n") {
+            a {$vidFMT=".mkv"} b {$vidFMT=".mp4"} c {$vidFMT=".flv"} Default {Write-Error "`r`n× Bad input, try again"}
         }
-        if ($mode -eq "s") {#Single encoding mode
-            Do {$vidEXP=Read-Host "`r`nSpecify filename to export (no extension). e.g., [Zzz] Memories – 01 (BDRip 1764x972 HEVC)"
-                $chkme=namecheck($vidEXP)
-                if  (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false)) {Write-Warning "Detecting variable `$serial in single-encode mode; No value entered; Or intercepted illegal characters / | \ < > : ? * `""}
-            } While (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false))
-        }
-        #[string]$serial=($s).ToString($zroStr) #Example of parsing leading zeros to $serial. Used in for loop below (supplies variable $s)
-        #$vidEXP=$ExecutionContext.InvokeCommand.ExpandString($vidEXP) #Activating $serial as a variable with expand string method. Used in for loop below
-    } default {
-        if ($mode -eq "m") {$vidEXP+='_$serial'} #!Using single quotes to prevent variable expansion of $serial
-    }
-}
-Write-Output "√ Added exporting filename $vidEXP`r`n"
+    } While ($vidFMT -eq "")
+} elseif ($ENCops -eq "a") {$vidFMT=".hevc"}
 
 #「Bootstrap L, M」1: Specify file extention based on x264-5. 2: For x265, add pme/pools based on cpu core count & motherboard node count
 if ($ENCops -eq "b") {
-    $nameIn+=".mp4"
     Do {$PICKops=$x264ParWrap=""
         Switch (Read-Host "Select an x264 preset [A: General purpose custom | B: Stock footage for editing]") {
             a {$x264ParWrap=avcparwrapper -PICKops "a"; Write-Output "`r`n√ Selected General-purpose preset"}
@@ -358,7 +346,6 @@ if ($ENCops -eq "b") {
     Write-Output "√ Defined x264 options: $x264ParWrap"
 }
 elseif ($ENCops -eq "a") {
-    $nameIn+=".hevc"
     $pme=$pool=""
     $procNodes=0
     [int]$cores=(wmic cpu get NumberOfCores)[2]
@@ -379,6 +366,15 @@ elseif ($ENCops -eq "a") {
     } While ($x265ParWrap -eq "")
     Write-Output "√ Defined x265 options: $x265ParWrap"
 }
+
+#「Bootstrap N」Activate when using x264 that supports Film grain optimization
+#Do {$x264fgo=$FGOops=""
+#    Switch (Read-Host "Select whether x264 [A: Support | B: Doesn't support] high frequency singal quantity based rate distorstion optimization (--fgo), this feature is outside of AVC standard") {
+#        a {$FGOops="A";Write-Output "`r`nAltering to better RDO strategy"; $x264fgo="--fgo 15"}
+#        b {$FGOops="B";Write-Output "`r`nKeeping currect RDO strategy";    $x264fgo=""}
+#        default {Write-Warning "`r`n× Bad input, try again"}
+#    }
+#} While ($FGOops -eq "")
 
 Set-PSDebug -Strict
 $utf8NoBOM=New-Object System.Text.UTF8Encoding $false #export batch file w/ utf-8NoBOM text codec

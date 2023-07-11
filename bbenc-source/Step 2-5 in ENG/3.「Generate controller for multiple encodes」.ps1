@@ -319,7 +319,7 @@ Write-Output "√ Selected $encEXT"
 #「Bootstrap K1」Select multiple ways of specifying exporting filenames, episode variable $serial works at lower loop structure
 $vidEXP=[io.path]::GetFileNameWithoutExtension($impEXTs)
 Do {$switchOPS=""
-    $switchOPS=Read-Host "`r`nChoose how to specify filename of encoding exports [A: Copy from an existing file | B: Input manually | C: $vidEXP]"
+    $switchOPS=Read-Host "`r`nChoose how to specify filename of encoding exports [A: Copy from a file | B: Input manually | C: $vidEXP]"
     if  (($switchOPS -ne "a") -and ($switchOPS -ne "b") -and ($switchOPS -ne "c")) {Write-Error "`r`n× Bad input, try again"}
 } While (($switchOPS -ne "a") -and ($switchOPS -ne "b") -and ($switchOPS -ne "c"))
 
