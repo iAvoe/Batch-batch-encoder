@@ -131,6 +131,52 @@ This level of gatekeeping is a waste of time and efort for people who don't actu
 -----
 
 ## ★Updates / change log
+**v1.2380**
+<ul>
+    <li>Lots of changes in commenting, prompt-txt to make it concise and more readable (around 150 lines)</li>
+    <li> √ Step 2:<ul>
+        <li> √ Moved the entire file output name specifying codline into a Function</li>
+        <li> √ Reconstruction of the entire Batch writing Switching statement</li>
+        <li> √ Temporary multiplexing output disabled for x264 downstream pathway (with variable MUXwrt)</li>
+        <li> √ Added a REM print to explain what does xxxVar do in the generated batch</li>
+        <li> √ Retired some variables that ended up only being intermediates (overdesign)</li>
+        <li> √ More in-batch "REM" & PSScript prompt informations in the end that tells user what to do and whether to keep generated batches</li>
+        <li> √ Improved all warning/error prompt & commented texts for all the functions</li>
+        <li> √ Logic improvements (optimizations) in all Functions, Statements, Switches, Pathways (up-downstreaming)</li></ul>
+    </li>
+    <li> √ Step 3:<ul>
+        <li> √ Moved the entire file output name specifying codline into a Function</li>
+        <li> √ Fixed: stream_tag difference in MOV container format causing failures, by isolating MOV & non-MOV code execusion</li>
+        <li> √ switchOPS variable added to work-around varible-in-the-string prompting failure wihtin a function</li>
+        <li> √ Added: yuva444p10le, yua444p12le support</li>
+        <li> √ Fixed: differenciate x264's yuv-for-mpeg commandline being different than x265</li>
+        <li> √ Moved "chcp 65001" to the top of the batch commandline due to issues with "REM" texts failed to display</li>
+        <li> √ More input validations such as preventing ".exe" from entered into stream input</li>
+        <li> √ Improved many input validations' retry prompt: instead of creating detection variable, just destroy the variable within DO-While to cause a loopback</li>
+        <li> √ MUXops variable and it's prompt notes are moved to the top level for better user interactivity</li>
+        <li> √ Rewrote the user interaction, commenting and codeline for MUXops, including disabling temporary multiplexing output for x264 downstream pathway</li>
+        <li> √ Output file extension missing problem addressed</li>
+        <li> √ A massive variable, codeline clean up task completed and the script was reorganized</li>
+        <li> √ Retired over 6 key variables that ended up only being intermediates (overdesign)</li>
+        <li> √ More in-batch "REM" info are included for user to manually generate a small batch of encodes</li>
+        <li> √ Improved all warning/error prompt & commented texts for all the functions</li>
+        <li> √ Corrected variable impEXTs --> impEXTm variable failed to depend on single/multiple emcoding mode</li>
+        <li> √ Inspected and fixed missing olsarg commandlines</li>
+        <li> √ Bootstrap K separated, simplfied (by exporting code blocks to function), and adjusted to better to support x264 downstream pathway</li>
+        <li> √ Logic improvements (optimizations) in all Functions, Statements, Switches, Pathways (up-downstreaming)</li></ul>
+    </li>
+    <li> √ Completed the entire CHS Step 2 single   --> ENG Step 2 single   code migration</li>
+    <li> √ Completed the entire CHS Step 2 single   --> CHS Step 2 multiple code migration</li>
+    <li> √ Completed the entire ENG Step 2 multiple --> ENG Step 2 multiple code migration</li>
+    <li> √ Completed the entire ENG Step 2 single   --> ENG Step 2 multiple lang migration</li>
+    <li> √ Completed the entire CHS Step 3 single   --> ENG Step 3 single   code migration</li>
+    <li> √ Completed the entire CHS Step 3 single   --> CHS Step 3 multiple code migration</li>
+    <li> √ Completed the entire ENG Step 3 multiple --> ENG Step 3 multiple code migration</li>
+    <li> √ Completed the entire ENG Step 3 single   --> ENG Step 3 multiple lang migration</li>
+    <li> √ Completed the entire ENG Step 2 single   --> ENG Step 3 single   lang migration</li>
+    <li> √ Completed the entire ENG Step 2 multiple --> ENG Step 3 multiple lang migration</li>
+</ul>
+
 **v1.1840**
 <ul>
     <li> √ Step 2:<ul>
