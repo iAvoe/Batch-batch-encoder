@@ -243,11 +243,9 @@ if %ERRORLEVEL%==3 cmd /k
 if %ERRORLEVEL%==2 pause
 if %ERRORLEVEL%==1 endlocal && exit /b"
 
-
     $trueExpPath=$exptPath+"enc_"+$s+".bat" #增加一道变量赋值, 以防加号分隔变量$exptPath和文本enc_输出到文件名
     #Out-File -InputObject $enc_gen -FilePath $trueExpPath -Encoding utf8
     [IO.File]::WriteAllLines($trueExpPath, $enc_gen, $utf8NoBOM) #强制导出utf-8NoBOM编码
-
     $x+=1
 }#关闭ForLoop
 
