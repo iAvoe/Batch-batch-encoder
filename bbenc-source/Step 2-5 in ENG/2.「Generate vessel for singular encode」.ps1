@@ -123,7 +123,7 @@ Do {$ENCops=$x265Path=$x264Path=""
     Switch (Read-Host "Choose a downstream pipe program [A: x265/hevc | B: x264/avc]") {
         a {$ENCops="a"; Write-Output "`r`nSelecting x265--route A. Opening a selection window to [locate x265.exe]"; $x265Path=whereisit}
         b {$ENCops="b"; Write-Output "`r`nSelecting x264--route B. Opening a selection window to [locate x264.exe]"; $x264Path=whereisit}
-        default {Write-Output "× Bad input, try again"}
+        default {Write-Warning "× Bad input, try again"}
     }
 } While ($ENCops -eq "")
 $encEXT=$x265Path+$x264Path
@@ -185,9 +185,8 @@ del `"$EXPpath$tmpStrmOut`""
 $utf8NoBOM=New-Object System.Text.UTF8Encoding $false 
 Write-Output "`r`n... Generating enc_0S.bat`r`n"
 $enc_gen="REM 「Title」
-
 @echo.
-@echo -----------Starting encode 001-----------
+@echo -------------Starting encode--------------
 
 REM 「Debug」Comment out during normal usage
 REM @echo %ffmpegParA%
