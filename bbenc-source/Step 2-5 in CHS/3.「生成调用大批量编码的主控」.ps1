@@ -1,7 +1,7 @@
 ﻿cls #「启动-」大批量版生成的主控缺失文件名, 所以要提醒
 Read-Host "[单任务模式]大批量模式下, 生成的主控里没有导入用的文件名, 因此需要手动逐个填写导入文件名
 x264一般内置lavf, x265一般不带, 不内置lavf库的编码器需要通过ffmpeg等上游pipe端工具导入视频流，输出未封装的流. 按Enter继续"
-$mode="m"
+$mode="m" #大批量模式
 #Function namecheck([string]$inName) {
 #    $badChars = '[{0}]' -f [regex]::Escape(([IO.Path]::GetInvalidFileNameChars() -join ''))
 #    ForEach ($_ in $badChars) {if ($_ -match $inName) {return $false}}
@@ -39,7 +39,6 @@ Function setencoutputname ([string]$mode, [string]$switchOPS) {
             if ($mode -eq "m") {$vidEXP+='_$serial'} #!使用单引号防止$serial变量被激活
             Write-Debug "大批量模式下选项A会在末尾添加序号, 文件名尾会多出`"_`"`r`n"
         } b {
-            Write-Debug "`r`nPowerShell默认紧挨的方括号为一般表达式, 如[xx][yy]间要隔开"
             if ($mode -eq "m") {#大批量模式用
                 Do {$vidEXP=Read-Host "`r`n填写文件名(无后缀), 大批量模式下要于集数变化处填 `$serial, 并隔开`$serial后的英文字母, 两个方括号间要隔开. 如 [Zzz] Memories – `$serial (BDRip 1764x972 HEVC)"
                     $chkme=namecheck($vidEXP)
@@ -54,9 +53,8 @@ Function setencoutputname ([string]$mode, [string]$switchOPS) {
             }
             #[string]$serial=($s).ToString($zroStr) #赋值示例. 用于下面的for循环(提供变量$s)
             #$vidEXP=$ExecutionContext.InvokeCommand.ExpandString($vidEXP) #下面的for循环中, 用户输入的变量只能通过Expand方法才能作为变量激活$serial
-        } default {
+        } default {#相比于settmpoutputname, 此函数不存在空值输入，所以default状态下就是原始的$vidEXP文件名
             if ($mode -eq "m") {$vidEXP+='_$serial'} #!使用单引号防止$serial变量被激活
-            #相比于settmpoutputname, 此函数不存在空值输入，所以default状态下就是原始的$vidEXP文件名
         }
     }
     Write-Debug "√ 写入了导出文件名 $vidEXP`r`n"
@@ -157,25 +155,20 @@ $fileEXPpath = whichlocation
 Write-Output "选择的路径为 $fileEXPpath`r`n"
 
 #「启动E」导入原文件, 注意步骤2中已经导入了ffmpeg等工具的路径. 所以步骤3只导入源. 注意变量也为此而改了名
-Write-Output "参考[视频文件类型]https://en.wikipedia.org/wiki/Video_file_format"
-Write-Output "由于步骤2已填写ffmpeg, vspipe, avs2yuv, avs2pipemod的所在路径, 所以步骤3中选择的是待压制文件`r`n"
-Do {$IMPchk=$vidIMP=$vpyIMP=$avsIMP=$apmIMP=""
-    Switch (Read-Host "之前选择的pipe上游方案是[A: ffmpeg | B: vspipe | C: avs2yuv | D: avs2pipemod | E: SVFI (alpha)]") {
-        a {$IMPchk="a"; Write-Output "`r`n选择了ffmpeg----视频源. 已打开[定位所有源所在]的路径选窗`r`n由于分别导入文件太慢, 所以要求在生成的主控批处理中手动写入文件名"; $vidIMP=whichlocation}
-        b {$IMPchk="b"; Write-Output "`r`n选择了vspipe----.vpy源. 已打开[定位所有源所在]的路径选窗`r`n由于分别导入文件太慢, 所以要求在生成的主控批处理中手动写入文件名"; $vpyIMP=whichlocation}
-        c {$IMPchk="c"; Write-Output "`r`n选择了avs2yuv---.avs源. 已打开[定位所有源所在]的路径选窗`r`n由于分别导入文件太慢, 所以要求在生成的主控批处理中手动写入文件名"; $avsIMP=whichlocation}
-        d {$IMPchk="d"; Write-Output "`r`n选了avs2pipemod-.avs源. 已打开[定位所有源所在]的路径选窗`r`n由于分别导入文件太慢, 所以要求在生成的主控批处理中手动写入文件名"; $apmIMP=whichlocation}
-        e {$IMPchk="e"; Write-Output "`r`n选了SVFI(alpha)-视频源. 已打开[定位所有源所在路径]的选窗`r`n由于分别导入文件太慢, 所以要求在生成的主控批处理中手动写入文件名"; $vidIMP=whichlocation}
-        default {Write-Warning "输入错误, 重试"}
-    }
-    if (($vidIMP+$vpyIMP+$avsIMP+$apmIMP).Contains(".exe")) {
-        Write-Error "× 该输入不是导入上游方案，而是要编码的源"
-        $IMPchk=""
-    }
-} While ($IMPchk -eq "")
+Write-Output "参考[视频文件类型]https://en.wikipedia.org/wiki/Video_file_format`r`n由于步骤2已填写ffmpeg, vspipe, avs2yuv, avs2pipemod的所在路径, 所以步骤3中选择的是待压制文件`r`n"
+$impEXTm=$IMPchk="" #impEXTm: 大批量模式用的导入源方案(路径)，IMPchk: 上游线路/源类型
+Do {Switch (Read-Host "之前选择的pipe上游方案是[A: ffmpeg | B: vspipe | C: avs2yuv | D: avs2pipemod | E: SVFI (alpha)]") {
+        a {Write-Output "`r`n选择了ffmpeg----视频源. 已打开[定位所有源所在]的路径选窗`r`n由于分别导入文件太慢, 所以要求在生成的主控批处理中手动写入文件名"; $impEXTm=whichlocation; $IMPchk="a"}
+        b {Write-Output "`r`n选择了vspipe----.vpy源. 已打开[定位所有源所在]的路径选窗`r`n由于分别导入文件太慢, 所以要求在生成的主控批处理中手动写入文件名"; $impEXTm=whichlocation; $IMPchk="b"}
+        c {Write-Output "`r`n选择了avs2yuv---.avs源. 已打开[定位所有源所在]的路径选窗`r`n由于分别导入文件太慢, 所以要求在生成的主控批处理中手动写入文件名"; $impEXTm=whichlocation; $IMPchk="c"}
+        d {Write-Output "`r`n选了avs2pipemod-.avs源. 已打开[定位所有源所在]的路径选窗`r`n由于分别导入文件太慢, 所以要求在生成的主控批处理中手动写入文件名"; $impEXTm=whichlocation; $IMPchk="d"}
+        e {Write-Output "`r`n选了SVFI(alpha)-视频源. 已打开[定位所有源所在路径]的选窗`r`n由于分别导入文件太慢, 所以要求在生成的主控批处理中手动写入文件名"; $impEXTm=whichlocation; $IMPchk="e"}
+        default {Write-Warning "`r`n× 输入错误, 重试"}
+    } #大批量模式下仅支持输入含有所有源视频的路径
+    $impEXTm
+} While ($impEXTm -eq "")
 
 #「启动F1」整合并反馈选取的路径/文件
-$impEXTm=$vidIMP+$vpyIMP+$avsIMP+$apmIMP
 if ($mode -eq "m") {Write-Output "`r`n√ 选择的路径为 $impEXTm`r`n"}
 if ($mode -eq "s") {Write-Output "`r`n√ 选择的文件为 $impEXTs`r`n"
     if ($impEXTs -eq "") {Write-Error "× 没有导入任何文件"; pause; exit}
@@ -202,7 +195,7 @@ if ($IMPchk -eq "d") {
     $apmDLL="X:\Somewhere\avisynth.dll"
     Write-Output "未选择Avs2pipemod线路, AVS动态链接库路径将临时设为 $apmDLL `r`n"
 }
-#「启动G2」SVFI需要的文件
+#「启动G2」SVFI需要的文件. !默认无插帧活动!
 if ($IMPchk -eq "e") {
     Write-Warning "本程序会自动修改渲染配置ini文件中的target_fps值, 目的是将下游x264/5编码器设置x264Par, x265Par中的--fps设置统一起来`r`n但缺点是自定义的插帧设置会失效, 若需插帧则手动修改target_fps及x264/5Par设置的--fps参数."
     Read-Host "`r`n将为SVFI打开[自定渲染配置.ini]的路径选择窗, 可能会在窗口底层弹出.`r`nSteam发布端的路径如 X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini 按Enter继续"
@@ -318,7 +311,7 @@ Do {$ENCops=$x265Path=$x264Path=""
     Switch (Read-Host "选择pipe下游程序 [A: x265/hevc | B: x264/avc]") {
         a {$ENCops="a"; Write-Output "`r`n选择了x265--A线路. 已打开[定位x265.exe]的选窗"; $x265Path=whereisit}
         b {$ENCops="b"; Write-Output "`r`n选择了x264--B线路. 已打开[定位x264.exe]的选窗"; $x264Path=whereisit}
-        default {Write-Warning "输入错误, 重试"}
+        default {Write-Error "`r`n× 输入错误, 重试"}
     }
 } While ($ENCops -eq "")
 $encEXT=$x265Path+$x264Path
@@ -328,16 +321,16 @@ Write-Output "√ 选择了 $encEXT `r`n"
 $vidEXP=[io.path]::GetFileNameWithoutExtension($impEXTs)
 Do {$switchOPS=""
     $switchOPS=Read-Host "`r`n选择导出压制结果的文件名`r`n[A: 选择文件并拷贝 | B: 手动填写 | C: $vidEXP]"
-    if  (($switchOPS -ne "a") -and ($switchOPS -ne "b") -and ($switchOPS -ne "c")) {Write-Error "× 输入错误，重试"}
+    if  (($switchOPS -ne "a") -and ($switchOPS -ne "b") -and ($switchOPS -ne "c")) {Write-Error "`r`n× 输入错误，重试"}
 } While (($switchOPS -ne "a") -and ($switchOPS -ne "b") -and ($switchOPS -ne "c"))
     
 if (($switchOPS -eq "a") -or ($switchOPS -eq "b")) {$vidEXP = setencoutputname($mode, $switchOPS)}
 else {Write-Output "√ 写入了导出文件名 $vidEXP`r`n"}
 
 #「启动K2」x264线路下，选择导出压制结果的后缀名（x265线路下默认.hevc）
-if       ($ENCops -eq "b") {$vidFMT=""
+if ($ENCops -eq "b") {$vidFMT=""
     Do {Switch (Read-Host "「x264线路」选择导出压制结果的文件后缀名/格式`r`n[A: MKV | B: MP4 | C: FLV]`r`n") {
-            a {$vidFMT=".mkv"} b {$vidFMT=".mp4"} c {$vidFMT=".flv"} Default {Write-Error "× 输入错误，重试"}
+            a {$vidFMT=".mkv"} b {$vidFMT=".mp4"} c {$vidFMT=".flv"} Default {Write-Error "`r`n× 输入错误，重试"}
         }
     } While ($vidFMT -eq "")
 } elseif ($ENCops -eq "a") {$vidFMT=".hevc"}
@@ -470,8 +463,7 @@ REM 「非正常退出时」用taskkill /F /IM cmd.exe /T才能清理打开的�
 @echo. && @echo --Starting multi-batch-enc workflow v2--
 
 REM 「ffmpeg debug」删-loglevel 16
-REM 「-thread_queue_size过小」加-thread_queue_size<压制平均码率kbps+1000>, 但最好换ffmpeg
-
+REM 「-thread_queue_size过小」加-thread_queue_size<每核心内存带宽Kbps>, 但最好换ffmpeg
 REM 「ffmpeg, vspipe, avsyuv, avs2pipemod固定参数」
 
 @set `"ffmpegParA="+$ffmpegParA+"`"

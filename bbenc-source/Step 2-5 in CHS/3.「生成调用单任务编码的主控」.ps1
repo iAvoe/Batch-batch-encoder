@@ -39,7 +39,6 @@ Function setencoutputname ([string]$mode, [string]$switchOPS) {
             if ($mode -eq "m") {$vidEXP+='_$serial'} #!使用单引号防止$serial变量被激活
             Write-Debug "大批量模式下选项A会在末尾添加序号, 文件名尾会多出`"_`"`r`n"
         } b {
-            Write-Debug "`r`nPowerShell默认紧挨的方括号为一般表达式, 如[xx][yy]间要隔开"
             if ($mode -eq "m") {#大批量模式用
                 Do {$vidEXP=Read-Host "`r`n填写文件名(无后缀), 大批量模式下要于集数变化处填 `$serial, 并隔开`$serial后的英文字母, 两个方括号间要隔开. 如 [Zzz] Memories – `$serial (BDRip 1764x972 HEVC)"
                     $chkme=namecheck($vidEXP)
@@ -54,9 +53,8 @@ Function setencoutputname ([string]$mode, [string]$switchOPS) {
             }
             #[string]$serial=($s).ToString($zroStr) #赋值示例. 用于下面的for循环(提供变量$s)
             #$vidEXP=$ExecutionContext.InvokeCommand.ExpandString($vidEXP) #下面的for循环中, 用户输入的变量只能通过Expand方法才能作为变量激活$serial
-        } default {
+        } default {#相比于settmpoutputname, 此函数不存在空值输入，所以default状态下就是原始的$vidEXP文件名
             if ($mode -eq "m") {$vidEXP+='_$serial'} #!使用单引号防止$serial变量被激活
-            #相比于settmpoutputname, 此函数不存在空值输入，所以default状态下就是原始的$vidEXP文件名
         }
     }
     Write-Debug "√ 写入了导出文件名 $vidEXP`r`n"
@@ -432,7 +430,7 @@ REM 「非正常退出时」用taskkill /F /IM cmd.exe /T才能清理打开的�
 @echo. && @echo --Starting multi-batch-enc workflow v2--
 
 REM 「ffmpeg debug」删-loglevel 16
-REM 「-thread_queue_size过小」加-thread_queue_size<压制平均码率kbps+1000>, 但最好换ffmpeg
+REM 「-thread_queue_size过小」加-thread_queue_size<每核心内存带宽Kbps>, 但最好换ffmpeg
 
 REM 「ffmpeg, vspipe, avsyuv, avs2pipemod固定参数」
 REM 修改为批量编码时，需要确认视频格式（如-pix_fmt，-r）不变，否则应运行步骤3另建一个主控

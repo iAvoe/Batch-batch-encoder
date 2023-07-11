@@ -1,6 +1,6 @@
 ﻿cls #「Bootstrap -」Multi-encode methods require users to manually add importing filenames
 Read-Host "[Multiple encoding mode] only specifies the path to import files to encode, which require manually adding filenames into generated controller batch`r`nx264 usually comes with lavf, unlike x265, therefore x265 usually exports .hevc raw-streams instead of .mp4. Press Enter to proceed"
-$mode="m"
+$mode="m" #multi-encode mode
 #Function namecheck([string]$inName) {
 #    $badChars = '[{0}]' -f [regex]::Escape(([IO.Path]::GetInvalidFileNameChars() -join ''))
 #    ForEach ($_ in $badChars) {if ($_ -match $inName) {return $false}}
@@ -25,6 +25,40 @@ Function whichlocation($startPath='DESKTOP') {
     #Root directory always have a "\" in return, whereas a folder/path/dir doesn't. Therefore an if statement is used to add "\" when needed, but comment out under single-encode mode
     if (($startPath.SelectedPath.SubString($startPath.SelectedPath.Length-1) -eq "\") -eq $false) {$startPath.SelectedPath+="\"}
     return $startPath.SelectedPath
+}
+
+Function setencoutputname ([string]$mode, [string]$switchOPS) {
+    $DebugPreference="Continue" #Write-Output/Host does not work in a function, using Write-Debug instead
+
+    Switch ($switchOPS) { #Switch with Read-Host doesn't work in Functions, therefore this question is asked & answered before entering this Function at K1-2
+        a { Write-Debug "Opening a window that [copy filename on selection], it may pop up at rear of current window."
+
+            $vidEXP=whereisit
+            $chkme=namecheck($vidEXP)
+            $vidEXP=[io.path]::GetFileNameWithoutExtension($vidEXP)
+            if ($mode -eq "m") {$vidEXP+='_$serial'} #! Using single quotes in codeline here to prevent variable `$serial from being executed
+                Write-Debug "`r`nIn multi-encode mode, choosing A will add a trailing counter in filename`r`n"
+        } b {
+            if ($mode -eq "m") {#Multi-encoding mode
+                Do {$vidEXP=Read-Host "`r`nSpecify filename w/out extension (multi-encode mode)  `r`n1. Specify episode counter `$serial in desired location`r`n2. `$serial should be padded from trailing alphabets.`r`n3. Space is needed inbetween 2 square brackets`r`n  e.g., [YYDM-11FANS] [Yuru Yuri 2]`$serial[BDRIP 720P]; [Zzz] Memories – `$serial (BDRip 1764x972 HEVC)"
+                    $chkme=namecheck($vidEXP)
+                    if  (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false)) {Write-Warning "Missing variable `$serial under multi-encode mode; No value entered, Or intercepted illegal characters / | \ < > : ? * `""}
+                } While (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false))
+            }
+            if ($mode -eq "s") {#Single encoding mode
+                Do {$vidEXP=Read-Host "`r`nSpecify filename w/out extension (multi-encode mode)  `r`n1. Specify episode counter `$serial in desired location`r`n2. `$serial should be padded from trailing alphabets.`r`n3. Space is needed inbetween 2 square brackets`r`n  e.g., [YYDM-11FANS] [Yuru Yuri 2]`$serial[BDRIP 720P]; [Zzz] Memories – `$serial (BDRip 1764x972 HEVC)"
+                    $chkme=namecheck($vidEXP)
+                    if  (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false)) {Write-Warning "Missing variable `$serial under multi-encode mode; No value entered, Or intercepted illegal characters / | \ < > : ? * `""}
+                } While (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false))
+            }
+                #[string]$serial=($s).ToString($zroStr) #Example of parsing leading zeros to $serial. Used in for loop below (supplies variable $s)
+                #$vidEXP=$ExecutionContext.InvokeCommand.ExpandString($vidEXP) #Activating $serial as a variable with expand string method. Used in for loop below
+        } default {#Compared to settmpoutputname, this Function won't encounter empty input, therefore Switch-default corresponds to the input file's own name
+            if ($mode -eq "m") {$vidEXP+='_$serial'} #! Using single quotes in codeline here to prevent variable `$serial from being executed
+        }
+    }
+    Write-Debug "`r`n√ Added exporting filename $vidEXP`r`n"
+    return $vidEXP
 }
 
 Function hevcparwrapper {
@@ -117,25 +151,24 @@ Write-Output "√ Selected $exptPath`r`n"
 
 #「Bootstrap D」Locate path to export encoded files
 Read-Host "Hit Enter to proceed open a window to [locate path to export encoded files]"
-$fileEXP = whichlocation
-Write-Output "√ Selected $fileEXP`r`n"
+$fileEXPpath = whichlocation
+Write-Output "√ Selected $fileEXPpath`r`n"
 
 #「Bootstrap E」Step 2 already learns paths to ffmpeg & so. Therefore here the import is for files to encode. Note the variables are renamed to further stress the difference
-Write-Output "Reference: [Video file formats]https://en.wikipedia.org/wiki/Video_file_format"
-Write-Output "Step 2 already learns paths to ffmpeg & so. Here it's about to import a path with files to encode`r`n"
-Do {$IMPchk=$vidIMP=$vpyIMP=$avsIMP=$apmIMP=""
-    Switch (Read-Host "The previously selected pipe upstream program was [A: ffmpeg | B: vspipe | C: avs2yuv | D: avs2pipemod | E: SVFI (alpha)]") {
-        a {$IMPchk="a"; Write-Output "`r`nSelected ffmpeg-----video source. Opening a window to [locate path/directory w/ files to encode]`r`nThe procedure is to import path & add filnames in generated batch later"; $vidIMP=whichlocation}
-        b {$IMPchk="b"; Write-Output "`r`nSelected vspipe------.vpy source. Opening a window to [locate path/directory w/ files to encode]`r`nThe procedure is to import path & add filnames in generated batch later"; $vpyIMP=whichlocation} #Multi-encode only, procedure is different from single-encode mode
-        c {$IMPchk="c"; Write-Output "`r`nSelected avs2yuv-----.avs source. Opening a window to [locate path/directory w/ files to encode]`r`nThe procedure is to import path & add filnames in generated batch later"; $avsIMP=whichlocation}
-        d {$IMPchk="d"; Write-Output "`r`nSelected avs2pipemod-.avs source. Opening a window to [locate path/directory w/ files to encode]`r`nThe procedure is to import path & add filnames in generated batch later"; $apmIMP=whichlocation}
-        e {$IMPchk="e"; Write-Output "`r`nSelected scfi(α)---video source. Opening a window to [locate path/directory w/ files to encode]`r`nThe procedure is to import path & add filnames in generated batch later"; $vidIMP=whichlocation}
-        default {Write-Warning "Bad input, try again"}
-    }
-} While ($IMPchk -eq "")
+Write-Output "Reference: [Video file formats]https://en.wikipedia.org/wiki/Video_file_format`r`nStep 2 already learns paths to ffmpeg & so. Here it's about to import a path with files to encode`r`n"
+$impEXTm=$IMPchk="" #impEXTm: Multu-encode mode's sourcefile import mode (path to files only)，IMPchk: upper-stream source type
+Do {Switch (Read-Host "The previously selected pipe upstream program was [A: ffmpeg | B: vspipe | C: avs2yuv | D: avs2pipemod | E: SVFI (alpha)]") {
+        a {Write-Output "`r`nSelected ffmpeg-----video source. Opening a window to [locate path/directory w/ files to encode]`r`nThe procedure is to import path & add filnames in generated batch later"; $impEXTs=whichlocation; $IMPchk="a"}
+        b {Write-Output "`r`nSelected vspipe------.vpy source. Opening a window to [locate path/directory w/ files to encode]`r`nThe procedure is to import path & add filnames in generated batch later"; $impEXTs=whichlocation; $IMPchk="b"}
+        c {Write-Output "`r`nSelected avs2yuv-----.avs source. Opening a window to [locate path/directory w/ files to encode]`r`nThe procedure is to import path & add filnames in generated batch later"; $impEXTs=whichlocation; $IMPchk="c"}
+        d {Write-Output "`r`nSelected avs2pipemod-.avs source. Opening a window to [locate path/directory w/ files to encode]`r`nThe procedure is to import path & add filnames in generated batch later"; $impEXTs=whichlocation; $IMPchk="d"}
+        e {Write-Output "`r`nSelected svfi(β)---video source. Opening a window to [locate path/directory w/ files to encode]`r`nThe procedure is to import path & add filnames in generated batch later"; $impEXTs=whichlocation; $IMPchk="e"}
+        default {Write-Warning "`r`n× Bad input, try again"}
+    } # Multi-encode can only input a path which contains all the files to encode
+    $impEXTm
+} While ($impEXTm -eq "")
 
 #「Bootstrap F1」Aggregate and feedback user's selected path
-$impEXTs=$vidIMP+$vpyIMP+$avsIMP+$apmIMP
 if ($mode -eq "m") {Write-Output "`r`n√ Importing path is selected as $impEXTm`r`n"}
 if ($mode -eq "s") {Write-Output "`r`n√ Importing file is selected as $impEXTs`r`n"
     if (($impEXTs -eq "") -eq $true) {Write-Error "× Imported file is blank"; pause; exit}
@@ -148,7 +181,7 @@ if ($mode -eq "s") {Write-Output "`r`n√ Importing file is selected as $impEXTs
         if ($impEXTs -ne ".avs") {Write-Warning "Imported file extension is $impEXTs instead of .avs`r`n"} #if statement is used to prevent selection of ffmpeg path + an empty $impEXTs
     } elseif ($IMPchk -eq "b") {#「Bootstrap F4」Check file extension for vspipe routes
         if ($impEXTs -ne ".vpy") {Write-Warning "Imported file extension is $impEXTs instead of .vpy`r`n"} #Comment this out during multi-encode mode as no source file is imported
-    } #Note: Path source: $impEXTm, File source: $impEXTs, File export: $fileEXP
+    } #Note: Path source: $impEXTm, File source: $impEXTs, File export: $fileEXPpath
 }
 
 #「Bootstrap G1」Importing required avisynth.dll by Avs2pipemod
@@ -174,33 +207,47 @@ if ($IMPchk -eq "e") {
     $olsINI="X:\Somewhere\SVFI-render-customize.ini"
     Write-Output "Skipped selection procedure for SVFI, config ini file will be set to $olsINI"
 }
-
 #「Bootstrap H」Importing a video file for ffprobe to check under 4 circs: VS(1) route, AVS(2) routes, multi-encoding mode(1)
 if (($mode -eq "m") -or (($IMPchk -ne "a") -and ($IMPchk -ne "e"))) {
     Do {$continue="n"
-        Read-Host "`r`nHit Enter to proceed open a window to [import a source video sample] for ffprobe to analyze. This is due to the fact that .vpy, .avs input source are not videos"
+        Read-Host "`r`nnHit Enter to proceed open a window to [import a source video sample] for ffprobe to analyze. This is due to the fact that .vpy, .avs input source are not videos"
         $impEXTs=whereisit
         if ((Read-Host "[Assure] type of file input $impEXTs is video [Y: Confirm | N: Cancel and re-input]") -eq "y") {$continue="y"; Write-Output "Continue"} else {Write-Output "Rework"}
     } While ($continue -eq "n")
 } else {$impEXTs=$vidIMP}
-Write-Output "√ Video file for ffprobe to analyze: $impEXTs`r`n"
+
+if ($impEXTs.Contains(".mov")) {
+    $is_mov=$true;  Write-Output "视频 $impEXTs 的封装格式为MOV`r`n"
+} else {
+    $is_mov=$false; Write-Output "视频 $impEXTs 的封装格式非MOV`r`n"
+}
 
 #「Bootstrap I」Locate ffprobe
 Read-Host "Hit Enter to proceed open a window to [locate ffprobe.exe]"
 $fprbPath=whereisit
 
-#「ffprobeA2」Begin analyze sample video. Due to people confuses at MKV files' NUMBER_OF_FRAMES; NUMBER_OF_FRAMES-eng & etc. tagging, some MKV files ends up not having data on NUMBER_OF_FRAMES tag (at CSV's tag 24,25), therefore by reading both and keep the non-0 value would provide fallback
-$parsProbe = $fprbPath+" -i '$impEXTs' -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
-Invoke-Expression $parsProbe > "C:\temp_v_info.csv"
-
-#i.e.: $parsProbe = "D:\ffprobe.exe -i `"F:\Asset\Video\BDRipPT\[Beatrice-Raws] Anne Happy [BDRip 1920x1080 x264 FLAC]\[Beatrice-Raws] Anne Happy 01 [BDRip 1920x1080 x264 FLAC].mkv`" -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
-#i.e.: $parsProbe = "D:\ffprobe.exe -i `"N:\SolLevante_HDR10_r2020_ST2084_UHD_24fps_1000nit.mov`" -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
-#Invoke-Expression $parsProbe > "C:\temp_v_info.csv"
-#Notepad "C:\temp_v_info.csv"
-
-#「ffprobeB」Read with Import-CSV module and map them as an array, header is needed as ffprobe generates headless CSV by default A~F, A file is created because there is currently no method to parse value wihtout exporting CSV to file, and for debugging (swap Remove-Item to Notepad) purpose
-$ffprobeCSV = Import-Csv "C:\temp_v_info.csv" -Header A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,AA
-Remove-Item "C:\temp_v_info.csv" #File is saved to C drive because most Windows PC has only has 1 logical disk
+#「ffprobeA2」Begin analyze sample video. #「ffprobeA2」Due to people tends to use MKV files' NUMBER_OF_FRAMES; NUMBER_OF_FRAMES-eng & etc. tagging, some MKV files ends up not having data on NUMBER_OF_FRAMES tag (at CSV's tag 24,25), therefore a fallback operation by readong all of these values is needed
+#             And due to the differently implemented MOV container, the stream_tags are completly unusable and causes errors
+#「ffprobeB2」Read with Import-CSV module and map them as an array, header is needed as ffprobe generates headless CSV by default A~F, A file is created because there is currently no method to parse value wihtout exporting CSV to file, and for debugging (swap Remove-Item to Notepad) purpose
+#             Due to ffprobe writes the title "stream" at beginning of CSV, the header A is automatically ignored and the rest value are +1 in order
+#             e.g.: $parsProbe = "D:\ffprobe.exe -i `"F:\Asset\Video\BDRip私种\[Beatrice-Raws] Anne Happy [BDRip 1920x1080 x264 FLAC]\[Beatrice-Raws] Anne Happy 01 [BDRip 1920x1080 x264 FLAC].mkv`" -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
+#             e.g.: $parsProbe = "D:\ffprobe.exe -i `"N:\SolLevante_HDR10_r2020_ST2084_UHD_24fps_1000nit.mov`" -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
+#                   Invoke-Expression $parsProbe > "C:\temp_v_info.csv"
+#                   Notepad "C:\temp_v_info.csv"
+Switch ($is_mov) {
+    $true {
+        [String]$parsProbe = $fprbPath+" -i `"$impEXTs`" -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries -of csv"
+        Invoke-Expression $parsProbe > "C:\temp_v_info_is_mov.csv" #File is saved to C drive because most Windows PC has only has 1 disk
+        $ffprobeCSV = Import-Csv "C:\temp_v_info_is_mov.csv" -Header A,B,C,D,E,F,G,H,I
+    }
+    $false{
+        [String]$parsProbe = $fprbPath+" -i `"$impEXTs`" -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
+        Invoke-Expression $parsProbe > "C:\temp_v_info.csv"        #File is saved to C drive because most Windows PC has only has 1 disk
+        $ffprobeCSV = Import-Csv "C:\temp_v_info.csv" -Header A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,AA
+    }
+}
+if     (Test-Path "C:\temp_v_info.csv")        {Remove-Item "C:\temp_v_info.csv"}
+elseif (Test-Path "C:\temp_v_info_is_mov.csv") {Remove-Item "C:\temp_v_info_is_mov.csv"}
 
 #「ffprobeB3」Filling x265's option --subme
 $x265subme=x265submecalc -CSVfps $ffprobeCSV.H
@@ -246,6 +293,8 @@ Do {Switch ($ffprobeCSV.D) {
         yuv444p     {Write-Output "Detecting colorspace & bitdepth[yuv444p 8bit ]"; $avsCSP="-csp i444"; $avsD="-depth 8";  $encCSP="--input-csp i444"; $encD="--input-depth 8";  $ffmpegCSP="-pix_fmt yuv444p"}
         yuv444p10le {Write-Output "Detecting colorspace & bitdepth[yuv444p 10bit]"; $avsCSP="-csp i444"; $avsD="-depth 10"; $encCSP="--input-csp i444"; $encD="--input-depth 10"; $ffmpegCSP="-pix_fmt yuv444p10le"}
         yuv444p12le {Write-Output "x265-only colorspace & bitdepth[yuv444p 12bit]"; $avsCSP="-csp i444"; $avsD="-depth 12"; $encCSP="--input-csp i444"; $encD="--input-depth 12"; $ffmpegCSP="-pix_fmt yuv444p12le"}
+        yuva444p10le{Write-Output "Detecting colorspace & bitdepth[yuv444p 10bit]"; $avsCSP="-csp i444"; $avsD="-depth 10"; $encCSP="--input-csp i444"; $encD="--input-depth 10"; $ffmpegCSP="-pix_fmt yuv444p10le"}
+        yuva444p12le{Write-Output "x265-only colorspace & bitdepth[yuv444p 12bit]"; $avsCSP="-csp i444"; $avsD="-depth 12"; $encCSP="--input-csp i444"; $encD="--input-depth 12"; $ffmpegCSP="-pix_fmt yuv444p12le"}
         gray        {Write-Output "Detecting colorspace & bitdepth[yuv400p 8bit ]"; $avsCSP="-csp i400"; $avsD="-depth 8";  $encCSP="--input-csp i400"; $encD="--input-depth 8";  $ffmpegCSP="-pix_fmt gray"}
         gray10le    {Write-Output "Detecting colorspace & bitdepth[yuv400p 10bit]"; $avsCSP="-csp i400"; $avsD="-depth 10"; $encCSP="--input-csp i400"; $encD="--input-depth 10"; $ffmpegCSP="-pix_fmt gray10le"}
         gray12le    {Write-Output "x265-only colorspace & bitdepth[yuv400p 12bit]"; $avsCSP="-csp i400"; $avsD="-depth 12"; $encCSP="--input-csp i400"; $encD="--input-depth 12"; $ffmpegCSP="-pix_fmt gray12le"}
@@ -262,44 +311,32 @@ Do {$ENCops=$x265Path=$x264Path=""
     Switch (Read-Host "Choose a downstream pipe program [A: x265/hevc | B: x264/avc]") {
         a {$ENCops="a"; Write-Output "`r`nSelecting x265--route A. Opening a selection window to [locate x265.exe]"; $x265Path=whereisit}
         b {$ENCops="b"; Write-Output "`r`nSelecting x264--route B. Opening a selection window to [locate x264.exe]"; $x264Path=whereisit}
-        default {Write-Warning "Bad input, try again"}
+        default {Write-Error "`r`n× Bad input, try again"}
     }
 } While ($ENCops -eq "")
 $encEXT=$x265Path+$x264Path
 Write-Output "√ Selected $encEXT"
 
-#「Bootstrap K」Select multiple ways of specifying exporting filenames, episode variable $serial works at lower loop structure
+#「Bootstrap K1」Select multiple ways of specifying exporting filenames, episode variable $serial works at lower loop structure
 $vidEXP=[io.path]::GetFileNameWithoutExtension($impEXTs)
-Switch (Read-Host "`r`nChoose how to specify filename of encoding exports [A: Copy from an existing file | B: Input manually | C: $vidEXP]`r`nNote that PowerShell misinterprets square brackets next to eachother, e.g., [some][text]. Space inbetween them is required") {
-    a { Write-Output "Opening a selection window to [get filename from a file]"
-        $vidEXP=whereisit
-        $chkme=namecheck($vidEXP)
-        $vidEXP=[io.path]::GetFileNameWithoutExtension($vidEXP)
-        if ($mode -eq "m") {$vidEXP+='_$serial'} #!Using single quotes to prevent variable expansion of $serial
-    } b {
-        if ($mode -eq "m") {#Multi-encoding mode
-            Do {$vidEXP=Read-Host "`r`nSpecify filename to export (no extension). Place episode conter `$serial in desired location.`r`n`r`n`$serial should be padded from trailing alphabets. e.g., [Zzz] Memories – `$serial (BDRip 1764x972 HEVC)"
-                $chkme=namecheck($vidEXP)
-                if  (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false)) {Write-Warning "Missing variable `$serial under multi-encode mode; No value entered; Or intercepted illegal characters / | \ < > : ? * `""}
-            } While (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false))
+Do {$switchOPS=""
+    $switchOPS=Read-Host "`r`nChoose how to specify filename of encoding exports [A: Copy from an existing file | B: Input manually | C: $vidEXP]"
+    if  (($switchOPS -ne "a") -and ($switchOPS -ne "b") -and ($switchOPS -ne "c")) {Write-Error "`r`n× Bad input, try again"}
+} While (($switchOPS -ne "a") -and ($switchOPS -ne "b") -and ($switchOPS -ne "c"))
+
+if (($switchOPS -eq "a") -or ($switchOPS -eq "b")) {$vidEXP = setencoutputname($mode, $switchOPS)}
+else {Write-Output "√ Added exporting filename $vidEXP`r`n"}
+
+#「Bootstrap K2」Select container file export format for x264 downstream（Default .hevc for x265 downstream）
+if ($ENCops -eq "b") {$vidFMT=""
+    Do {Switch (Read-Host "「x264 downstream」Select container format for file export`r`n[A: MKV | B: MP4 | C: FLV]`r`n") {
+            a {$vidFMT=".mkv"} b {$vidFMT=".mp4"} c {$vidFMT=".flv"} Default {Write-Error "`r`n× Bad input, try again"}
         }
-        if ($mode -eq "s") {#Single encoding mode
-            Do {$vidEXP=Read-Host "`r`nSpecify filename to export (no extension). e.g., [Zzz] Memories – 01 (BDRip 1764x972 HEVC)"
-                $chkme=namecheck($vidEXP)
-                if  (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false)) {Write-Warning "Detecting variable `$serial in single-encode mode; No value entered; Or intercepted illegal characters / | \ < > : ? * `""}
-            } While (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false))
-        }
-        #[string]$serial=($s).ToString($zroStr) #Example of parsing leading zeros to $serial. Used in for loop below (supplies variable $s)
-        #$vidEXP=$ExecutionContext.InvokeCommand.ExpandString($vidEXP) #Activating $serial as a variable with expand string method. Used in for loop below
-    } default {
-        if ($mode -eq "m") {$vidEXP+='_$serial'} #!Using single quotes to prevent variable expansion of $serial
-    }
-}
-Write-Output "√ Added exporting filename $vidEXP`r`n"
+    } While ($vidFMT -eq "")
+} elseif ($ENCops -eq "a") {$vidFMT=".hevc"}
 
 #「Bootstrap L, M」1: Specify file extention based on x264-5. 2: For x265, add pme/pools based on cpu core count & motherboard node count
 if ($ENCops -eq "b") {
-    $nameIn+=".mp4"
     Do {$PICKops=$x264ParWrap=""
         Switch (Read-Host "Select an x264 preset [A: General purpose custom | B: Stock footage for editing]") {
             a {$x264ParWrap=avcparwrapper -PICKops "a"; Write-Output "`r`n√ Selected General-purpose preset"}
@@ -310,7 +347,6 @@ if ($ENCops -eq "b") {
     Write-Output "√ Defined x264 options: $x264ParWrap"
 }
 elseif ($ENCops -eq "a") {
-    $nameIn+=".hevc"
     $pme=$pool=""
     $procNodes=0
     [int]$cores=(wmic cpu get NumberOfCores)[2]
@@ -332,14 +368,21 @@ elseif ($ENCops -eq "a") {
     Write-Output "√ Defined x265 options: $x265ParWrap"
 }
 
+#「Bootstrap N」Activate when using x264 that supports Film grain optimization
+#Do {$x264fgo=$FGOops=""
+#    Switch (Read-Host "Select whether x264 [A: Support | B: Doesn't support] high frequency singal quantity based rate distorstion optimization (--fgo), this feature is outside of AVC standard") {
+#        a {$FGOops="A";Write-Output "`r`nAltering to better RDO strategy"; $x264fgo="--fgo 15"}
+#        b {$FGOops="B";Write-Output "`r`nKeeping currect RDO strategy";    $x264fgo=""}
+#        default {Write-Warning "`r`n× Bad input, try again"}
+#    }
+#} While ($FGOops -eq "")
+
 Set-PSDebug -Strict
 $utf8NoBOM=New-Object System.Text.UTF8Encoding $false #export batch file w/ utf-8NoBOM text codec
 
-#Note: Inport file variable: $impEXTs; Export file variable: $fileEXP
+#Note: Inport file variable: $impEXTs; Export file variable: $fileEXPpath
 #「Initialize」$ffmpegPar-ameters variable contains no trailing spaces
 #「Limitation」$ffmpegPar-ameters can only be added after all of file-imported option ("-i")s are written, & ffmpeg option "-hwaccel" must be written before of "-i". This further increases the string reallocation work & amount of variables needed to assemble ffmpeg commandline
-#Remove option "loglevel" when debugging
-#Add "-thread_queue_size<Avg bitrate gets computed during encode kbps+1000>" when ffmpeg shows warning "-thread_queue_size is too small", but the better practice is to replace ffmpeg
 $ffmpegParA="$ffmpegCSP $fmpgfps -loglevel 16 -y -hide_banner -an -f yuv4mpegpipe -strict unofficial" #Step 2 already addes "- | -" for pipe operation. Therefore there is no need to add it here
 $ffmpegParB="$ffmpegCSP $fmpgfps -loglevel 16 -y -hide_banner -c:v copy" #The ffmpeg commandline to generate temporary MP4. This workaround enables ffmpeg to multiplex .mp4 instead of .hevc to .mkv
 $vspipeParA="--y4m"
@@ -348,16 +391,21 @@ $avsmodParA="`"$apmDLL`" -y4mp" #Note: avs2pipemod uses "| -" instead of other t
 $olsargParA="-c `"$iniEXP`" --pipe-out" #Note: svfi doesn't support y4m pipe
 
 #「Initialize」x265Par-ameters
-if ($IMPchk -eq "e") {$y4m=""; Write-Output "！ SVFI doesn't support yuv-for-mpeg pipe, configuring downstream x264, x265 to raw pipe format"} else {$y4m="--y4m"}
+if ($IMPchk -eq "e") {
+    $x265y4m=$x264y4m=""; Write-Output "√ SVFI doesn't support yuv-for-mpeg pipe, configuring downstream x264, x265 to raw pipe format"
+} else {
+    $x265y4m="--y4m"
+    $x264y4m="--demuxer y4m" #x264，x265 has different option writing on yuv-for-mpeg demultiplexer
+}
 $x265ParA="$encD $x265subme $color_mtx $trans_chrctr $fps $WxH $encCSP $pme $pools $keyint $x265ParWrap $y4m -"
 $x264ParA="$encD $avc_mtx $avc_tsf $fps $WxH $encCSP $keyint $x264ParWrap $y4m -"
-$x265ParA=$x265ParA -replace "  ", " " #Remove double space caused by empty variables, eventhough double space doesn't really affect anything
+$x265ParA=$x265ParA -replace "  ", " " #Remove double space caused by empty variables, eventhough double space doesn't really affect execusion
 $x264ParA=$x264ParA -replace "  ", " "
 
 #「Initialize」ffmpeg, vspipe, avs2yuv, avs2pipemod Variable optoins, multi-encoding mode requires different filename and other attributes to separate tasks, therefore all Var-iables will first be loop-assigned
 if ($mode -eq "s") {
     $ffmpegVarA=$vspipeVarA=$avsyuvVarA=$avsmodVarA=$olsargVarA="-i `"$impEXTs`"" #Upstream Vars
-    $x265VarA=$x264VarA="$nbrframes --output `"$fileEXP$vidEXP`"" #Downstream Vars
+    $x265VarA=$x264VarA="$nbrframes --output `"$fileEXPpath$vidEXP`"" #Downstream Vars
 }
 
 #Iteration begins, carry as any axis reaches letter 27. Switch occupies temp-variable $_ which cannot be used to initialize this loop. Counts as a 3-digit twenty-hexagonal
@@ -382,8 +430,8 @@ For ($s=0; $s -lt $qty; $s++) {
     $avsyuvVarSChar+="@set `"avsyuvVar"+$sChar+"=-i `"video-to-encode"+"_"+"$sChar.mkv`"`"`n"
     $avsmodVarSChar+="@set `"avsmodVar"+$sChar+"=-i `"video-to-encode"+"_"+"$sChar.mkv`"`"`n"
 
-    $x265VarNosChar+="@set `"x265Var"+$sChar+"=--output `"$fileEXP$tempMuxOut`"`"`n"
-    $x264VarNosChar+="@set `"x264Var"+$sChar+"=--output `"$fileEXP$tempMuxOut`"`"`n"
+    $x265VarNosChar+="@set `"x265Var"+$sChar+"=--output `"$fileEXPpath$tempMuxOut`"`"`n"
+    $x264VarNosChar+="@set `"x264Var"+$sChar+"=--output `"$fileEXPpath$tempMuxOut`"`"`n"
     $encCallNosChar+="call enc_$s.bat`n"
 
     $x+=1 #The loop automatically applies $s+=1, but manual application is needed for debugging
@@ -393,19 +441,20 @@ For ($s=0; $s -lt $qty; $s++) {
 [string]$vspipeVarWrap=$vspipeVarSChar;$vspipeVarWrap=$vspipeVarWrap -replace " @set", "@set"
 [string]$avsyuvVarWrap=$avsyuvVarSChar;$avsyuvVarWrap=$avsyuvVarWrap -replace " @set", "@set"
 [string]$avsmodVarWrap=$avsmodVarSChar;$avsmodVarWrap=$avsmodVarWrap -replace " @set", "@set"
+[string]$olsargVarWrap=$olsargVarSChar;$olsargVarWrap=$olsargVarWrap -replace " @set", "@set"
 [string]$x265VarWrap = $x265VarNosChar;$x265VarWrap = $x265VarWrap   -replace " @set", "@set"
 [string]$x264VarWrap = $x264VarNosChar;$x264VarWrap = $x264VarWrap   -replace " @set", "@set"
 [string]$encCallWrap = $encCallNosChar;$encCallWrap = $encCallWrap   -replace " call", "call"
 
 #「Generate the controller batch」
-$ctrl_gen="REM 「Compatible with UTF-8」opt-out from ANSI code page
+$ctrl_gen="
+chcp 65001
+REM 「Compatible with UTF-8」opt-out from ANSI code page
 REM 「Safe for with multiple runs」Achieved by set+endlocal, works both at stopping during encoding and controlling batch
-REM 「Compatible localized CLI language」Implementation failed, the batch file must run with code page 65001
 REM 「Startup」Disable prompt input display, 5s sleep
 
 @echo off
 timeout 5
-chcp 65001
 setlocal
 
 REM 「Non-std exiting」Clean up used variables with taskkill /F /IM cmd.exe /T. Otherwise it may cause variable contamination
@@ -414,14 +463,14 @@ REM 「Non-std exiting」Clean up used variables with taskkill /F /IM cmd.exe /T
 @echo. && @echo --Starting multi-batch-enc workflow v2--
 
 REM 「ffmpeg debug」Delete -loglevel 16
-REM 「-thread_queue_size small err」Specity ffmpeg option -thread_queue_size<computing kbps+1000>, but better to replace ffmpeg
-
+REM 「-thread_queue_size small error」Specity ffmpeg option -thread_queue_size<memory bandwidth (Kbps) per core>, but better to replace ffmpeg
 REM 「ffmpeg, vspipe, avsyuv, avs2pipemod fixed Parameters」
 
 @set `"ffmpegParA="+$ffmpegParA+"`"
 @set `"vspipeParA="+$vspipeParA+"`"
 @set `"avsyuvParA="+$avsyuvParA+"`"
 @set `"avsmodParA="+$avsmodParA+"`"
+@set `"olsargParA="+$olsargParA+"`"
 
 REM 「ffmpeg, vspipe, avsyuv, avs2pipemod Variable optoins」
 
@@ -429,6 +478,7 @@ REM 「ffmpeg, vspipe, avsyuv, avs2pipemod Variable optoins」
 "+$vspipeVarWrap+"
 "+$avsyuvVarWrap+"
 "+$avsmodVarWrap+"
+"+$olsargVarWrap+"
 
 REM 「x264-5 fixed Parameters」
 

@@ -1,6 +1,6 @@
 ﻿cls #「Bootstrap -」Multi-encode methods require users to manually add importing filenames
 Read-Host "[Single encoding mode] Multiple encoding mode only specifies the path to import files to encode, therefore manually adding files into generated controller batch is needed`r`nx264 usually comes with lavf, unlike x265, therefore x265 usually exports .hevc raw-streams instead of .mp4. Press Enter to proceed"
-$mode="s"
+$mode="s" #single encode mode
 Function namecheck([string]$inName) {
     $badChars = '[{0}]' -f [regex]::Escape(([IO.Path]::GetInvalidFileNameChars() -join ''))
     ForEach ($_ in $badChars) {if ($_ -match $inName) {return $false}}
@@ -25,6 +25,41 @@ Function whichlocation($startPath='DESKTOP') {
     #Root directory always have a "\" in return, whereas a folder/path/dir doesn't. Therefore an if statement is used to add "\" when needed, but comment out under single-encode mode
     if (($startPath.SelectedPath.SubString($startPath.SelectedPath.Length-1) -eq "\") -eq $false) {$startPath.SelectedPath+="\"}
     return $startPath.SelectedPath
+}
+
+Function setencoutputname ([string]$mode, [string]$switchOPS) {
+    $DebugPreference="Continue" #function里不能用Write-Output/Host,或" "来输出交互信息, 所以用Write-Debug
+
+    Switch ($switchOPS) { #函数中不支持「Switch + Readhost " $变量名 "」，所以把原本由Switch问的问题在进入函数前就要回答，只把答案导入进函数中
+        a { Write-Debug "已打开[复制文件名]的选择窗"
+            $vidEXP=whereisit
+            $chkme=namecheck($vidEXP)
+            $vidEXP=[io.path]::GetFileNameWithoutExtension($vidEXP)
+            if ($mode -eq "m") {$vidEXP+='_$serial'} #!使用单引号防止$serial变量被激活
+            Write-Debug "大批量模式下选项A会在末尾添加序号, 文件名尾会多出`"_`"`r`n"
+        } b {
+            Write-Debug "`r`nPowerShell默认紧挨的方括号为一般表达式, 如[xx][yy]间要隔开"
+            if ($mode -eq "m") {#大批量模式用
+                Do {$vidEXP=Read-Host "`r`n填写文件名(无后缀), 大批量模式下要于集数变化处填 `$serial, 并隔开`$serial后的英文字母, 两个方括号间要隔开. 如 [Zzz] Memories – `$serial (BDRip 1764x972 HEVC)"
+                    $chkme=namecheck($vidEXP)
+                    if  (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false)) {Write-Warning "文件名中缺少变量`$serial, 输入了空值, 或拦截了不可用字符/ | \ < > : ? * `""}
+                } While (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false))
+            }
+            if ($mode -eq "s") {#单文件模式用
+                Do {$vidEXP=Read-Host "`r`n填写文件名(无后缀), 两个方括号间要隔开. 如 [Zzz] Memories – 01 (BDRip 1764x972 HEVC)"
+                    $chkme=namecheck($vidEXP)
+                    if  (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false)) {Write-Warning "单文件模式下文件名中含变量`$serial; 输入了空值; 或拦截了不可用字符/ | \ < > : ? * `""}
+                } While (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false))
+            }
+            #[string]$serial=($s).ToString($zroStr) #赋值示例. 用于下面的for循环(提供变量$s)
+            #$vidEXP=$ExecutionContext.InvokeCommand.ExpandString($vidEXP) #下面的for循环中, 用户输入的变量只能通过Expand方法才能作为变量激活$serial
+        } default {
+            if ($mode -eq "m") {$vidEXP+='_$serial'} #!使用单引号防止$serial变量被激活
+            #相比于settmpoutputname, 此函数不存在空值输入，所以default状态下就是原始的$vidEXP文件名
+        }
+    }
+    Write-Debug "√ 写入了导出文件名 $vidEXP`r`n"
+    return $vidEXP
 }
 
 Function hevcparwrapper {

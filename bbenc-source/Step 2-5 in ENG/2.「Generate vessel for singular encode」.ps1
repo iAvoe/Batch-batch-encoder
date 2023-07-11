@@ -42,7 +42,7 @@ Function settmpoutputname([string]$mode) {
                         if  (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false)) {Write-Warning "Missing variable `$serial under multi-encode mode; No value entered, Or intercepted illegal characters / | \ < > : ? * `""}
                     } While (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false))
                 }
-                if ($mode -eq "s") {# Single encoding mode
+                if ($mode -eq "s") {#Single encoding mode
                     Do {[string]$vidEXP=Read-Host "`r`nSpecify filename w/out extension (single encoding mode)`r`nSpace is needed inbetween 2 square brackets`r`ne.g., [YYDM-11FANS] [Yuru Yuri 2]01[BDRIP 720P]"
                         $chkme=namecheck($vidEXP)
                         if  (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false)) {Write-Warning "Detecting variable `$serial in single-encode mode; No value entered, Or intercepted illegal characters / | \ < > : ? * `""}
@@ -54,7 +54,7 @@ Function settmpoutputname([string]$mode) {
             default {Write-Warning "× Bad input, try again`r`n"}
         }
     } While ($vidEXP -eq "")
-    Write-Debug "√ Added exporting filename $vidEXP`r`n"
+    Write-Debug "`r`n√ Added exporting filename $vidEXP`r`n"
     return $vidEXP
 }
 
