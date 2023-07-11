@@ -137,7 +137,7 @@ if ($mode -eq "m") {
             Switch (Read-Host "Choose [y|n] to [add leading zeros] on exporting filename's episode counter. E.g., use 01, 02... for 2-digit episodes") {
                 y {$leadCHK="y"; Write-Output "√ enable leading 0s`r`n"; $ldZeros=$qty.ToString().Length}
                 n {$leadCHK="n"; Write-Output "× disable leading 0s`r`n"}
-                default {Write-Warning "Bad input, try again"}
+                default {Write-Warning "`r`n× Bad input, try again"}
             }
         } While ($leadCHK -eq "")
         [string]$zroStr="0"*$ldZeros #Gaining '000' protion for ".ToString('000')" method. $zroStr would be 0 if leading zero feature is deactivated, the calculation still haves but takes no effect
@@ -162,7 +162,7 @@ Do {$IMPchk=$vidIMP=$vpyIMP=$avsIMP=$apmIMP="" #Single-encode mode's source file
         c {$IMPchk="c"; Write-Output "`r`nSelected avs2yuv-----.avs source. Opening a window to [locate a file to encode]`r`n"; $avsIMP=whereisit}
         d {$IMPchk="d"; Write-Output "`r`nSelected avs2pipemod-.avs source. Opening a window to [locate a file to encode]`r`n"; $apmIMP=whereisit}
         e {$IMPchk="e"; Write-Output "`r`nSelected svfi(α)---video source. Opening a window to [locate a file to encode]`r`n"; $vidIMP=whereisit}
-        default {Write-Warning "Bad input, try again"}
+        default {Write-Warning "`r`n× Bad input, try again"}
     }
     if (($vidIMP+$vpyIMP+$avsIMP+$apmIMP).Contains(".exe")) {$IMPchk=""; Write-Error "`r`n× This is a encoding source file import, you are importing an executable instead"}
 } While ($IMPchk -eq "")
@@ -310,7 +310,7 @@ Do {$ENCops=$x265Path=$x264Path=""
     Switch (Read-Host "Choose a downstream pipe program [A: x265/hevc | B: x264/avc]") {
         a {$ENCops="a"; Write-Output "`r`nSelecting x265--route A. Opening a selection window to [locate x265.exe]"; $x265Path=whereisit}
         b {$ENCops="b"; Write-Output "`r`nSelecting x264--route B. Opening a selection window to [locate x264.exe]"; $x264Path=whereisit}
-        default {Write-Warning "Bad input, try again"}
+        default {Write-Warning "`r`n× Bad input, try again"}
     }
 } While ($ENCops -eq "")
 $encEXT=$x265Path+$x264Path
@@ -340,10 +340,10 @@ if ($ENCops -eq "b") {
         Switch (Read-Host "Select an x264 preset [A: General purpose custom | B: Stock footage for editing]") {
             a {$x264ParWrap=avcparwrapper -PICKops "a"; Write-Output "`r`n√ Selected General-purpose preset"}
             b {$x264ParWrap=avcparwrapper -PICKops "b"; Write-Output "`r`n√ Selected Stock-footage preset"}
-            default {Write-Warning "Bad input, try again"}
+            default {Write-Warning "`r`n× Bad input, try again"}
         }
     } While ($x264ParWrap -eq "")
-    Write-Output "√ Defined x264 options: $x264ParWrap"
+    Write-Output "`r`n√ Defined x264 options: $x264ParWrap"
 }
 elseif ($ENCops -eq "a") {
     $pme=$pool=""
@@ -352,7 +352,7 @@ elseif ($ENCops -eq "a") {
     if ($cores -gt 21) {$pme="--pme"; Write-Output "√ Detecting processor's core count reaching 22, added x265 option: --pme"}
 
     $pools=poolscalc
-    if ($pools -ne "") {Write-Output "√ Added x265 option: $pools"}
+    if ($pools -ne "") {Write-Output "`r`n√ Added x265 option: $pools"}
 
     Do {$PICKops=$x265ParWrap=""
         Switch (Read-Host "`r`nSelect an x265 preset [A: General purpose custom | B: High-compression film | C: Stock footage for editing | D: High-compression anime fansub | E: HEDT anime BDRip coldwar]") {
@@ -361,10 +361,10 @@ elseif ($ENCops -eq "a") {
             c {$x265ParWrap=hevcparwrapper -PICKops "c"; Write-Output "`r`n√ Selected ST-footage preset"}
             d {$x265ParWrap=hevcparwrapper -PICKops "d"; Write-Output "`r`n√ Selected HC-AnimeFS preset"}
             e {$x265ParWrap=hevcparwrapper -PICKops "e"; Write-Output "`r`n√ Selected HEDT-ABC preset"}
-            default {Write-Warning "Bad input, try again"}
+            default {Write-Warning "`r`n× Bad input, try again"}
         }
     } While ($x265ParWrap -eq "")
-    Write-Output "√ Defined x265 options: $x265ParWrap"
+    Write-Output "`r`n√ Defined x265 options: $x265ParWrap"
 }
 
 #「Bootstrap N」Activate when using x264 that supports Film grain optimization
@@ -382,8 +382,6 @@ $utf8NoBOM=New-Object System.Text.UTF8Encoding $false #export batch file w/ utf-
 #Note: Import paths' variable: $impEXTm; Import file variable: $impEXTs; Export path variable: $fileEXP
 #「Initialize」$ffmpegPar-ameters variable contains no trailing spaces
 #「Limitation」$ffmpegPar-ameters can only be added after all of file-imported option ("-i")s are written, & ffmpeg option "-hwaccel" must be written before of "-i". This further increases the string reallocation work & amount of variables needed to assemble ffmpeg commandline
-#Remove option "loglevel" when debugging
-#Add "-thread_queue_size<Avg bitrate gets computed during encode kbps+1000>" when ffmpeg shows warning "-thread_queue_size is too small", but the better practice is to replace ffmpeg
 $ffmpegParA="$ffmpegCSP $fmpgfps -loglevel 16 -y -hide_banner -an -f yuv4mpegpipe -strict unofficial" #Step 2 already addes "- | -" for pipe operation. Therefore there is no need to add it here
 $ffmpegParB="$ffmpegCSP $fmpgfps -loglevel 16 -y -hide_banner -c:v copy" #The ffmpeg commandline to generate temporary MP4. This workaround enables ffmpeg to multiplex .mp4 instead of .hevc to .mkv
 $vspipeParA="--y4m"
@@ -392,7 +390,12 @@ $avsmodParA="`"$apmDLL`" -y4mp" #Note: avs2pipemod uses "| -" instead of other t
 $olsargParA="-c `"$iniEXP`" --pipe-out" #Note: svfi doesn't support y4m pipe
 
 #「Initialize」x265Par-ameters
-if ($IMPchk -eq "e") {$y4m=""; Write-Output "！ SVFI doesn't support yuv-for-mpeg pipe, configuring downstream x264, x265 to raw pipe format"} else {$y4m="--y4m"}
+if ($IMPchk -eq "e") {
+    $x265y4m=$x264y4m=""; Write-Output "√ SVFI doesn't support yuv-for-mpeg pipe, configuring downstream x264, x265 to raw pipe format"
+} else {
+    $x265y4m="--y4m"
+    $x264y4m="--demuxer y4m" #x264，x265 has different option writing on yuv-for-mpeg demultiplexer
+}
 $x265ParA="$encD $x265subme $color_mtx $trans_chrctr $fps $WxH $encCSP $pme $pools $keyint $x265ParWrap $y4m -"
 $x264ParA="$encD $avc_mtx $avc_tsf $fps $WxH $encCSP $keyint $x264ParWrap $y4m -"
 $x265ParA=$x265ParA -replace "  ", " " #Remove double space caused by empty variables, eventhough double space doesn't really affect anything
@@ -405,14 +408,14 @@ if ($mode -eq "s") {
 }
 
 #「Generate ffmpeg, vspipe, avs2yuv, avspipemod controller batch」
-$ctrl_gen="REM 「Compatible with UTF-8」opt-out from ANSI code page
+$ctrl_gen="
+chcp 65001
+REM 「Compatible with UTF-8」opt-out from ANSI code page
 REM 「Safe for with multiple runs」Achieved by set+endlocal, works both at stopping during encoding and controlling batch
-REM 「Compatible localized CLI language」Implementation failed, the batch file must run with code page 65001
 REM 「Startup」Disable prompt input display, 5s sleep
 
 @echo off
 timeout 5
-chcp 65001
 setlocal
 
 REM 「Non-std exiting」Clean up used variables with taskkill /F /IM cmd.exe /T. Otherwise it may cause variable contamination
@@ -420,9 +423,9 @@ REM 「Non-std exiting」Clean up used variables with taskkill /F /IM cmd.exe /T
 @echo. && @echo --Starting multi-batch-enc workflow v2--
 
 REM 「ffmpeg debug」Delete -loglevel 16
-REM 「-thread_queue_size small err」Specity ffmpeg option -thread_queue_size<computing kbps+1000>, but better to replace ffmpeg
-
+REM 「-thread_queue_size small err」Specity ffmpeg option -thread_queue_size<memory bandwidth (Kbps) per core>, but better to replace ffmpeg
 REM 「ffmpeg, vspipe, avsyuv, avs2pipemod fixed Parameters」
+REM To perform small batched multiple encoding, make sure（-pix_fmt, -r, --frames<x264/5>）remains the same, always run Step 3 if otherwise
 
 @set `"ffmpegParA="+$ffmpegParA+"`"
 @set `"vspipeParA="+$vspipeParA+"`"
@@ -430,6 +433,7 @@ REM 「ffmpeg, vspipe, avsyuv, avs2pipemod fixed Parameters」
 @set `"avsmodParA="+$avsmodParA+"`"
 
 REM 「ffmpeg, vspipe, avsyuv, avs2pipemod Variable optoins」
+REM Add commands like @set `"ffmpegVarX=-i `"X:\vid_2.mp4`"`" to perform small batched multiple encoding
 
 @set `"ffmpegVarA=-hwaccel auto "+$ffmpegVarA+"`"
 @set `"vspipeVarA="+$vspipeVarA+"`"
@@ -437,6 +441,7 @@ REM 「ffmpeg, vspipe, avsyuv, avs2pipemod Variable optoins」
 @set `"avsmodVarA="+$avsmodVarA+"`"
 
 REM 「x264/5 fixed Parameters」
+REM Add commands like `"x264ParX=...`" to perform small batched multiple encoding
 
 @set `"x265ParA="+$x265ParA+"`"
 @set `"x264ParA="+$x264ParA+"`"
@@ -454,6 +459,7 @@ REM @set `"x264VarA=--crf 23 ... --output ...`"
 REM @set `"x264VarA=--crf 26 ... --output ...`"
 
 REM 「Encoding」Use commenting or deleting encode batches to skip undesired encode tasks
+REM Add commands like call enc_x.bat to perform small batched multiple encoding
 
 call enc_0S.bat
 

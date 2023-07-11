@@ -137,7 +137,7 @@ if ($mode -eq "m") {
             Switch (Read-Host "选择之前[y启用了 | n关闭了]导出压制文件名的[序号补0]. 如导出十位数文件时写作01, 02...") {
                 y {$leadCHK="y"; Write-Output "√ 启用补零`r`n"; $ldZeros=$qty.ToString().Length}
                 n {$leadCHK="n"; Write-Output "× 关闭补零`r`n"}
-                default {Write-Warning "输入错误, 重试"}
+                default {Write-Warning "`r`n× 输入错误, 重试"}
             }
         } While ($leadCHK -eq "")
         [string]$zroStr="0"*$ldZeros #得到.ToString('000')所需的'000'部分, 如果关闭补零则$zroStr为0, 补零计算仍然存在但没有效果
@@ -162,7 +162,7 @@ Do {$IMPchk=$vidIMP=$vpyIMP=$avsIMP=$apmIMP=""
         c {$IMPchk="c"; Write-Output "`r`n选择了avs2yuv---.avs源. 已打开[定位源]的文件选窗"; $avsIMP=whereisit}
         d {$IMPchk="d"; Write-Output "`r`n选了avs2pipemod-.avs源. 已打开[定位源]的文件选窗"; $apmIMP=whereisit}
         e {$IMPchk="e"; Write-Output "`r`n选了SVFI(alpha)-视频源. 已打开[定位源]的文件选窗"; $vidIMP=whereisit}
-        default {Write-Warning "输入错误, 重试"}
+        default {Write-Warning "`r`n× 输入错误, 重试"}
     }
     if (($vidIMP+$vpyIMP+$avsIMP+$apmIMP).Contains(".exe")) {$IMPchk=""; Write-Error "`r`n× 该输入不是导入上游方案，而是要编码的源"}
 } While ($IMPchk -eq "")
@@ -310,7 +310,7 @@ Do {$ENCops=$x265Path=$x264Path=""
     Switch (Read-Host "选择pipe下游程序 [A: x265/hevc | B: x264/avc]") {
         a {$ENCops="a"; Write-Output "`r`n选择了x265--A线路. 已打开[定位x265.exe]的选窗"; $x265Path=whereisit}
         b {$ENCops="b"; Write-Output "`r`n选择了x264--B线路. 已打开[定位x264.exe]的选窗"; $x264Path=whereisit}
-        default {Write-Warning "输入错误, 重试"}
+        default {Write-Warning "`r`n× 输入错误, 重试"}
     }
 } While ($ENCops -eq "")
 $encEXT=$x265Path+$x264Path
@@ -329,7 +329,7 @@ else {Write-Output "√ 写入了导出文件名 $vidEXP`r`n"}
 #「启动K2」x264线路下，选择导出压制结果的后缀名（x265线路下默认.hevc）
 if       ($ENCops -eq "b") {$vidFMT=""
     Do {Switch (Read-Host "「x264线路」选择导出压制结果的文件后缀名/格式`r`n[A: MKV | B: MP4 | C: FLV]`r`n") {
-            a {$vidFMT=".mkv"} b {$vidFMT=".mp4"} c {$vidFMT=".flv"} Default {Write-Error "× 输入错误，重试"}
+            a {$vidFMT=".mkv"} b {$vidFMT=".mp4"} c {$vidFMT=".flv"} Default {Write-Error "`r`n× 输入错误，重试"}
         }
     } While ($vidFMT -eq "")
 } elseif ($ENCops -eq "a") {$vidFMT=".hevc"}
@@ -340,7 +340,7 @@ if ($ENCops -eq "b") {
         Switch (Read-Host "选择x264压制参数预设 [A: 高画质高压缩 | B: 剪辑素材存档]") {
             a {$x264ParWrap=avcparwrapper -PICKops "a"; Write-Output "`r`n√ 选择了高画质高压缩预设"}
             b {$x264ParWrap=avcparwrapper -PICKops "b"; Write-Output "`r`n√ 选择了剪辑素材存档预设"}
-            default {Write-Warning "输入错误, 重试"}
+            default {Write-Warning "`r`n× 输入错误, 重试"}
         }
     } While ($x264ParWrap -eq "")
     Write-Output "√ 已定义x264压制参数: $x264ParWrap"
@@ -349,10 +349,10 @@ elseif ($ENCops -eq "a") {
     $pme=$pool=""
     $procNodes=0
     [int]$cores=(wmic cpu get NumberOfCores)[2]
-    if ($cores -gt 21) {$pme="--pme"; Write-Output "√ 检测到处理器核心数达22, 已添加x265参数: --pme"}
+    if ($cores -gt 21) {$pme="--pme"; Write-Output "`r`n√ 检测到处理器核心数达22, 已添加x265参数: --pme"}
 
     $pools=poolscalc
-    if ($pools -ne "") {Write-Output "√ 已添加x265参数: $pools"}
+    if ($pools -ne "") {Write-Output "`r`n√ 已添加x265参数: $pools"}
 
     Do {$PICKops=$x265ParWrap=""
         Switch (Read-Host "`r`n选择x265压制参数预设 [A: 通用-自定义 | B: 高压-录像 | C: 剪辑素材存档 | D: 高压-动漫字幕组 | E: HEDT-动漫BDRip冷战]") {
@@ -361,7 +361,7 @@ elseif ($ENCops -eq "a") {
             c {$x265ParWrap=hevcparwrapper -PICKops "c"; Write-Output "`r`n√ 选择了剪辑素材存档预设"}
             d {$x265ParWrap=hevcparwrapper -PICKops "d"; Write-Output "`r`n√ 选择了高压-动漫字幕组预设"}
             e {$x265ParWrap=hevcparwrapper -PICKops "e"; Write-Output "`r`n√ 选择了HEDT-动漫BDRip冷战预设"}
-            default {Write-Warning "输入错误, 重试"}
+            default {Write-Warning "`r`n× 输入错误, 重试"}
         }
     } While ($x265ParWrap -eq "")
     Write-Output "√ 已定义x265压制参数: $x265ParWrap"
@@ -372,7 +372,7 @@ elseif ($ENCops -eq "a") {
 #    Switch (Read-Host "选择x264 [A: 是 | B: 否] 支持基于高频信号量的率失真优化策略 (--fgo参数/Film grain optimization)注: AVC标准外") {
 #        a {$FGOops="A";Write-Output "`r`n修改率失真优化策略"; $x264fgo="--fgo 15"}
 #        b {$FGOops="B";Write-Output "`r`n保持率失真优化策略"; $x264fgo=""}
-#        default {Write-Warning "输入错误, 重试"}
+#        default {Write-Warning "`r`n× 输入错误, 重试"}
 #    }
 #} While ($FGOops -eq "")
 
@@ -425,7 +425,6 @@ REM 「非正常退出时」用taskkill /F /IM cmd.exe /T才能清理打开的�
 
 REM 「ffmpeg debug」删-loglevel 16
 REM 「-thread_queue_size过小」加-thread_queue_size<每核心内存带宽Kbps>, 但最好换ffmpeg
-
 REM 「ffmpeg, vspipe, avsyuv, avs2pipemod固定参数」
 REM 修改为批量编码时，需要确认视频格式（如-pix_fmt，-r）不变，否则应运行步骤3另建一个主控
 

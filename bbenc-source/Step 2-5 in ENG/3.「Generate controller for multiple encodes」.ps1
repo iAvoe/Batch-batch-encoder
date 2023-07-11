@@ -343,7 +343,7 @@ if ($ENCops -eq "b") {
             default {Write-Warning "Bad input, try again"}
         }
     } While ($x264ParWrap -eq "")
-    Write-Output "√ Defined x264 options: $x264ParWrap"
+    Write-Output "`r`n√ Defined x264 options: $x264ParWrap"
 }
 elseif ($ENCops -eq "a") {
     $pme=$pool=""
@@ -352,7 +352,7 @@ elseif ($ENCops -eq "a") {
     if ($cores -gt 21) {$pme="--pme"; Write-Output "√ Detecting processor's core count reaching 22, added x265 option: --pme"}
 
     $pools=poolscalc
-    if ($pools -ne "") {Write-Output "√ Added x265 option: $pools"}
+    if ($pools -ne "") {Write-Output "`r`n√ Added x265 option: $pools"}
 
     Do {$PICKops=$x265ParWrap=""
         Switch (Read-Host "`r`nSelect an x265 preset [A: General purpose custom | B: High-compression film | C: Stock footage for editing | D: High-compression anime fansub | E: HEDT anime BDRip coldwar]") {
@@ -364,7 +364,7 @@ elseif ($ENCops -eq "a") {
             default {Write-Warning "Bad input, try again"}
         }
     } While ($x265ParWrap -eq "")
-    Write-Output "√ Defined x265 options: $x265ParWrap"
+    Write-Output "`r`n√ Defined x265 options: $x265ParWrap"
 }
 
 #「Bootstrap N」Activate when using x264 that supports Film grain optimization
