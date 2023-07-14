@@ -428,6 +428,7 @@ REM 「ffmpeg, vspipe, avsyuv, avs2pipemod fixed Parameters」
 REM To perform small batched multiple encoding, make sure（-pix_fmt, -r, --frames<x264/5>）remains the same, always run Step 3 if otherwise
 
 @set `"ffmpegParA="+$ffmpegParA+"`"
+@set `"ffmpegParB="+$ffmpegParB+"`"
 @set `"vspipeParA="+$vspipeParA+"`"
 @set `"avsyuvParA="+$avsyuvParA+"`"
 @set `"avsmodParA="+$avsmodParA+"`"

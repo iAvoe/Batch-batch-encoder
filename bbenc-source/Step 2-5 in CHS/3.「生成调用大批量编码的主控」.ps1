@@ -467,6 +467,7 @@ REM 「-thread_queue_size过小」加-thread_queue_size<每核心内存带宽Kbp
 REM 「ffmpeg, vspipe, avsyuv, avs2pipemod固定参数」
 
 @set `"ffmpegParA="+$ffmpegParA+"`"
+@set `"ffmpegParB="+$ffmpegParB+"`"
 @set `"vspipeParA="+$vspipeParA+"`"
 @set `"avsyuvParA="+$avsyuvParA+"`"
 @set `"avsmodParA="+$avsmodParA+"`"

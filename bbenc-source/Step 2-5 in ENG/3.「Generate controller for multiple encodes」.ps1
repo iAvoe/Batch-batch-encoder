@@ -466,6 +466,7 @@ REM 「-thread_queue_size small error」Specity ffmpeg option -thread_queue_size
 REM 「ffmpeg, vspipe, avsyuv, avs2pipemod fixed Parameters」
 
 @set `"ffmpegParA="+$ffmpegParA+"`"
+@set `"ffmpegParB="+$ffmpegParB+"`"
 @set `"vspipeParA="+$vspipeParA+"`"
 @set `"avsyuvParA="+$avsyuvParA+"`"
 @set `"avsmodParA="+$avsmodParA+"`"

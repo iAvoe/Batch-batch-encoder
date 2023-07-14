@@ -429,6 +429,7 @@ REM 「ffmpeg, vspipe, avsyuv, avs2pipemod固定参数」
 REM 修改为批量编码时，需要确认视频格式（如-pix_fmt，-r）不变，否则应运行步骤3另建一个主控
 
 @set `"ffmpegParA="+$ffmpegParA+"`"
+@set `"ffmpegParB="+$ffmpegParB+"`"
 @set `"vspipeParA="+$vspipeParA+"`"
 @set `"avsyuvParA="+$avsyuvParA+"`"
 @set `"avsmodParA="+$avsmodParA+"`"
