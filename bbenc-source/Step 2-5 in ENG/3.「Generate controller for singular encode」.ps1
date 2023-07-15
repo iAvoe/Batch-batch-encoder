@@ -31,7 +31,7 @@ Function setencoutputname ([string]$mode, [string]$switchOPS) {
     $DebugPreference="Continue" #Write-Output/Host does not work in a function, using Write-Debug instead
 
     Switch ($switchOPS) { #Switch with Read-Host doesn't work in Functions, therefore this question is asked & answered before entering this Function at K1-2
-        a { Write-Debug "Opening a window that [copy filename on selection], it may pop up at rear of current window."
+        a { Write-Debug "Opening a window that [copy filename on selection]"
             $vidEXP=whereisit
             $chkme=namecheck($vidEXP)
             $vidEXP=[io.path]::GetFileNameWithoutExtension($vidEXP)
@@ -144,7 +144,7 @@ if ($mode -eq "m") {
     } else {[string]$zroStr="0"}
 }
 #「Bootstrap C」Locate path to export batch files
-Read-Host "`r`nPress Enter to open a window that locates [path for exporting batch files], it may pop up at rear of current window."
+Read-Host "`r`nPress Enter to open a window that locates [path for exporting batch files]"
 $exptPath = whichlocation
 Write-Output "√ Selected $exptPath`r`n"
 
@@ -185,7 +185,7 @@ if ($mode -eq "s") {Write-Output "`r`n√ Importing file is selected as $impEXTs
 }
 #「Bootstrap G1」Importing required avisynth.dll by Avs2pipemod
 if ($IMPchk -eq "d") {
-    Read-Host "Hit Enter to proceed open a window to [Select avisynth.dll] for Avs2pipemod, it may pop up at rear of current window"
+    Read-Host "Hit Enter to proceed open a window to [Select avisynth.dll] for Avs2pipemod"
     $apmDLL=whereisit
     $DLLchk=(Get-ChildItem $apmDLL).Extension #Report error if file extension is not .dll
     if (($DLLchk -eq ".dll") -eq $false) {Write-Warning "File extension is $apmDLL instead of .dll"}
@@ -197,7 +197,7 @@ if ($IMPchk -eq "d") {
 #「Bootstrap G2」Importing required config.ini by SVFI. !No frame interpolation in default!
 if ($IMPchk -eq "e") {
     Write-Warning "This script will disable frame interpolation by automatically replcing a line: target_fps=<ffprobe detected fps>`r`This is to make the frames cohesive with encoding fps generated for x264/5. Replace both target_fps & x264/5Par's --fps manually if interpolation is desired."
-    Read-Host "`r`nHit Enter to proceed open a window to [rendering-configuration.ini] for SVFI, it may pop up at rear of current window.`r`ni.e. under Steam distro: X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini"
+    Read-Host "`r`nHit Enter to proceed open a window to [rendering-configuration.ini] for SVFI`r`ni.e. under Steam distro: X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini"
     $olsINI=whereisit
     $INIchk=(Get-ChildItem $olsINI).Extension #Report error if file extension is not .ini
     if (($INIchk -eq ".ini") -eq $false) {Write-Warning "File extension is $olsINI instead of .ini"}

@@ -16,7 +16,7 @@ Function whereisit($startPath='DESKTOP') {
     [void] [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") 
     Add-Type -AssemblyName System.Windows.Forms
     $startPath = New-Object System.Windows.Forms.OpenFileDialog -Property @{ InitialDirectory = [Environment]::GetFolderPath('DESKTOP') }#GUI交互窗锁定到桌面文件夹
-    Do {$dInput = $startPath.ShowDialog((New-Object System.Windows.Forms.Form -Property @{TopMost=$true}))} While ($dInput -eq "Cancel") #1.打开选择文件的GUI交互窗, 通过重新打开选择窗来反取消用户的取消操作, 2.窗口小, TopMost开
+    Do {$dInput = $startPath.ShowDialog()} While ($dInput -eq "Cancel") #1.打开选择文件的GUI交互窗, 通过重新打开选择窗来反取消用户的取消操作. 2. 窗口大, TopMost关
     return $startPath.FileName
 }
 
@@ -25,7 +25,7 @@ Function whichlocation($startPath='DESKTOP') {
     Add-Type -AssemblyName System.Windows.Forms
     $startPath = New-Object System.Windows.Forms.FolderBrowserDialog -Property @{ Description="选择路径用的窗口. 拖拽边角可放大以便操作"; SelectedPath=[Environment]::GetFolderPath($startPath); RootFolder='MyComputer'; ShowNewFolderButton=$true }
     #打开选择文件的GUI交互窗, 用Do-While循环拦截误操作（取消/关闭选择窗）
-    Do {$dInput = $startPath.ShowDialog()} While ($dInput -eq "Cancel") #窗口大, TopMost关
+    Do {$dInput = $startPath.ShowDialog((New-Object System.Windows.Forms.Form -Property @{TopMost=$true}))} While ($dInput -eq "Cancel") #2. 窗口小, TopMost开
     #由于选择根目录时路径变量含"\", 而文件夹时路径变量缺"\", 所以要自动判断并补上
     if (($startPath.SelectedPath.SubString($startPath.SelectedPath.Length-1) -eq "\") -eq $false) {$startPath.SelectedPath+="\"}
     return $startPath.SelectedPath
@@ -71,7 +71,7 @@ Write-Output "avs2pipemod [.avs] -y4mp                 | x265.exe --y4m - --outp
 #    } else {[string]$zroStr="0"}
 #}
 #「启动C」定位导出主控文件用路径, 需要区分单任务和大批量模式
-Read-Host "将打开[导出待调用批处理]的路径选择窗, 可能会在窗口底层弹出. 按Enter继续"
+Read-Host "将打开[导出待调用批处理]的路径选择窗. 按Enter继续"
 if     ($mode -eq "s") {      $bchExpPath = (whichlocation)+"enc_0S.bat"}
 elseif ($mode -eq "m") {$bchExpPath = (whichlocation)+'enc_$s.bat'} #大批量模式下, 使用单引号来防止变量$s在此处被激活
 else                   {modeparamerror}

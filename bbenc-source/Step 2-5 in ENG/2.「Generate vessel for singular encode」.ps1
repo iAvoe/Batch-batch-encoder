@@ -100,7 +100,7 @@ if ($mode -eq "m") {
     } else {[string]$zroStr="0"}
 }
 #「Bootstrap C」Locate path to export batch files
-Read-Host "-----Welcome-----`r`nHit Enter to proceed open a selection window that locates [path for exporting batch files]...`r`nThis selection window might pop up at rear of current PowerShell instance."
+Read-Host "-----Welcome-----`r`nHit Enter to proceed open a selection window that locates [path for exporting batch files]..."
 $exptPath = whichlocation
 Write-Output "√ Selected $exptPath`r`n"
 
@@ -138,7 +138,7 @@ if ($ENCops -eq "a") {
             a { $MUXhevc="a" #x265 downstream, consideration of whether to generate temporary MP4 is needed
 
                 # "MUXops A/B" has been assigned on top, specified manually
-                Read-Host "Hit Enter to proceed open a window that locates [path to export temporary MP4 files]...`r`nThis selection window might pop up at rear of current PowerShell instance"
+                Read-Host "Hit Enter to proceed open a window that locates [path to export temporary MP4 files]..."
                 $EXPpath = whichlocation
                 Write-Output "√ Selected $EXPpath`r`n"
 

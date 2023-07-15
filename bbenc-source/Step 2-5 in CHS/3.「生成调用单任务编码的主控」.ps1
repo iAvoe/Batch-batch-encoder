@@ -12,7 +12,7 @@ Function whereisit($startPath='DESKTOP') {
     [void] [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") 
     Add-Type -AssemblyName System.Windows.Forms
     $startPath = New-Object System.Windows.Forms.OpenFileDialog -Property @{ InitialDirectory = [Environment]::GetFolderPath('DESKTOP') }#GUI交互窗锁定到桌面文件夹
-    Do {$dInput = $startPath.ShowDialog((New-Object System.Windows.Forms.Form -Property @{TopMost=$true}))} While ($dInput -eq "Cancel") #1.打开选择文件的GUI交互窗, 通过重新打开选择窗来反取消用户的取消操作, 2.窗口小, TopMost开
+    Do {$dInput = $startPath.ShowDialog()} While ($dInput -eq "Cancel") #1.打开选择文件的GUI交互窗, 通过重新打开选择窗来反取消用户的取消操作. 2. 窗口大, TopMost关
     return $startPath.FileName
 }
 
@@ -21,7 +21,7 @@ Function whichlocation($startPath='DESKTOP') {
     Add-Type -AssemblyName System.Windows.Forms
     $startPath = New-Object System.Windows.Forms.FolderBrowserDialog -Property @{ Description="选择路径用的窗口. 拖拽边角可放大以便操作"; SelectedPath=[Environment]::GetFolderPath($startPath); RootFolder='MyComputer'; ShowNewFolderButton=$true }
     #打开选择文件的GUI交互窗, 用Do-While循环拦截误操作（取消/关闭选择窗）
-    Do {$dInput = $startPath.ShowDialog()} While ($dInput -eq "Cancel") #窗口大, TopMost关
+    Do {$dInput = $startPath.ShowDialog((New-Object System.Windows.Forms.Form -Property @{TopMost=$true}))} While ($dInput -eq "Cancel") #2. 窗口小, TopMost开
     #由于选择根目录时路径变量含"\", 而文件夹时路径变量缺"\", 所以要自动判断并补上
     if (($startPath.SelectedPath.SubString($startPath.SelectedPath.Length-1) -eq "\") -eq $false) {$startPath.SelectedPath+="\"}
     return $startPath.SelectedPath
@@ -144,12 +144,12 @@ if ($mode -eq "m") {
     } else {[string]$zroStr="0"}
 }
 #「启动C」定位导出主控文件用路径
-Read-Host "将打开[导出主控批处理]的路径选择窗, 可能会在窗口底层弹出. 按Enter继续"
+Read-Host "将打开[导出主控批处理]的路径选择窗. 按Enter继续"
 $exptPath = whichlocation
 Write-Output "√ 选择的路径为 $exptPath`r`n"
 
 #「启动D」定位导出压制结果用路径
-Read-Host "将打开[导出压制文件]的路径选择窗, 可能会在窗口底层弹出. 按Enter继续"
+Read-Host "将打开[导出压制文件]的路径选择窗. 按Enter继续"
 $fileEXPpath = whichlocation
 Write-Output "选择的路径为 $fileEXPpath`r`n"
 
@@ -185,7 +185,7 @@ if ($mode -eq "s") {Write-Output "`r`n√ 选择的文件为 $impEXTs`r`n"
 }
 #「启动G1」Avs2pipemod需要的文件
 if ($IMPchk -eq "d") {
-    Read-Host "将为Avs2pipemod打开[选择avisynth.dll]的路径选择窗, 可能会在窗口底层弹出. 按Enter继续"
+    Read-Host "将为Avs2pipemod打开[选择avisynth.dll]的路径选择窗. 按Enter继续"
     $apmDLL=whereisit
     $DLLchk=(Get-ChildItem $apmDLL).Extension #检查文件后缀是否为.dll并报错
     if (($DLLchk -eq ".dll") -eq $false) {Write-Warning "文件后缀名是 $apmDLL 而非 .dll `r`n"}
@@ -197,7 +197,7 @@ if ($IMPchk -eq "d") {
 #「启动G2」SVFI需要的文件
 if ($IMPchk -eq "e") {
     Write-Warning "本程序会自动修改渲染配置ini文件中的target_fps值, 目的是将下游x264/5编码器设置x264Par, x265Par中的--fps设置统一起来`r`n但缺点是自定义的插帧设置会失效, 若需插帧则手动修改target_fps及x264/5Par设置的--fps参数."
-    Read-Host "`r`n将为SVFI打开[自定渲染配置.ini]的路径选择窗, 可能会在窗口底层弹出.`r`nSteam发布端的路径如 X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini 按Enter继续"
+    Read-Host "`r`n将为SVFI打开[自定渲染配置.ini]的路径选择窗.`r`nSteam发布端的路径如 X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini 按Enter继续"
     $olsINI=whereisit
     $INIchk=(Get-ChildItem $olsINI).Extension #检查文件后缀是否为.ini并报错
     if (($INIchk -eq ".ini") -eq $false) {Write-Warning "文件后缀名是 $olsINI 而非 .ini"}
