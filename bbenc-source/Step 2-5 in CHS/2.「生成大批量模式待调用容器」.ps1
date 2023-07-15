@@ -1,5 +1,10 @@
 ﻿cls #开发人员的Github: https://github.com/iAvoe
 $mode="m"
+Function badinputwarning {Write-Warning "`r`n× 输入错误, 重试"}
+Function nosuchrouteerr  {Write-Error "`r`b× 该线路不存在, 重试"}
+Function tmpmuxreminder {Write-Warning "x265线路下仅支持生成.hevc文件，若要封装为.mkv, 则受ffmpeg限制需要先封装为.mp4`r`n"}
+Function modeparamerror {Write-Error "`r`n× 崩溃: 变量`$mode损坏, 无法区分单任务和大批量模式"; pause; exit}
+Function skip {return "`r`n. 跳过"}
 Function namecheck([string]$inName) {
     $badChars = '[{0}]' -f [regex]::Escape(([IO.Path]::GetInvalidFileNameChars() -join ''))
     ForEach ($_ in $badChars) {if ($_ -match $inName) {return $false}}
@@ -26,38 +31,6 @@ Function whichlocation($startPath='DESKTOP') {
     return $startPath.SelectedPath
 }
 
-Function settmpoutputname([string]$mode) {
-    $DebugPreference="Continue" #function里不能用Write-Output/Host,或" "来输出交互信息, 所以用Write-Debug
-
-    Do {Switch (Read-Host "选择导出临时封装的文件名[A: 从现有文件复制 | B: 手动填写]") {
-            a { Write-Debug "√ 已打开[复制文件名]的选择窗"
-                $vidEXP=whereisit
-                $vidEXP=[io.path]::GetFileNameWithoutExtension($vidEXP)
-                if ($mode -eq "m") {$vidEXP+='_$serial'} #!使用单引号防止$serial变量被激活
-                Write-Debug "`r`n大批量模式下, 选项A会在末尾添加序号`r`n"
-            }
-            b { if ($mode -eq "m") {#大批量模式
-                    Do {[string]$vidEXP=Read-Host "`r`n填写文件名(无后缀), 大批量模式下要求于集数变化处填 `$serial, 并隔开`$serial后的英文字母, 两个方括号间要隔开. 如[YYDM-11FANS] [Yuru Yuri 2]`$serial[BDRIP 720P]"
-                        $chkme=namecheck($vidEXP)
-                        if  (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false)) {Write-Warning "文件名中缺少变量`$serial, 输入了空值, 或拦截了不可用字符/ | \ < > : ? * `""}
-                    } While (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false))
-                }
-                if ($mode -eq "s") {#单文件模式
-                    Do {[string]$vidEXP=Read-Host "`r`n填写文件名(无后缀), 两个方括号间要隔开. 如 [YYDM-11FANS] [Yuru Yuri 2]01[BDRIP 720P]"
-                        $chkme=namecheck($vidEXP)
-                        if  (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false)) {Write-Warning "文件名中缺少变量`$serial, 输入了空值, 或拦截了不可用字符/ | \ < > : ? * `""}
-                    } While (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false))
-                }
-                #[string]$serial=($s).ToString($zroStr) #赋值示例. 用于下面的for循环(提供变量$s)
-                #$vidEXP=$ExecutionContext.InvokeCommand.ExpandString($vidEXP) #下面的for循环中, 用户输入的变量只能通过Expand方法才能作为变量激活$serial
-            }
-            default {Write-Warning "× 输入错误, 重试"}
-        }
-    } While ($vidEXP -eq "")
-    Write-Debug "√ 写入了导出文件名 $vidEXP`r`n"
-    return $vidEXP
-}
-
 #「@MrNetTek」高DPI显示渲染模式的System.Windows.Forms
 Add-Type -TypeDefinition @'
 using System.Runtime.InteropServices;
@@ -76,9 +49,7 @@ Write-Output "ffmpeg可变转恒定帧率: -vsync cfr`r`n"
 Write-Output "压制分场隔行视频 - x265: --tff/--bff; - x264: --interlaced<tff/bff>`r`n"
 Write-Output "VSpipe      [.vpy] --y4m               - | x265.exe --y4m - --output"
 Write-Output "avs2yuv     [.avs] -csp<串> -depth<整> - | x265.exe --input-res <串> --fps <整/小/分数> - --output"
-Write-Output "avs2pipemod [.avs] -y4mp                 | x265.exe --y4m - --output`r`n"
-Write-Output "x265线路下，可手动在脚本中更改`$MUXops=[`r`n| a: 压制后封装(x265线路下默认)`r`n| b: 压制后封装并删除未封装流`r`n| c: 仅压制(封装命令注释掉，x264线路时自动选择)]`r`n"
-$MUXops="a"
+Write-Output "avs2pipemod [.avs] -y4mp                 | x265.exe --y4m - --output <<上游无`"-`">>`r`n"
 
 #「启动A」生成1~n个"enc_[序号].bat"单文件版不需要
 if ($mode -eq "m") {
@@ -99,65 +70,92 @@ if ($mode -eq "m") {
         [string]$zroStr="0"*$ldZeros #得到.ToString('000')所需的'000'部分, 如果关闭补零则$zroStr为0, 补零计算仍然存在但没有效果
     } else {[string]$zroStr="0"}
 }
-#「启动C」定位导出主控文件用路径
-Read-Host "将打开[导出主控批处理]的路径选择窗, 可能会在窗口底层弹出. 按Enter继续"
-$exptPath = whichlocation
-Write-Output "√ 选择的路径为 $exptPath`r`n"
+#「启动C」定位导出主控文件用路径, 需要区分单任务和大批量模式
+Read-Host "将打开[导出待调用批处理]的路径选择窗, 可能会在窗口底层弹出. 按Enter继续"
+if     ($mode -eq "s") {      $bchExpPath = (whichlocation)+"enc_0S.bat"}
+elseif ($mode -eq "m") {$s=0; $bchExpPath = (whichlocation)+"enc_$s.bat"} #大批量模式下, `$s会在代码中后段被赋值, 提前赋值以防崩溃
+else                   {modeparamerror}
+Write-Output "`r`n√ 选择的路径与导出文件名为 $bchExpPath"
 
-#「启动D」选择pipe上游程序, 同时使用y4m pipe和ffprobe两者来实现冗余/fallback. 步骤2选择上游程序, 步骤3选择片源
-Do {$IMPchk=$fmpgPath=$vprsPath=$avsyPath=$avspPath=$svfiPath=""
-    Switch (Read-Host "选择pipe上游程序 [A: ffmpeg | B: vspipe | C: avs2yuv | D: avs2pipemod | E: SVFI]") {
-        a {$IMPchk="a"; Write-Output "`r`n选择了ffmpeg----A线路. 已打开[定位ffmpeg.exe]的选窗"; $fmpgPath=whereisit}
-        b {$IMPchk="b"; Write-Output "`r`n选择了vspipe----B线路. 已打开[定位vspipe.exe]的选窗"; $vprsPath=whereisit}
-        c {$IMPchk="c"; Write-Output "`r`n选择了avs2yuv---C线路. 已打开[定位avs2yuv.avs]的选窗"; $avsyPath=whereisit}
-        d {$IMPchk="d"; Write-Output "`r`n选了avs2pipemod-D线路. 已打开[定位avs2pipemod.exe]的选窗"; $avspPath=whereisit}
-        e {$IMPchk="e"; Write-Output "`r`n选了svfi--------E线路. 已打开[定位one_line_shot_args.exe]的选窗`r`nSteam发布端的路径如 X:\SteamLibrary\steamapps\common\SVFI\one_line_shot_args.exe"; $svfiPath=whereisit}
-        default {Write-Warning "× 输入错误, 重试"}
-    }
-} While ($IMPchk -eq "")
-$impEXT=$fmpgPath+$vprsPath+$avsyPath+$avspPath+$svfiPath
-Write-Output "√ 选择了 $impEXT`r`n"
-
-#「启动E」选择pipe下游程序, x264或x265
-Do {$ENCops=$x265Path=$x264Path=""
-    Switch (Read-Host "选择pipe下游程序 [A: x265/hevc | B: x264/avc]") {
-        a {$ENCops="a"; Write-Output "`r`n选择了x265--A线路. 已打开[定位x265.exe]的选窗"; $x265Path=whereisit}
-        b {$ENCops="b"; Write-Output "`r`n选择了x264--B线路. 已打开[定位x264.exe]的选窗"; $x264Path=whereisit}
-        default {Write-Warning "× 输入错误, 重试"}
-    }
-} While ($ENCops -eq "")
-$encEXT=$x265Path+$x264Path
-Write-Output "√ 选择了 $encEXT`r`n"
-
-#「启动F」定位导出临时MP4封装的路径, x264有libav所以用$ENCops排除并直接导出MP4. 
-#         由步骤3定义导出压制文件的路径，文件名和后缀名
-[string]$vidEXP=[string]$serial=[string]$MUXhevc=""
-
-if ($ENCops -eq "a") {
-    Do {Switch (Read-Host "Select [ A: 后面要用ffmpeg封装MKV (ffmpeg需生成临时MP4，再封装MKV）`r`n | B: 后面不用MKV封装 - 只生成.hevc流 ]") {
-            a { $MUXhevc="a" #x265线路，需要考虑是否生成临时MP4
-                             #"MUXops A/B" 在顶部代码中赋值，可手动修改
-                Read-Host "将打开[导出临时封装文件]的路径选择窗, 可能会在窗口底层弹出. 按Enter继续"
-                $EXPpath = whichlocation 
-                Write-Output "√ 选择的路径为 $EXPpath`r`n"
-                $vidEXP = settmpoutputname($mode) #设置导出文件名
-                }
-            b{ $MUXhevc="b"
-                $MUXops ="c"#后面不用MKV封装，"MUXops C" 写入注释掉的MUXwrt A
-            }
-            Default {
-                Write-Warning "`r`n × 输入错误，重试"
-                $MUXhevc=""
-            }
+#「启动D」循环选择所有pipe上游，下游程序, 同时使用y4m pipe和ffprobe两者来实现冗余/fallback. 步骤2选择上游程序, 步骤3选择片源
+$impEND="n"
+$fmpgPath=$vprsPath=$avsyPath=$avspPath=$svfiPath=$x265Path=$x264Path=""
+Do {Do {
+        Switch (Read-Host "`r`n导入上游程序路径 [A: ffmpeg | B: vspipe | C: avs2yuv | D: avs2pipemod | E: SVFI], 重复选择会触发跳过") {
+            a {if ($fmpgPath -eq "") {Write-Output "`r`nffmpeg------上游A线. 已打开[定位ffmpeg.exe]的选窗";            $fmpgPath=whereisit} else {skip}}
+            b {if ($vprsPath -eq "") {Write-Output "`r`nvspipe------上游B线. 已打开[定位vspipe.exe]的选窗";            $vprsPath=whereisit} else {skip}}
+            c {if ($avsyPath -eq "") {Write-Output "`r`navs2yuv-----上游C线. 已打开[定位avs2yuv.avs]的选窗";           $avsyPath=whereisit} else {skip}}
+            d {if ($avspPath -eq "") {Write-Output "`r`navs2pipemod-上游D线. 已打开[定位avs2pipemod.exe]的选窗";       $avspPath=whereisit} else {skip}}
+            e {if ($svfiPath -eq "") {Write-Output "`r`nsvfi--------上游E线. 已打开[定位one_line_shot_args.exe]的选窗";$svfiPath=whereisit} else {skip}}
+            default {badinputwarning}
         }
-    } While ($MUXhevc -eq "")
-} elseif ($ENCops -eq "b") {#x264线路
-    $MUXhevc="b"            #不需要生成临时封装文件
-    $MUXops="c"
-}
+    } While ($fmpgPath+$vprsPath+$avsyPath+$avspPath+$svfiPath -eq "")
+    Do {
+        Switch (Read-Host "`r`n导入下游程序路径 [A: x265/hevc | B: x264/avc], 重复选择会触发跳过") {
+            a {if ($x265Path -eq "") {Write-Output "`r`nx265--------下游A线. 已打开[定位x265.exe]的选窗";              $x265Path=whereisit} else {skip}}
+            b {if ($x264Path -eq "") {Write-Output "`r`nx264--------下游B线. 已打开[定位x264.exe]的选窗";              $x264Path=whereisit} else {skip}}
+            default {badinputwarning}
+        }
+    } While ($x265Path+$x264Path -eq "")
+    if ((Read-Host "`r`n√ 按Enter导入更多线路(推荐)或更换导入的程序, 输入y再Enter以进行下一步") -eq "y") {$impEND="y"} else {$impEND="n"}
+    $impEND #用户选择是否完成导入操作并退出
+} While ($impEND -eq "n")
 
-#「三维for循环轴」通过$validChars[x]+$validChars[y]+$validChars[z]实现
-#这里进行的计算相当于数学上的进位. 当x轴被填满后y轴+1并清除x, 当y轴填满后z轴+1并清除x和y
+#「启动E」选择上下游线路, 通过impOPS, extOPS来判断注释掉剩余未选择的路线
+Write-Output "`r`n√↑A=`"$fmpgPath`",↑B=`"$vprsPath`",↑C=`"$avsyPath`",`r`n  ↑D=`"$avspPath`",↑E=`"$svfiPath`"`r`n√↓A=`"$x265Path`", ↓B=`"$x264Path`""
+$impOPS=$extOPS=""
+Do {Switch (Read-Host "`r`n选择启用一条pipe上游线路 [A | B | C | D | E], 剩余线路会通过注释遮蔽掉") {
+            a {if ($fmpgPath -ne "") {Write-Output "`r`nffmpeg------上游A线."; $impOPS="a"} else {nosuchrouteerr}}
+            b {if ($vprsPath -ne "") {Write-Output "`r`nvspipe------上游B线."; $impOPS="b"} else {nosuchrouteerr}}
+            c {if ($avsyPath -ne "") {Write-Output "`r`navs2yuv-----上游C线."; $impOPS="c"} else {nosuchrouteerr}}
+            d {if ($avspPath -ne "") {Write-Output "`r`navs2pipemod-上游D线."; $impOPS="d"} else {nosuchrouteerr}}
+            e {if ($svfiPath -ne "") {Write-Output "`r`nsvfi--------上游E线."; $impOPS="e"} else {nosuchrouteerr}}
+            default {badinputwarning}
+    }
+    if ($impOPS -ne "") {#未选择上游时, 通过if跳过本段代码回到选择上游的部分
+        Switch (Read-Host "`r`n选择启用一条pipe下游线路 [A | B], 剩余线路会通过注释遮蔽掉") {
+            a {if ($x265Path -ne "") {Write-Output "`r`nx265--------下游A线."; $extOPS="a"} else {nosuchrouteerr}}
+            b {if ($x264Path -ne "") {Write-Output "`r`nx264-------下游B线.";  $extOPS="b"} else {nosuchrouteerr}}
+            default {badinputwarning}
+        }
+    }
+} While (($impOPS -eq "") -or ($extOPS -eq ""))
+
+#「启动F」调用impOPS, extOPS生成被选中线路的命令行
+$keyRoute=""
+Switch ($impOps+$extOPS) {
+    aa {$keyRoute="$fmpgPath %ffmpegVarA% %ffmpegParA% - | $x265Path %x265ParA% %x265VarA%"} #ffmpeg+x265
+    ab {$keyRoute="$fmpgPath %ffmpegVarA% %ffmpegParA% - | $x264Path %x264ParA% %x264VarA%"} #ffmpeg+x264
+    ba {$keyRoute="$vprsPath %vspipeVarA% %vspipeParA% - | $x265Path %x265ParA% %x265VarA%"} #VSPipe+x265
+    bb {$keyRoute="$vprsPath %vspipeVarA% %vspipeParA% - | $x264Path %x264ParA% %x264VarA%"} #VSPipe+x264
+    ca {$keyRoute="$avsyPath %avsyuvVarA% %avsyuvParA% - | $x265Path %x265ParA% %x265VarA%"} #AVSYUV+x265
+    cb {$keyRoute="$avsyPath %avsyuvVarA% %avsyuvParA% - | $x264Path %x264ParA% %x264VarA%"} #AVSYUV+x264
+    da {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x265Path %x265ParA% %x265VarA%"} #AVSPmd+x265, 上游无"-"
+    db {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x264Path %x264ParA% %x264VarA%"} #AVSPmd+x264, 上游无"-"
+    ea {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x265Path %x265ParA% %x265VarA%"} #OLSARG+x265
+    eb {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x264Path %x264ParA% %x264VarA%"} #OLSARG+x264
+}
+#「启动G」将已知可用的上下游线路列举并进行排列组合
+[array] $upPipeStr=@("$fmpgPath %ffmpegVarA% %ffmpegParA%", "$vprsPath %vspipeVarA% %vspipeParA%", "$avsyPath %avsyuvVarA% %avsyuvParA%", "$avspPath %avsmodVarA% %avsmodParA%","$svfiPath %olsargVarA% %olsargParA%") | Where-Object {$_.Length -gt 26}
+[string]$sChar="AAA" #以防止意外情况下出现变量空值错误, 所以提前给变量赋值
+Switch ($mode) {     #用字长过滤掉dnPipeStr中不存在的线路, 大批量版使用sChar变量所以原始字符串要比单文件版多一个字
+    s {[array]$dnPipeStr=@("$x265Path %x265ParA% %x265VarA%",      "$x264Path %x264ParA% %x264VarA%")      | Where-Object {$_.Length -gt 22}}
+    m {[array]$dnPipeStr=@("$x265Path %x265ParA% %x265Var$sChar%", "$x264Path %x264ParA% %x264Var$sChar%") | Where-Object {$_.Length -gt 23}}
+    Default {modeparamerror}
+}
+[array]$altRoute=@() #注释符 + `$updnPipeStr值 = 备选线路. 生成所有的备选线路命令行
+for     ($x=0; $x -lt ($upPipeStr.Length); $x++) {#上游/横向可能性的循环迭代
+    for ($y=0; $y -lt ($dnPipeStr.Length); $y++) {#下游/纵向可能性的循环迭代
+        if ($upPipeStr -notlike "avsmod") {$altRoute="REM "+$upPipeStr[$x]+" - | "+$dnPipeStr[$y]} #AVSPmd, 上游无"-"
+        else                              {$altRoute="REM "+$upPipeStr[$x]+"   | "+$dnPipeStr[$y]} #AVSPmd, 上游无"-"
+    }
+}
+Write-Output "`r`n√ 可用线路数量为:"($altRoute.Count)" `r`n" #此时已得出主选线路`$keyRoute和备选线路`$altRoute
+
+if ($extOPS="a") {tmpmuxreminder} #选择x265下游时, 给出只能间接封装为.mkv的警告
+#---------------------
+#「启动H.m」三维for循环轴通过$validChars[x]+$validChars[y]+$validChars[z], 用三个循环模拟了26进位制实现
+#x轴被填满后y轴+1并清除x, 当y轴填满后z轴+1并清除x和y
 [int]$x=[int]$y=[int]$z=0
 $utf8NoBOM=New-Object System.Text.UTF8Encoding $false #导出utf-8NoBOM文本编码hack
 
@@ -172,27 +170,7 @@ For ($s=0; $s -lt $qty; $s++) {
     
     $vidEXX=$ExecutionContext.InvokeCommand.ExpandString($vidEXP) #$vidEXP内含$serial. Expand用于将$serial从文本转为变量
 
-    $tmpStrmOut=$vidEXX+$sChar+".hevc" #临时待封装流的赋值方案（Stream    Output - 导出待封装流）
-    $tempMuxOut=$vidEXX+$sChar+".mp4"  #临时封装文件的赋值方案（Multiplex Output - 导出已封装流）
-
-    #手动在顶部更改`$MUXops的值，x264线路下自动选C所以该代码块无效
-    if       ($MUXops -eq "a") {$MUXwrt = "$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$vidEXP.hevc`"
-    ::del `"$EXPpath$vidEXP.hevc`""
-    } elseif ($MUXops -eq "b") {$MUXwrt = "$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$vidEXP.hevc`"
-    del `"$EXPpath$vidEXP.hevc`""
-    } elseif ($MUXops -eq "c") {$MUXwrt="::$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$vidEXP.hevc`"
-    ::del `"$EXPpath$vidEXP.hevc`""
-    } else {
-        Write-Error "`r`n× 崩溃: 请修复变量`$MUXops的值[A|B|C]"; pause; exit
-    }
-
-    #大批量封装模式下的x265, x264线路切换. 此处和单文件模式下实现原理不同. $MUXwrt在循环开始前已初始化
-    #单任务模式下没有$sChar变量
-    if     ($ENCops -eq "a") {$ENCwrt="$impEXT %ffmpegVar$sChar% %ffmpegParA% - | $x265Path %x265ParA% %x265Var$sChar%"}
-    elseif ($ENCops -eq "b") {$ENCwrt="$impEXT %ffmpegVar$sChar% %ffmpegParA% - | $x264Path %x264ParA% %x264Var$sChar%"}
-    else {Write-Error "× 失败: 未选择编码器"; pause; exit}
-
-    [string]$trueExpPath=[string]$cVO=[string]$fVO=[string]$xVO=[string]$aVO="" #trueExpPath即完整导出路径, 由导出路径$exptPath和文件名enc_[数字].bat组成, 同时以防加号分隔变量$exptPath和文本enc_输出到文件名
+    [string]$cVO=[string]$fVO=[string]$xVO=[string]$aVO=""
 
     $banner = "-----------Starting encode "+$sChar+"-----------"
     Write-Output "  正在生成enc_$s.bat (上游路线 $impEXT)"
@@ -203,37 +181,30 @@ For ($s=0; $s -lt $qty; $s++) {
 @echo "+$banner+"
 
 REM 「debug部分」正常使用时注释掉
-REM @echo %ffmpegParA%
-REM @echo %ffmpegVarA%
+REM @echo %ffmpegParA% %ffmpegVarA%
 REM @echo %ffmpegVar"+$sChar+"%
-REM @echo %vspipeParA%
-REM @echo %vspipeVarA%
+REM @echo %vspipeParA% %vspipeVarA%
 REM @echo %vspipeVar"+$sChar+"%
-REM @echo %avsyuvParA%
-REM @echo %avsyuvVarA%
+REM @echo %avsyuvParA% %avsyuvVarA%
 REM @echo %avsyuvVar"+$sChar+"%
-REM @echo %avsmodVarParA%
-REM @echo %avsmodVarVarA%
+REM @echo %avsmodVarParA% %avsmodVarVarA%
 REM @echo %avsmodVarVar"+$sChar+"%
-REM @echo %olsargParA%
-REM @echo %olsargVarA%
+REM @echo %olsargParA% %olsargVarA%
 REM @echo %olsargVar"+$sChar+"%
-REM @echo %x265ParA%
-REM @echo %x265VarA%
+REM @echo %x265ParA% %x265VarA%
 REM @echo %x265Var"+$sChar+"%
-REM @echo %x264ParA%
-REM @echo %x264VarA%
+REM @echo %x264ParA% %x264VarA%
 REM @echo %x264Var"+$sChar+"%
 REM pause
 
-REM 「压制部分」debug时注释掉
+REM 「压制-主要线路」debug时注释掉
 REM Var被用于引用动态数据，如输入输出路径和根据源视频自动调整的部分参数值
 
-"+$ENCwrt+"
+"+$keyRoute+"
 
-REM 「临时封装部分」x265下游时启用
+REM 「压制-备选线路」下方除REM注释外的命令复制并覆盖掉上方命令以更换主要线路
 
-"+$MUXwrt+"
+"+$altRoute+"
 
 REM 「选择续y/暂n/止z」5秒后自动y, 除外字符被choice命令屏蔽, 暂停代表仍可继续.
 
@@ -243,11 +214,10 @@ if %ERRORLEVEL%==3 cmd /k
 if %ERRORLEVEL%==2 pause
 if %ERRORLEVEL%==1 endlocal && exit /b"
 
-    $trueExpPath=$exptPath+"enc_"+$s+".bat" #增加一道变量赋值, 以防加号分隔变量$exptPath和文本enc_输出到文件名
     #Out-File -InputObject $enc_gen -FilePath $trueExpPath -Encoding utf8
     [IO.File]::WriteAllLines($trueExpPath, $enc_gen, $utf8NoBOM) #强制导出utf-8NoBOM编码
     $x+=1
 }#关闭ForLoop
 
-Write-Output "完成，只要线路不变，步骤3生成的各种批处理（步骤4）就可以一直调用enc_0S.bat / enc_0M.bat"
+Write-Output "完成，只要线路不变，步骤3生成的各种批处理（步骤4）就可以一直调用enc_0S.bat / enc_X.bat"
 pause

@@ -1,9 +1,10 @@
 ﻿cls #开发人员的Github: https://github.com/iAvoe
 $mode="s" #单任务模式
-
-Function badinputwarning {Write-Warning "`r`n× 输入错误, 重试"}
-Function nosuchrouteerr  {Write-Error "`r`b× 该线路不存在, 重试"}
+Function badinputwarning{Write-Warning "`r`n× 输入错误, 重试"}
+Function nosuchrouteerr {Write-Error "`r`b× 该线路不存在, 重试"}
 Function tmpmuxreminder {Write-Warning "x265线路下仅支持生成.hevc文件，若要封装为.mkv, 则受ffmpeg限制需要先封装为.mp4`r`n"}
+Function modeparamerror {Write-Error "`r`n× 崩溃: 变量`$mode损坏, 无法区分单任务和大批量模式"; pause; exit}
+Function skip {return "`r`n. 跳过"}
 Function namecheck([string]$inName) {
     $badChars = '[{0}]' -f [regex]::Escape(([IO.Path]::GetInvalidFileNameChars() -join ''))
     ForEach ($_ in $badChars) {if ($_ -match $inName) {return $false}}
@@ -49,52 +50,50 @@ Write-Output "压制分场隔行视频 - x265: --tff/--bff; - x264: --interlaced
 Write-Output "VSpipe      [.vpy] --y4m               - | x265.exe --y4m - --output"
 Write-Output "avs2yuv     [.avs] -csp<串> -depth<整> - | x265.exe --input-res <串> --fps <整/小/分数> - --output"
 Write-Output "avs2pipemod [.avs] -y4mp                 | x265.exe --y4m - --output <<上游无`"-`">>`r`n"
-Write-Output "x265线路下，可手动在脚本中更改`$MUXops=[`r`n| a: 压制后封装(x265线路下默认)`r`n| b: 压制后封装并删除未封装流`r`n| c: 仅压制(封装命令注释掉，x264线路时自动选择)]`r`n"
-$MUXops="a"
 
 #「启动A」生成1~n个"enc_[序号].bat"单文件版不需要
-if ($mode -eq "m") {
-    [array]$validChars='A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'
-    [int]$qty=0 #从0而非1开始数
-    Do {[int]$qty = (Read-Host -Prompt "指定[生成压制批处理]的整数数量, 从1开始数, 最大为15625次编码")
-        if ($qty -eq 0) {"输入了非整数或空值"} elseif ($qty -gt 15625) {Write-Error "× 编码次数超过15625"; pause; exit}
-    } While ($qty -eq 0)
-    #「启动B」选择是否在导出文件序号上补零, 由于int变量$qty得不到字长Length, 所以先转string再取值
-    if ($qty -gt 9) {#个位数下关闭补零
-        Do {[string]$leadCHK=""; [int]$ldZeros=0
-            Switch (Read-Host "选择之前[y启用了 | n关闭了]导出压制文件名的[序号补0]. 如导出十位数文件时写作01, 02...") {
-                y {$leadCHK="y"; Write-Output "√ 启用补零`r`n"; $ldZeros=$qty.ToString().Length}
-                n {$leadCHK="n"; Write-Output "× 关闭补零`r`n"}
-                default {badinputwarning}
-            }
-        } While ($leadCHK -eq "")
-        [string]$zroStr="0"*$ldZeros #得到.ToString('000')所需的'000'部分, 如果关闭补零则$zroStr为0, 补零计算仍然存在但没有效果
-    } else {[string]$zroStr="0"}
-}
+#if ($mode -eq "m") {
+#    [array]$validChars='A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'
+#    [int]$qty=0 #从0而非1开始数
+#    Do {[int]$qty = (Read-Host -Prompt "指定[生成压制批处理]的整数数量, 从1开始数, 最大为15625次编码")
+#        if ($qty -eq 0) {"输入了非整数或空值"} elseif ($qty -gt 15625) {Write-Error "× 编码次数超过15625"; pause; exit}
+#    } While ($qty -eq 0)
+#    #「启动B」选择是否在导出文件序号上补零, 由于int变量$qty得不到字长Length, 所以先转string再取值
+#    if ($qty -gt 9) {#个位数下关闭补零
+#        Do {[string]$leadCHK=""; [int]$ldZeros=0
+#            Switch (Read-Host "选择之前[y启用了 | n关闭了]导出压制文件名的[序号补0]. 如导出十位数文件时写作01, 02...") {
+#                y {$leadCHK="y"; Write-Output "√ 启用补零`r`n"; $ldZeros=$qty.ToString().Length}
+#                n {$leadCHK="n"; Write-Output "× 关闭补零`r`n"}
+#                default {badinputwarning}
+#            }
+#        } While ($leadCHK -eq "")
+#        [string]$zroStr="0"*$ldZeros #得到.ToString('000')所需的'000'部分, 如果关闭补零则$zroStr为0, 补零计算仍然存在但没有效果
+#    } else {[string]$zroStr="0"}
+#}
 #「启动C」定位导出主控文件用路径, 需要区分单任务和大批量模式
-Read-Host "将打开[导出主控批处理]的路径选择窗, 可能会在窗口底层弹出. 按Enter继续"
-if     ($mode="s") {$bchExpPath = (whichlocation)+"enc_0S.bat"}
-elseif ($mode="m") {$bchExpPath = (whichlocation)+"enc_$s.bat"; $s=0} #大批量模式下, `$s会在代码中后段被赋值, 提前赋值以防崩溃
-else               {Write-Error "`r`n× 崩溃: 变量`$mode损坏, 无法区分单任务和大批量模式"; pause; exit}
-Write-Output "√ 选择的路径与文件名为 $bchExpPath`r`n"
+Read-Host "将打开[导出待调用批处理]的路径选择窗, 可能会在窗口底层弹出. 按Enter继续"
+if     ($mode -eq "s") {      $bchExpPath = (whichlocation)+"enc_0S.bat"}
+elseif ($mode -eq "m") {$s=0; $bchExpPath = (whichlocation)+"enc_$s.bat"} #大批量模式下, `$s会在代码中后段被赋值, 提前赋值以防崩溃
+else                   {modeparamerror}
+Write-Output "`r`n√ 选择的路径与导出文件名为 $bchExpPath"
 
-#「启动D-E1」循环选择所有pipe上游，下游程序, 同时使用y4m pipe和ffprobe两者来实现冗余/fallback. 步骤2选择上游程序, 步骤3选择片源
+#「启动D」循环选择所有pipe上游，下游程序, 同时使用y4m pipe和ffprobe两者来实现冗余/fallback. 步骤2选择上游程序, 步骤3选择片源
 $impEND="n"
 $fmpgPath=$vprsPath=$avsyPath=$avspPath=$svfiPath=$x265Path=$x264Path=""
 Do {Do {
-        Switch (Read-Host "`r`n导入上游程序路径 [A: ffmpeg | B: vspipe | C: avs2yuv | D: avs2pipemod | E: SVFI]") {
-            a {Write-Output "`r`nffmpeg------上游A线. 已打开[定位ffmpeg.exe]的选窗";            $fmpgPath=whereisit}
-            b {Write-Output "`r`nvspipe------上游B线. 已打开[定位vspipe.exe]的选窗";            $vprsPath=whereisit}
-            c {Write-Output "`r`navs2yuv-----上游C线. 已打开[定位avs2yuv.avs]的选窗";           $avsyPath=whereisit}
-            d {Write-Output "`r`navs2pipemod-上游D线. 已打开[定位avs2pipemod.exe]的选窗";       $avspPath=whereisit}
-            e {Write-Output "`r`nsvfi--------上游E线. 已打开[定位one_line_shot_args.exe]的选窗";$svfiPath=whereisit}
+        Switch (Read-Host "`r`n导入上游程序路径 [A: ffmpeg | B: vspipe | C: avs2yuv | D: avs2pipemod | E: SVFI], 重复选择会触发跳过") {
+            a {if ($fmpgPath -eq "") {Write-Output "`r`nffmpeg------上游A线. 已打开[定位ffmpeg.exe]的选窗";            $fmpgPath=whereisit} else {skip}}
+            b {if ($vprsPath -eq "") {Write-Output "`r`nvspipe------上游B线. 已打开[定位vspipe.exe]的选窗";            $vprsPath=whereisit} else {skip}}
+            c {if ($avsyPath -eq "") {Write-Output "`r`navs2yuv-----上游C线. 已打开[定位avs2yuv.avs]的选窗";           $avsyPath=whereisit} else {skip}}
+            d {if ($avspPath -eq "") {Write-Output "`r`navs2pipemod-上游D线. 已打开[定位avs2pipemod.exe]的选窗";       $avspPath=whereisit} else {skip}}
+            e {if ($svfiPath -eq "") {Write-Output "`r`nsvfi--------上游E线. 已打开[定位one_line_shot_args.exe]的选窗";$svfiPath=whereisit} else {skip}}
             default {badinputwarning}
         }
     } While ($fmpgPath+$vprsPath+$avsyPath+$avspPath+$svfiPath -eq "")
     Do {
-        Switch (Read-Host "`r`n导入下游程序路径 [A: x265/hevc | B: x264/avc]") {
-            a {Write-Output "`r`nx265--------下游A线. 已打开[定位x265.exe]的选窗";              $x265Path=whereisit}
-            b {Write-Output "`r`nx264--------下游B线. 已打开[定位x264.exe]的选窗";              $x264Path=whereisit}
+        Switch (Read-Host "`r`n导入下游程序路径 [A: x265/hevc | B: x264/avc], 重复选择会触发跳过") {
+            a {if ($x265Path -eq "") {Write-Output "`r`nx265--------下游A线. 已打开[定位x265.exe]的选窗";              $x265Path=whereisit} else {skip}}
+            b {if ($x264Path -eq "") {Write-Output "`r`nx264--------下游B线. 已打开[定位x264.exe]的选窗";              $x264Path=whereisit} else {skip}}
             default {badinputwarning}
         }
     } While ($x265Path+$x264Path -eq "")
@@ -102,22 +101,7 @@ Do {Do {
     $impEND #用户选择是否完成导入操作并退出
 } While ($impEND -eq "n")
 
-#「启动F1」调用impOPS, extOPS生成被选中线路的命令行
-$keyRoute=""
-Switch ($impOps+$extOPS) {
-    aa {$keyRoute="$fmpgPath %ffmpegVarA% %ffmpegParA% - | $x265Path %x265ParA% %x265VarA%"} #ffmpeg+x265
-    ab {$keyRoute="$fmpgPath %ffmpegVarA% %ffmpegParA% - | $x264Path %x264ParA% %x264VarA%"} #ffmpeg+x264
-    ba {$keyRoute="$vprsPath %vspipeVarA% %vspipeParA% - | $x265Path %x265ParA% %x265VarA%"} #VSPipe+x265
-    bb {$keyRoute="$vprsPath %vspipeVarA% %vspipeParA% - | $x264Path %x264ParA% %x264VarA%"} #VSPipe+x264
-    ca {$keyRoute="$avsyPath %avsyuvVarA% %avsyuvParA% - | $x265Path %x265ParA% %x265VarA%"} #AVSYUV+x265
-    cb {$keyRoute="$avsyPath %avsyuvVarA% %avsyuvParA% - | $x264Path %x264ParA% %x264VarA%"} #AVSYUV+x264
-    da {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x265Path %x265ParA% %x265VarA%"} #AVSPmd+x265, 上游无"-"
-    db {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x264Path %x264ParA% %x264VarA%"} #AVSPmd+x264, 上游无"-"
-    ea {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x265Path %x265ParA% %x265VarA%"} #OLSARG+x265
-    eb {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x264Path %x264ParA% %x264VarA%"} #OLSARG+x264
-}
-
-#「启动F2」选择上下游线路, 通过impOPS, extOPS来判断注释掉剩余未选择的路线
+#「启动E」选择上下游线路, 通过impOPS, extOPS来判断注释掉剩余未选择的路线
 Write-Output "`r`n√↑A=`"$fmpgPath`",↑B=`"$vprsPath`",↑C=`"$avsyPath`",`r`n  ↑D=`"$avspPath`",↑E=`"$svfiPath`"`r`n√↓A=`"$x265Path`", ↓B=`"$x264Path`""
 $impOPS=$extOPS=""
 Do {Switch (Read-Host "`r`n选择启用一条pipe上游线路 [A | B | C | D | E], 剩余线路会通过注释遮蔽掉") {
@@ -137,22 +121,41 @@ Do {Switch (Read-Host "`r`n选择启用一条pipe上游线路 [A | B | C | D | E
     }
 } While (($impOPS -eq "") -or ($extOPS -eq ""))
 
-#「启动E3」将已知可用的上下游线路列举并进行排列组合
-[array]$upPipeStr=@("$fmpgPath %ffmpegVarA% %ffmpegParA%", "$vprsPath %vspipeVarA% %vspipeParA%", "$avsyPath %avsyuvVarA% %avsyuvParA%", "$avspPath %avsmodVarA% %avsmodParA%","$svfiPath %olsargVarA% %olsargParA%") | Where-Object {$_.Length -gt 26}
-[array]$dnPipeStr=@("$x265Path %x265ParA% %x265VarA%", "$x264Path %x264ParA% %x264VarA%") | Where-Object {$_.Length -gt 25} #用字长过滤掉不存在的线路
-[array]$altRoute=@() #注释符 + `$updnPipeStr值 = 备选线路
-#          生成所有的备选线路命令行
+#「启动F」调用impOPS, extOPS生成被选中线路的命令行
+$keyRoute=""
+Switch ($impOps+$extOPS) {
+    aa {$keyRoute="$fmpgPath %ffmpegVarA% %ffmpegParA% - | $x265Path %x265ParA% %x265VarA%"} #ffmpeg+x265
+    ab {$keyRoute="$fmpgPath %ffmpegVarA% %ffmpegParA% - | $x264Path %x264ParA% %x264VarA%"} #ffmpeg+x264
+    ba {$keyRoute="$vprsPath %vspipeVarA% %vspipeParA% - | $x265Path %x265ParA% %x265VarA%"} #VSPipe+x265
+    bb {$keyRoute="$vprsPath %vspipeVarA% %vspipeParA% - | $x264Path %x264ParA% %x264VarA%"} #VSPipe+x264
+    ca {$keyRoute="$avsyPath %avsyuvVarA% %avsyuvParA% - | $x265Path %x265ParA% %x265VarA%"} #AVSYUV+x265
+    cb {$keyRoute="$avsyPath %avsyuvVarA% %avsyuvParA% - | $x264Path %x264ParA% %x264VarA%"} #AVSYUV+x264
+    da {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x265Path %x265ParA% %x265VarA%"} #AVSPmd+x265, 上游无"-"
+    db {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x264Path %x264ParA% %x264VarA%"} #AVSPmd+x264, 上游无"-"
+    ea {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x265Path %x265ParA% %x265VarA%"} #OLSARG+x265
+    eb {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x264Path %x264ParA% %x264VarA%"} #OLSARG+x264
+}
+
+#「启动G」将已知可用的上下游线路列举并进行排列组合
+[array] $upPipeStr=@("$fmpgPath %ffmpegVarA% %ffmpegParA%", "$vprsPath %vspipeVarA% %vspipeParA%", "$avsyPath %avsyuvVarA% %avsyuvParA%", "$avspPath %avsmodVarA% %avsmodParA%","$svfiPath %olsargVarA% %olsargParA%") | Where-Object {$_.Length -gt 26}
+[string]$sChar="AAA" #以防止意外情况下出现变量空值错误, 所以提前给变量赋值
+Switch ($mode) {     #用字长过滤掉dnPipeStr中不存在的线路, 大批量版使用sChar变量所以原始字符串要比单文件版多一个字
+    s {[array]$dnPipeStr=@("$x265Path %x265ParA% %x265VarA%",      "$x264Path %x264ParA% %x264VarA%")      | Where-Object {$_.Length -gt 22}}
+    m {[array]$dnPipeStr=@("$x265Path %x265ParA% %x265Var$sChar%", "$x264Path %x264ParA% %x264Var$sChar%") | Where-Object {$_.Length -gt 23}}
+    Default {modeparamerror}
+}
+[array]$altRoute=@() #注释符 + `$updnPipeStr值 = 备选线路. 生成所有的备选线路命令行
 for     ($x=0; $x -lt ($upPipeStr.Length); $x++) {#上游/横向可能性的循环迭代
     for ($y=0; $y -lt ($dnPipeStr.Length); $y++) {#下游/纵向可能性的循环迭代
-        if ($upPipeStr -notlike "avsmod") {$altRoute="REM"+$upPipeStr[$x]+" - | "+$dnPipeStr[$y]} #AVSPmd, 上游无"-"
-        else                              {$altRoute="REM"+$upPipeStr[$x]+"   | "+$dnPipeStr[$y]} #AVSPmd, 上游无"-"
+        if ($upPipeStr -notlike "avsmod") {$altRoute="REM "+$upPipeStr[$x]+" - | "+$dnPipeStr[$y]} #AVSPmd, 上游无"-"
+        else                              {$altRoute="REM "+$upPipeStr[$x]+"   | "+$dnPipeStr[$y]} #AVSPmd, 上游无"-"
     }
 }
-Write-Output "`r`n√ 可用线路数量为:"($updnPipeStr.Count)" `r`n" #此时已得出主选线路`$keyRoute和备选线路`$altRoute
+Write-Output "`r`n√ 可用线路数量为:"($altRoute.Count)" `r`n" #此时已得出主选线路`$keyRoute和备选线路`$altRoute
 
 if ($extOPS="a") {tmpmuxreminder} #选择x265下游时, 给出只能间接封装为.mkv的警告
 
-#单任务封装模式下的文件输出功能
+#「启动H.s」单任务封装模式下的文件输出功能
 $utf8NoBOM=New-Object System.Text.UTF8Encoding $false #导出utf-8NoBOM文本编码hack
 Write-Output "`r`n... 正在生成enc_0S.bat`r`n"
 $enc_gen="REM 「标题」
@@ -160,20 +163,13 @@ $enc_gen="REM 「标题」
 @echo -----------Starting encode 001-----------
 
 REM 「debug部分」正常使用时注释掉
-REM @echo %ffmpegParA%
-REM @echo %ffmpegVarA%
-REM @echo %vspipeParA%
-REM @echo %vspipeVarA%
-REM @echo %avsyuvParA%
-REM @echo %avsyuvVarA%
-REM @echo %avsmodParA%
-REM @echo %avsmodVarA%
-REM @echo %olsargParA%
-REM @echo %olsargVarA%
-REM @echo %x265ParA%
-REM @echo %x265VarA%
-REM @echo %x264ParA%
-REM @echo %x264VarA%
+REM @echo %ffmpegParA% %ffmpegVarA%
+REM @echo %vspipeParA% %vspipeVarA%
+REM @echo %avsyuvParA% %avsyuvVarA%
+REM @echo %avsmodParA% %avsmodVarA%
+REM @echo %olsargParA% %olsargVarA%
+REM @echo %x265ParA% %x265VarA%
+REM @echo %x264ParA% %x264VarA%
 REM pause
 
 REM 「压制-主要线路」debug时注释掉
