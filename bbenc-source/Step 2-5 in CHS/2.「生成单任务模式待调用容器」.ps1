@@ -112,18 +112,18 @@ Read-Host "`r`n按Enter以检查或确认所有导入的程序正确, 否则重�
 
 #「启动E」选择上下游线路, 通过impOPS, extOPS来判断注释掉剩余未选择的路线
 $impOPS=$extOPS=""
-Do {Switch (Read-Host "`r`n选择启用一条pipe上游线路 [A | B | C | D | E], 剩余线路会通过注释遮蔽掉") {
-            a {if ($fmpgPath -ne "") {Write-Output "`r`nffmpeg------上游A线."; $impOPS="a"} else {nosuchrouteerr}}
-            b {if ($vprsPath -ne "") {Write-Output "`r`nvspipe------上游B线."; $impOPS="b"} else {nosuchrouteerr}}
-            c {if ($avsyPath -ne "") {Write-Output "`r`navs2yuv-----上游C线."; $impOPS="c"} else {nosuchrouteerr}}
-            d {if ($avspPath -ne "") {Write-Output "`r`navs2pipemod-上游D线."; $impOPS="d"} else {nosuchrouteerr}}
-            e {if ($svfiPath -ne "") {Write-Output "`r`nsvfi--------上游E线."; $impOPS="e"} else {nosuchrouteerr}}
+Do {Switch (Read-Host "选择启用一条pipe上游线路 [A | B | C | D | E], 剩余线路会通过注释遮蔽掉") {
+            a {if ($fmpgPath -ne "") {$impOPS="a"} else {nosuchrouteerr}}
+            b {if ($vprsPath -ne "") {$impOPS="b"} else {nosuchrouteerr}}
+            c {if ($avsyPath -ne "") {$impOPS="c"} else {nosuchrouteerr}}
+            d {if ($avspPath -ne "") {$impOPS="d"} else {nosuchrouteerr}}
+            e {if ($svfiPath -ne "") {$impOPS="e"} else {nosuchrouteerr}}
             default {badinputwarning}
     }
     if ($impOPS -ne "") {#未选择上游时, 通过if跳过本段代码回到选择上游的部分
         Switch (Read-Host "`r`n选择启用一条pipe下游线路 [A | B], 剩余线路会通过注释遮蔽掉") {
-            a {if ($x265Path -ne "") {Write-Output "`r`nx265--------下游A线."; $extOPS="a"} else {nosuchrouteerr}}
-            b {if ($x264Path -ne "") {Write-Output "`r`nx264-------下游B线.";  $extOPS="b"} else {nosuchrouteerr}}
+            a {if ($x265Path -ne "") {$extOPS="a"} else {nosuchrouteerr}}
+            b {if ($x264Path -ne "") {$extOPS="b"} else {nosuchrouteerr}}
             default {badinputwarning}
         }
     }
@@ -168,11 +168,12 @@ for     ($x=0; $x -lt ($upPipeStr.Length); $x++) {#上游/横向可能性的循�
         else                              {$altRoute="REM "+$upPipeStr[$x]+"   | "+$dnPipeStr[$y]} #AVSPmd, 上游无"-"
     }
 }
-Write-Output "`r`n√ 可用线路数量为:"($altRoute.Count)" `r`n" #此时已得出主选线路`$keyRoute和备选线路`$altRoute
+"√ 可用线路数量为: "+($altRoute.Count.ToString()) | Out-String #此时已得出主选线路`$keyRoute和备选线路`$altRoute
 
 if ($extOPS="a") {tmpmuxreminder} #选择x265下游时, 给出只能间接封装为.mkv的警告
 
 #「启动H.s」单任务封装模式下的文件输出功能
+#由于单纯激活$sChar变量后, Array只会生成换行失败的多行文本, 所以先pipe到Out-String变成多行字符串, 才能激活$sChar变量, 单文件版下无
 $utf8NoBOM=New-Object System.Text.UTF8Encoding $false #导出utf-8NoBOM文本编码hack
 Write-Output "`r`n... 正在生成enc_0S.bat`r`n"
 $enc_gen="REM 「标题」
@@ -189,14 +190,14 @@ REM @echo %x265ParA% %x265VarA%
 REM @echo %x264ParA% %x264VarA%
 REM pause
 
-REM 「压制-主要线路」debug时注释掉
+REM 「压制-选中线路」debug时注释掉
 REM Var被用于引用动态数据，如输入输出路径和根据源视频自动调整的部分参数值
 
-"+$ExecutionContext.InvokeCommand.ExpandString($keyRoute)+"
+"+$ExecutionContext.InvokeCommand.ExpandString(($keyRoute | Out-String))+"
 
-REM 「压制-备选线路」下方除REM注释外的命令复制并覆盖掉上方命令以更换主要线路
+REM 「压制-备选线路」下方命令去掉REM注释地复制-覆盖到上方命令以更换选中线路
 
-"+$ExecutionContext.InvokeCommand.ExpandString($altRoute)+"
+"+$ExecutionContext.InvokeCommand.ExpandString(($altRoute | Out-String))+"
 
 REM 「选择续y/暂n/止z」5秒后自动y, 除外字符被choice命令屏蔽, 暂停代表仍可继续.
 
