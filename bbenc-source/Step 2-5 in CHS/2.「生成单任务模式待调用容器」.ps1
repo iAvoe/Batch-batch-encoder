@@ -48,7 +48,7 @@ Write-Output "ffmpeg可变转恒定帧率: -vsync cfr`r`n"
 Write-Output "压制分场隔行视频 - x265: --tff/--bff; - x264: --interlaced<tff/bff>`r`n"
 Write-Output "VSpipe      [.vpy] --y4m               - | x265.exe --y4m - --output"
 Write-Output "avs2yuv     [.avs] -csp<串> -depth<整> - | x265.exe --input-res <串> --fps <整/小/分数> - --output"
-Write-Output "avs2pipemod [.avs] -y4mp                 | x265.exe --y4m - --output`r`n"
+Write-Output "avs2pipemod [.avs] -y4mp                 | x265.exe --y4m - --output <<上游无`"-`">>`r`n"
 Write-Output "x265线路下，可手动在脚本中更改`$MUXops=[`r`n| a: 压制后封装(x265线路下默认)`r`n| b: 压制后封装并删除未封装流`r`n| c: 仅压制(封装命令注释掉，x264线路时自动选择)]`r`n"
 $MUXops="a"
 
@@ -111,8 +111,8 @@ Switch ($impOps+$extOPS) {
     bb {$keyRoute="$vprsPath %vspipeVarA% %vspipeParA% - | $x264Path %x264ParA% %x264VarA%"} #VSPipe+x264
     ca {$keyRoute="$avsyPath %avsyuvVarA% %avsyuvParA% - | $x265Path %x265ParA% %x265VarA%"} #AVSYUV+x265
     cb {$keyRoute="$avsyPath %avsyuvVarA% %avsyuvParA% - | $x264Path %x264ParA% %x264VarA%"} #AVSYUV+x264
-    da {$keyRoute="$avspPath %avsmodVarA% %avsmodParA% - | $x265Path %x265ParA% %x265VarA%"} #AVSPmd+x265
-    db {$keyRoute="$avspPath %avsmodVarA% %avsmodParA% - | $x264Path %x264ParA% %x264VarA%"} #AVSPmd+x264
+    da {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x265Path %x265ParA% %x265VarA%"} #AVSPmd+x265, 上游无"-"
+    db {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x264Path %x264ParA% %x264VarA%"} #AVSPmd+x264, 上游无"-"
     ea {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x265Path %x265ParA% %x265VarA%"} #OLSARG+x265
     eb {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x264Path %x264ParA% %x264VarA%"} #OLSARG+x264
 }
@@ -144,7 +144,8 @@ Do {Switch (Read-Host "`r`n选择启用一条pipe上游线路 [A | B | C | D | E
 #          生成所有的备选线路命令行
 for     ($x=0; $x -lt ($upPipeStr.Length); $x++) {#上游/横向可能性的循环迭代
     for ($y=0; $y -lt ($dnPipeStr.Length); $y++) {#下游/纵向可能性的循环迭代
-        $altRoute="REM"+$upPipeStr[$x]+" - | "+$dnPipeStr[$y]
+        if ($upPipeStr -notlike "avsmod") {$altRoute="REM"+$upPipeStr[$x]+" - | "+$dnPipeStr[$y]} #AVSPmd, 上游无"-"
+        else                              {$altRoute="REM"+$upPipeStr[$x]+"   | "+$dnPipeStr[$y]} #AVSPmd, 上游无"-"
     }
 }
 Write-Output "`r`n√ 可用线路数量为:"($updnPipeStr.Count)" `r`n" #此时已得出主选线路`$keyRoute和备选线路`$altRoute
