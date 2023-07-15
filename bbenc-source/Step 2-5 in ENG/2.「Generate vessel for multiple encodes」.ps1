@@ -200,7 +200,7 @@ For ($s=0; $s -lt $qty; $s++) {
     elseif ($ENCops -eq "b") {$ENCwrt="$impEXT %ffmpegVar$sChar% %ffmpegParA% - | $x264Path %x264ParA% %x264Var$sChar%"}
     else {Write-Error "× Failure: missing selection of video encoding program"; pause; exit}
 
-    [string]$trueExpPath=[string]$cVO=[string]$fVO=[string]$xVO=[string]$aVO="" #trueExpPath is the actual variable used to export temporary MP4s, to not write "+"s into exporting files, as $exptPath cannot be connecting to enc_ without a "+"
+    $trueExpPath="" #trueExpPath is the actual variable used to export temporary MP4s, to not write "+"s into exporting files, as $exptPath cannot be connecting to enc_ without a "+"
 
     $banner = "-----------Starting encode "+$sChar+"-----------"
     Write-Output "  Generating enc_$s.bat (Upstream $impEXT)"

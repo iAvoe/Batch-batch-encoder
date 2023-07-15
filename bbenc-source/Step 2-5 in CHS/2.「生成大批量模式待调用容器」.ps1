@@ -100,9 +100,17 @@ Do {Do {
     if ((Read-Host "`r`n√ 按Enter导入更多线路(推荐)或更换导入的程序, 输入y再Enter以进行下一步") -eq "y") {$impEND="y"} else {$impEND="n"}
     $impEND #用户选择是否完成导入操作并退出
 } While ($impEND -eq "n")
+#选择完成后生成一张表来表示所有已知路线
+$updnTbl = New-Object System.Data.DataTable
+$upColumn= [System.Data.DataColumn]::new("UNIX pipe upstream"); $dnColumn= [System.Data.DataColumn]::new("UNIX pipe downstream")
+[void]$updnTbl.Columns.Add($upColumn);        [void]$updnTbl.Columns.Add($dnColumn)
+[void]$updnTbl.Rows.Add($fmpgPath,$x265Path); [void]$updnTbl.Rows.Add($vprsPath,$x264Path)
+if ($avsyPath -ne "") {[void]$updnTbl.Rows.Add($avsyPath,"")} #为防table生产空行, 所以通过if判断避免空表格项被导入
+if ($avspPath -ne "") {[void]$updnTbl.Rows.Add($avspPath,"")}
+if ($svfiPath -ne "") {[void]$updnTbl.Rows.Add($svfiPath,"")}
+$updnTbl; $updnTbl.Clear()
 
 #「启动E」选择上下游线路, 通过impOPS, extOPS来判断注释掉剩余未选择的路线
-Write-Output "`r`n√↑A=`"$fmpgPath`",↑B=`"$vprsPath`",↑C=`"$avsyPath`",`r`n  ↑D=`"$avspPath`",↑E=`"$svfiPath`"`r`n√↓A=`"$x265Path`", ↓B=`"$x264Path`""
 $impOPS=$extOPS=""
 Do {Switch (Read-Host "`r`n选择启用一条pipe上游线路 [A | B | C | D | E], 剩余线路会通过注释遮蔽掉") {
             a {if ($fmpgPath -ne "") {Write-Output "`r`nffmpeg------上游A线."; $impOPS="a"} else {nosuchrouteerr}}
@@ -174,13 +182,9 @@ For ($s=0; $s -lt $qty; $s++) {
     #$x+=1 在开头注释掉, 因为+1要在生成文件名之后发生
     if ($x -gt 25) {$y+=1; $x=0}
     if ($y -gt 25) {$z+=1; $y=$x=0}
-    [string]$sChar=$validChars[$z]+$validChars[$y]+$validChars[$x]
-
-    [string]$serial=($s).ToString($zroStr)
-    
-    $vidEXX=$ExecutionContext.InvokeCommand.ExpandString($vidEXP) #$vidEXP内含$serial. Expand用于将$serial从文本转为变量
-
-    [string]$cVO=[string]$fVO=[string]$xVO=[string]$aVO=""
+    $sChar=$validChars[$z]+$validChars[$y]+$validChars[$x] #循环中生成$sChar变量
+    #keyRoute和altRoute已经在上面的代码中写完, 此处省略
+    #由于删除了生成临时封装的功能, 故不再需要#serial变量而删除
 
     $banner = "-----------Starting encode "+$sChar+"-----------"
     Write-Output "  正在生成enc_$s.bat (上游路线 $impEXT)"

@@ -100,9 +100,17 @@ Do {Do {
     if ((Read-Host "`r`n√ 按Enter导入更多线路(推荐)或更换导入的程序, 输入y再Enter以进行下一步") -eq "y") {$impEND="y"} else {$impEND="n"}
     $impEND #用户选择是否完成导入操作并退出
 } While ($impEND -eq "n")
+#选择完成后生成一张表来表示所有已知路线
+$updnTbl = New-Object System.Data.DataTable
+$upColumn= [System.Data.DataColumn]::new("UNIX pipe upstream"); $dnColumn= [System.Data.DataColumn]::new("UNIX pipe downstream")
+[void]$updnTbl.Columns.Add($upColumn);        [void]$updnTbl.Columns.Add($dnColumn)
+[void]$updnTbl.Rows.Add($fmpgPath,$x265Path); [void]$updnTbl.Rows.Add($vprsPath,$x264Path)
+if ($avsyPath -ne "") {[void]$updnTbl.Rows.Add($avsyPath,"")} #为防table生产空行, 所以通过if判断避免空表格项被导入
+if ($avspPath -ne "") {[void]$updnTbl.Rows.Add($avspPath,"")}
+if ($svfiPath -ne "") {[void]$updnTbl.Rows.Add($svfiPath,"")}
+$updnTbl; $updnTbl.Clear()
 
 #「启动E」选择上下游线路, 通过impOPS, extOPS来判断注释掉剩余未选择的路线
-Write-Output "`r`n√↑A=`"$fmpgPath`",↑B=`"$vprsPath`",↑C=`"$avsyPath`",`r`n  ↑D=`"$avspPath`",↑E=`"$svfiPath`"`r`n√↓A=`"$x265Path`", ↓B=`"$x264Path`""
 $impOPS=$extOPS=""
 Do {Switch (Read-Host "`r`n选择启用一条pipe上游线路 [A | B | C | D | E], 剩余线路会通过注释遮蔽掉") {
             a {if ($fmpgPath -ne "") {Write-Output "`r`nffmpeg------上游A线."; $impOPS="a"} else {nosuchrouteerr}}
