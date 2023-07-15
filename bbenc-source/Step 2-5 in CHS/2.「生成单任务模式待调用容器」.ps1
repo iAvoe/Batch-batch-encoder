@@ -2,7 +2,7 @@
 $mode="s" #单任务模式
 Function badinputwarning{Write-Warning "`r`n× 输入错误, 重试"}
 Function nosuchrouteerr {Write-Error   "`r`n× 该线路不存在, 重试"}
-Function tmpmuxreminder {Write-Warning "`r`n× x265线路下仅支持生成.hevc文件，若要封装为.mkv, 则受ffmpeg限制需要先封装为.mp4`r`n"}
+Function tmpmuxreminder {return "x265线路下仅支持生成.hevc文件，若要封装为.mkv, 则受ffmpeg限制需要先封装为.mp4`r`n"}
 Function modeparamerror {Write-Error   "`r`n× 崩溃: 变量`$mode损坏, 无法区分单任务和大批量模式"; pause; exit}
 Function skip {return "`r`n. 跳过"}
 Function namecheck([string]$inName) {
@@ -73,12 +73,11 @@ Write-Output "avs2pipemod [.avs] -y4mp                 | x265.exe --y4m - --outp
 #「启动C」定位导出主控文件用路径, 需要区分单任务和大批量模式
 Read-Host "将打开[导出待调用批处理]的路径选择窗, 可能会在窗口底层弹出. 按Enter继续"
 if     ($mode -eq "s") {      $bchExpPath = (whichlocation)+"enc_0S.bat"}
-elseif ($mode -eq "m") {$s=0; $bchExpPath = (whichlocation)+"enc_$s.bat"} #大批量模式下, `$s会在代码中后段被赋值, 提前赋值以防崩溃
+elseif ($mode -eq "m") {$bchExpPath = (whichlocation)+'enc_$s.bat'} #大批量模式下, 使用单引号来防止变量$s在此处被激活
 else                   {modeparamerror}
 Write-Output "`r`n√ 选择的路径与导出文件名为 $bchExpPath"
 
-#「启动D」循环选择所有pipe上游，下游程序, 同时使用y4m pipe和ffprobe两者来实现冗余/fallback. 步骤2选择上游程序, 步骤3选择片源
-$impEND="n"
+#「启动D」循环导入所有pipe上游，下游程序, 同时使用y4m pipe和ffprobe两者来实现冗余/fallback. 步骤2选择上游程序, 步骤3选择片源
 $fmpgPath=$vprsPath=$avsyPath=$avspPath=$svfiPath=$x265Path=$x264Path=""
 Do {Do {
         Switch (Read-Host "`r`n导入上游程序路径 [A: ffmpeg | B: vspipe | C: avs2yuv | D: avs2pipemod | E: SVFI], 重复选择会触发跳过") {
@@ -97,18 +96,20 @@ Do {Do {
             default {badinputwarning}
         }
     } While ($x265Path+$x264Path -eq "")
-    if ((Read-Host "`r`n√ 按Enter导入更多线路(推荐)或更换导入的程序, 输入y再Enter以进行下一步") -eq "y") {$impEND="y"} else {$impEND="n"}
+    if ((Read-Host "`r`n√ 按Enter以导入更多线路(推荐), 输入y再Enter以进行下一步") -eq "y") {$impEND="y"} else {$impEND="n"}
     $impEND #用户选择是否完成导入操作并退出
 } While ($impEND -eq "n")
-#选择完成后生成一张表来表示所有已知路线
+#生成一张表来表示所有已知路线
 $updnTbl = New-Object System.Data.DataTable
-$upColumn= [System.Data.DataColumn]::new("UNIX pipe upstream"); $dnColumn= [System.Data.DataColumn]::new("UNIX pipe downstream")
-[void]$updnTbl.Columns.Add($upColumn);        [void]$updnTbl.Columns.Add($dnColumn)
-[void]$updnTbl.Rows.Add($fmpgPath,$x265Path); [void]$updnTbl.Rows.Add($vprsPath,$x264Path)
-if ($avsyPath -ne "") {[void]$updnTbl.Rows.Add($avsyPath,"")} #为防table生产空行, 所以通过if判断避免空表格项被导入
-if ($avspPath -ne "") {[void]$updnTbl.Rows.Add($avspPath,"")}
-if ($svfiPath -ne "") {[void]$updnTbl.Rows.Add($svfiPath,"")}
-$updnTbl; $updnTbl.Clear()
+$availRts= [System.Data.DataColumn]::new("Routes")
+$upColumn= [System.Data.DataColumn]::new("UNIX pipe upstream")
+$dnColumn= [System.Data.DataColumn]::new("UNIX pipe downstream")
+$updnTbl.Columns.Add($availRts); $updnTbl.Columns.Add($upColumn); $updnTbl.Columns.Add($dnColumn)
+[void]$updnTbl.Rows.Add(" A:",$fmpgPath,$x265Path); [void]$updnTbl.Rows.Add(" B:",$vprsPath,$x264Path)
+[void]$updnTbl.Rows.Add(" C:",$avsyPath,""); [void]$updnTbl.Rows.Add(" D:",$avspPath,""); [void]$updnTbl.Rows.Add(" E:",$svfiPath,"")
+($updnTbl | Out-String).Trim() #1. Trim去掉空行, 2. pipe到Out-String以强制$updnTbl在Read-Host启动前发出
+
+Read-Host "`r`n按Enter以检查或确认所有导入的程序正确, 否则重运行此脚本"
 
 #「启动E」选择上下游线路, 通过impOPS, extOPS来判断注释掉剩余未选择的路线
 $impOPS=$extOPS=""
@@ -142,23 +143,23 @@ Switch ($mode+$impOps+$extOPS) {
     sdb {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x264Path %x264ParA% %x264VarA%"}      #AVSPmd+x264+single,   上游无"-"
     sea {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x265Path %x265ParA% %x265VarA%"}      #OLSARG+x265+single
     seb {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x264Path %x264ParA% %x264VarA%"}      #OLSARG+x264+single
-    maa {$keyRoute="$fmpgPath %ffmpegVarA% %ffmpegParA% - | $x265Path %x265ParA% %x265Var$sChar%"} #ffmpeg+x265+multiple
-    mab {$keyRoute="$fmpgPath %ffmpegVarA% %ffmpegParA% - | $x264Path %x264ParA% %x264Var$sChar%"} #ffmpeg+x264+multiple
-    mba {$keyRoute="$vprsPath %vspipeVarA% %vspipeParA% - | $x265Path %x265ParA% %x265Var$sChar%"} #VSPipe+x265+multiple
-    mbb {$keyRoute="$vprsPath %vspipeVarA% %vspipeParA% - | $x264Path %x264ParA% %x264Var$sChar%"} #VSPipe+x264+multiple
-    mca {$keyRoute="$avsyPath %avsyuvVarA% %avsyuvParA% - | $x265Path %x265ParA% %x265Var$sChar%"} #AVSYUV+x265+multiple
-    mcb {$keyRoute="$avsyPath %avsyuvVarA% %avsyuvParA% - | $x264Path %x264ParA% %x264Var$sChar%"} #AVSYUV+x264+multiple
-    mda {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x265Path %x265ParA% %x265Var$sChar%"} #AVSPmd+x265+multiple, 上游无"-"
-    mdb {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x264Path %x264ParA% %x264Var$sChar%"} #AVSPmd+x264+multiple, 上游无"-"
-    mea {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x265Path %x265ParA% %x265Var$sChar%"} #OLSARG+x265+multiple
-    meb {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x264Path %x264ParA% %x264Var$sChar%"} #OLSARG+x264+multiple
+    maa {$keyRoute="$fmpgPath %ffmpegVarA% %ffmpegParA% - | $x265Path %x265ParA%"+' %x265Var$sChar%'} #ffmpeg+x265+multiple, 单引号防止$sChar被提前激活
+    mab {$keyRoute="$fmpgPath %ffmpegVarA% %ffmpegParA% - | $x264Path %x264ParA%"+' %x264Var$sChar%'} #ffmpeg+x264+multiple
+    mba {$keyRoute="$vprsPath %vspipeVarA% %vspipeParA% - | $x265Path %x265ParA%"+' %x265Var$sChar%'} #VSPipe+x265+multiple
+    mbb {$keyRoute="$vprsPath %vspipeVarA% %vspipeParA% - | $x264Path %x264ParA%"+' %x264Var$sChar%'} #VSPipe+x264+multiple
+    mca {$keyRoute="$avsyPath %avsyuvVarA% %avsyuvParA% - | $x265Path %x265ParA%"+' %x265Var$sChar%'} #AVSYUV+x265+multiple
+    mcb {$keyRoute="$avsyPath %avsyuvVarA% %avsyuvParA% - | $x264Path %x264ParA%"+' %x264Var$sChar%'} #AVSYUV+x264+multiple
+    mda {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x265Path %x265ParA%"+' %x265Var$sChar%'} #AVSPmd+x265+multiple, 上游无"-"
+    mdb {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x264Path %x264ParA%"+' %x264Var$sChar%'} #AVSPmd+x264+multiple, 上游无"-"
+    mea {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x265Path %x265ParA%"+' %x265Var$sChar%'} #OLSARG+x265+multiple
+    meb {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x264Path %x264ParA%"+' %x264Var$sChar%'} #OLSARG+x264+multiple
     Default {Write-Error "`r`n× `$mode, `$impOps或`$extOPS中的某个变量值无法识别, 重试"; pause; exit}
 }
-#「启动G」将已知可用的上下游线路列举并进行排列组合
+#「启动G」将已知可用的上下游线路列举并进行排列组合, 以生成备选线路
 [array] $upPipeStr=@("$fmpgPath %ffmpegVarA% %ffmpegParA%", "$vprsPath %vspipeVarA% %vspipeParA%", "$avsyPath %avsyuvVarA% %avsyuvParA%", "$avspPath %avsmodVarA% %avsmodParA%","$svfiPath %olsargVarA% %olsargParA%") | Where-Object {$_.Length -gt 26}
 Switch ($mode) {     #用字长过滤掉dnPipeStr中不存在的线路, 大批量版使用sChar变量所以原始字符串要比单文件版多一个字
-    s {[array]$dnPipeStr=@("$x265Path %x265ParA% %x265VarA%",      "$x264Path %x264ParA% %x264VarA%")      | Where-Object {$_.Length -gt 22}}
-    m {[array]$dnPipeStr=@("$x265Path %x265ParA% %x265Var$sChar%", "$x264Path %x264ParA% %x264Var$sChar%") | Where-Object {$_.Length -gt 23}}
+    s {[array]$dnPipeStr=@("$x265Path %x265ParA% %x265VarA%",        "$x264Path %x264ParA% %x264VarA%")         | Where-Object {$_.Length -gt 22}}
+    m {[array]$dnPipeStr=@("$x265Path%x265ParA%"+' %x265Var$sChar%', "$x264Path %x264ParA%"+' %x264Var$sChar%') | Where-Object {$_.Length -gt 23}}
     Default {modeparamerror}
 }
 [array]$altRoute=@() #注释符 + `$updnPipeStr值 = 备选线路. 生成所有的备选线路命令行
@@ -192,11 +193,11 @@ REM pause
 REM 「压制-主要线路」debug时注释掉
 REM Var被用于引用动态数据，如输入输出路径和根据源视频自动调整的部分参数值
 
-"+$keyRoute+"
+"+$ExecutionContext.InvokeCommand.ExpandString($keyRoute)+"
 
 REM 「压制-备选线路」下方除REM注释外的命令复制并覆盖掉上方命令以更换主要线路
 
-"+$altRoute+"
+"+$ExecutionContext.InvokeCommand.ExpandString($altRoute)+"
 
 REM 「选择续y/暂n/止z」5秒后自动y, 除外字符被choice命令屏蔽, 暂停代表仍可继续.
 
@@ -207,7 +208,9 @@ if %ERRORLEVEL%==2 pause
 if %ERRORLEVEL%==1 endlocal && exit /b"
 
 #Out-File -InputObject $enc_gen -FilePath $bchExpPath -Encoding utf8
-[IO.File]::WriteAllLines($bchExpPath, $enc_gen, $utf8NoBOM) #强制导出utf-8NoBOM编码
+if     ($mode -eq "m") {[IO.File]::WriteAllLines($ExecutionContext.InvokeCommand.ExpandString($bchExpPath), $enc_gen, $utf8NoBOM)}
+elseif ($mode -eq "s") {[IO.File]::WriteAllLines($bchExpPath, $enc_gen, $utf8NoBOM)}#1.强制导出utf-8NoBOM编码, 2.大批量模式下激活$s变量
+else {modeparamerror}
 
 Write-Output "完成，只要线路不变，步骤3生成的各种批处理（步骤4）就可以一直调用enc_0S.bat / enc_X.bat"
 pause

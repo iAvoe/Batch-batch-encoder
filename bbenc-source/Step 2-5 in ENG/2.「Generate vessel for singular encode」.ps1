@@ -189,20 +189,13 @@ $enc_gen="REM 「Title」
 @echo -------------Starting encode--------------
 
 REM 「Debug」Comment out during normal usage
-REM @echo %ffmpegParA%
-REM @echo %ffmpegVarA%
-REM @echo %vspipeParA%
-REM @echo %vspipeVarA%
-REM @echo %avsyuvParA%
-REM @echo %avsyuvVarA%
-REM @echo %avsmodParA%
-REM @echo %avsmodVarA%
-REM @echo %olsargParA%
-REM @echo %olsargVarA%
-REM @echo %x265ParA%
-REM @echo %x265VarA%
-REM @echo %x264ParA%
-REM @echo %x264VarA%
+REM @echo %ffmpegParA% %ffmpegVarA%
+REM @echo %vspipeParA% %vspipeVarA%
+REM @echo %avsyuvParA% %avsyuvVarA%
+REM @echo %avsmodParA% %avsmodVarA%
+REM @echo %olsargParA% %olsargVarA%
+REM @echo %x265ParA% %x265VarA%
+REM @echo %x264ParA% %x264VarA%
 REM pause
 
 REM 「Encode」Comment out during debugging

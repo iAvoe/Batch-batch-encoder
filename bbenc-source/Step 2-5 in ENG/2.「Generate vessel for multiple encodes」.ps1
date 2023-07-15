@@ -209,26 +209,19 @@ For ($s=0; $s -lt $qty; $s++) {
 @echo.
 @echo "+$banner+"
 REM 「Debug」Comment out during normal usage
-REM @echo %ffmpegParA%
-REM @echo %ffmpegVarA%
+REM @echo %ffmpegParA% %ffmpegVarA%
 REM @echo %ffmpegVar"+$sChar+"%
-REM @echo %vspipeParA%
-REM @echo %vspipeVarA%
+REM @echo %vspipeParA% %vspipeVarA%
 REM @echo %vspipeVar"+$sChar+"%
-REM @echo %avsyuvParA%
-REM @echo %avsyuvVarA%
+REM @echo %avsyuvParA% %avsyuvVarA%
 REM @echo %avsyuvVar"+$sChar+"%
-REM @echo %avsmodVarParA%
-REM @echo %avsmodVarVarA%
-REM @echo %avsmodVarVar"+$sChar+"%
-REM @echo %olsargParA%
-REM @echo %olsargVarA%
+REM @echo %avsmodParA% %avsmodVarA%
+REM @echo %avsmodVar"+$sChar+"%
+REM @echo %olsargParA% %olsargVarA%
 REM @echo %olsargVar"+$sChar+"%
-REM @echo %x265ParA%
-REM @echo %x265VarA%
+REM @echo %x265ParA% %x265VarA%
 REM @echo %x265Var"+$sChar+"%
-REM @echo %x264ParA%
-REM @echo %x264VarA%
+REM @echo %x264ParA% %x264VarA%
 REM @echo %x264Var"+$sChar+"%
 REM pause
 
