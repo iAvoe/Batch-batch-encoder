@@ -96,8 +96,7 @@ Do {Do {
             default {badinputwarning}
         }
     } While ($x265Path+$x264Path -eq "")
-    if ((Read-Host "`r`n√ 按Enter以导入更多线路(推荐), 输入y再Enter以进行下一步") -eq "y") {$impEND="y"} else {$impEND="n"}
-    $impEND #用户选择是否完成导入操作并退出
+    if ((Read-Host "`r`n√ 按Enter以导入更多线路(推荐), 输入y再Enter以进行下一步") -eq "y") {$impEND="y"} else {$impEND="n"} #用户选择是否完成导入操作并退出
 } While ($impEND -eq "n")
 #生成一张表来表示所有已知路线
 $updnTbl = New-Object System.Data.DataTable
@@ -157,16 +156,16 @@ Switch ($mode+$impOps+$extOPS) {
 }
 #「启动G」将已知可用的上下游线路列举并进行排列组合, 以生成备选线路
 [array] $upPipeStr=@("$fmpgPath %ffmpegVarA% %ffmpegParA%", "$vprsPath %vspipeVarA% %vspipeParA%", "$avsyPath %avsyuvVarA% %avsyuvParA%", "$avspPath %avsmodVarA% %avsmodParA%","$svfiPath %olsargVarA% %olsargParA%") | Where-Object {$_.Length -gt 26}
-Switch ($mode) {     #用字长过滤掉dnPipeStr中不存在的线路, 大批量版使用sChar变量所以原始字符串要比单文件版多一个字
-    s {[array]$dnPipeStr=@("$x265Path %x265ParA% %x265VarA%",        "$x264Path %x264ParA% %x264VarA%")         | Where-Object {$_.Length -gt 22}}
-    m {[array]$dnPipeStr=@("$x265Path%x265ParA%"+' %x265Var$sChar%', "$x264Path %x264ParA%"+' %x264Var$sChar%') | Where-Object {$_.Length -gt 23}}
+Switch ($mode) {#用字长过滤掉dnPipeStr中不存在的线路, 大批量版使用sChar变量所以原始字符串要比单文件版多一个字
+    s {[array]$dnPipeStr=@( "$x265Path %x265ParA% %x265VarA%",          "$x264Path %x264ParA% %x264VarA%")          | Where-Object {$_.Length -gt 22}}
+    m {[array]$dnPipeStr=@(("$x265Path%x265ParA%"+' %x265Var$sChar%'), ("$x264Path %x264ParA%"+' %x264Var$sChar%')) | Where-Object {$_.Length -gt 23}} #单引号防止$sChar被提前激活, 额外的()用于防止"+"和","在Array中出现混淆
     Default {modeparamerror}
 }
 [array]$altRoute=@() #注释符 + `$updnPipeStr值 = 备选线路. 生成所有的备选线路命令行
 for     ($x=0; $x -lt ($upPipeStr.Length); $x++) {#上游/横向可能性的循环迭代
     for ($y=0; $y -lt ($dnPipeStr.Length); $y++) {#下游/纵向可能性的循环迭代
-        if ($upPipeStr -notlike "avsmod") {$altRoute="REM "+$upPipeStr[$x]+" - | "+$dnPipeStr[$y]} #AVSPmd, 上游无"-"
-        else                              {$altRoute="REM "+$upPipeStr[$x]+"   | "+$dnPipeStr[$y]} #AVSPmd, 上游无"-"
+        if ($upPipeStr -notlike "avsmod") {$altRoute+="REM "+$upPipeStr[$x]+" - | "+$dnPipeStr[$y]+"`r`n"} #AVSPmd, 上游无"-"
+        else                              {$altRoute+="REM "+$upPipeStr[$x]+"   | "+$dnPipeStr[$y]+"`r`n"} #AVSPmd, 上游无"-"
     }
 }
 Write-Output "`r`n√ 可用线路数量为:"($altRoute.Count)" `r`n" #此时已得出主选线路`$keyRoute和备选线路`$altRoute

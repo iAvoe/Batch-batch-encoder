@@ -96,8 +96,7 @@ Do {Do {
             default {badinputwarning}
         }
     } While ($x265Path+$x264Path -eq "")
-    if ((Read-Host "`r`n√ 按Enter以导入更多线路(推荐), 输入y再Enter以进行下一步") -eq "y") {$impEND="y"} else {$impEND="n"}
-    $impEND #用户选择是否完成导入操作并退出
+    if ((Read-Host "`r`n√ 按Enter以导入更多线路(推荐), 输入y再Enter以进行下一步") -eq "y") {$impEND="y"} else {$impEND="n"} #用户选择是否完成导入操作并退出
 } While ($impEND -eq "n")
 #生成一张表来表示所有已知路线
 $updnTbl = New-Object System.Data.DataTable
