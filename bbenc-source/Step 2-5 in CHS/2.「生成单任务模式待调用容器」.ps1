@@ -1,9 +1,9 @@
 ﻿cls #开发人员的Github: https://github.com/iAvoe
 $mode="s" #单任务模式
 Function badinputwarning{Write-Warning "`r`n× 输入错误, 重试"}
-Function nosuchrouteerr {Write-Error "`r`b× 该线路不存在, 重试"}
-Function tmpmuxreminder {Write-Warning "x265线路下仅支持生成.hevc文件，若要封装为.mkv, 则受ffmpeg限制需要先封装为.mp4`r`n"}
-Function modeparamerror {Write-Error "`r`n× 崩溃: 变量`$mode损坏, 无法区分单任务和大批量模式"; pause; exit}
+Function nosuchrouteerr {Write-Error   "`r`n× 该线路不存在, 重试"}
+Function tmpmuxreminder {Write-Warning "`r`n× x265线路下仅支持生成.hevc文件，若要封装为.mkv, 则受ffmpeg限制需要先封装为.mp4`r`n"}
+Function modeparamerror {Write-Error   "`r`n× 崩溃: 变量`$mode损坏, 无法区分单任务和大批量模式"; pause; exit}
 Function skip {return "`r`n. 跳过"}
 Function namecheck([string]$inName) {
     $badChars = '[{0}]' -f [regex]::Escape(([IO.Path]::GetInvalidFileNameChars() -join ''))
@@ -122,23 +122,32 @@ Do {Switch (Read-Host "`r`n选择启用一条pipe上游线路 [A | B | C | D | E
 } While (($impOPS -eq "") -or ($extOPS -eq ""))
 
 #「启动F」调用impOPS, extOPS生成被选中线路的命令行
-$keyRoute=""
-Switch ($impOps+$extOPS) {
-    aa {$keyRoute="$fmpgPath %ffmpegVarA% %ffmpegParA% - | $x265Path %x265ParA% %x265VarA%"} #ffmpeg+x265
-    ab {$keyRoute="$fmpgPath %ffmpegVarA% %ffmpegParA% - | $x264Path %x264ParA% %x264VarA%"} #ffmpeg+x264
-    ba {$keyRoute="$vprsPath %vspipeVarA% %vspipeParA% - | $x265Path %x265ParA% %x265VarA%"} #VSPipe+x265
-    bb {$keyRoute="$vprsPath %vspipeVarA% %vspipeParA% - | $x264Path %x264ParA% %x264VarA%"} #VSPipe+x264
-    ca {$keyRoute="$avsyPath %avsyuvVarA% %avsyuvParA% - | $x265Path %x265ParA% %x265VarA%"} #AVSYUV+x265
-    cb {$keyRoute="$avsyPath %avsyuvVarA% %avsyuvParA% - | $x264Path %x264ParA% %x264VarA%"} #AVSYUV+x264
-    da {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x265Path %x265ParA% %x265VarA%"} #AVSPmd+x265, 上游无"-"
-    db {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x264Path %x264ParA% %x264VarA%"} #AVSPmd+x264, 上游无"-"
-    ea {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x265Path %x265ParA% %x265VarA%"} #OLSARG+x265
-    eb {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x264Path %x264ParA% %x264VarA%"} #OLSARG+x264
+$keyRoute=""; $sChar="AAA" #防止意外情况下的启动F, G出现变量空值错误, 所以提前给变量赋值
+Switch ($mode+$impOps+$extOPS) {
+    saa {$keyRoute="$fmpgPath %ffmpegVarA% %ffmpegParA% - | $x265Path %x265ParA% %x265VarA%"}      #ffmpeg+x265+single
+    sab {$keyRoute="$fmpgPath %ffmpegVarA% %ffmpegParA% - | $x264Path %x264ParA% %x264VarA%"}      #ffmpeg+x264+single
+    sba {$keyRoute="$vprsPath %vspipeVarA% %vspipeParA% - | $x265Path %x265ParA% %x265VarA%"}      #VSPipe+x265+single
+    sbb {$keyRoute="$vprsPath %vspipeVarA% %vspipeParA% - | $x264Path %x264ParA% %x264VarA%"}      #VSPipe+x264+single
+    sca {$keyRoute="$avsyPath %avsyuvVarA% %avsyuvParA% - | $x265Path %x265ParA% %x265VarA%"}      #AVSYUV+x265+single
+    scb {$keyRoute="$avsyPath %avsyuvVarA% %avsyuvParA% - | $x264Path %x264ParA% %x264VarA%"}      #AVSYUV+x264+single
+    sda {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x265Path %x265ParA% %x265VarA%"}      #AVSPmd+x265+single,   上游无"-"
+    sdb {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x264Path %x264ParA% %x264VarA%"}      #AVSPmd+x264+single,   上游无"-"
+    sea {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x265Path %x265ParA% %x265VarA%"}      #OLSARG+x265+single
+    seb {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x264Path %x264ParA% %x264VarA%"}      #OLSARG+x264+single
+    maa {$keyRoute="$fmpgPath %ffmpegVarA% %ffmpegParA% - | $x265Path %x265ParA% %x265Var$sChar%"} #ffmpeg+x265+multiple
+    mab {$keyRoute="$fmpgPath %ffmpegVarA% %ffmpegParA% - | $x264Path %x264ParA% %x264Var$sChar%"} #ffmpeg+x264+multiple
+    mba {$keyRoute="$vprsPath %vspipeVarA% %vspipeParA% - | $x265Path %x265ParA% %x265Var$sChar%"} #VSPipe+x265+multiple
+    mbb {$keyRoute="$vprsPath %vspipeVarA% %vspipeParA% - | $x264Path %x264ParA% %x264Var$sChar%"} #VSPipe+x264+multiple
+    mca {$keyRoute="$avsyPath %avsyuvVarA% %avsyuvParA% - | $x265Path %x265ParA% %x265Var$sChar%"} #AVSYUV+x265+multiple
+    mcb {$keyRoute="$avsyPath %avsyuvVarA% %avsyuvParA% - | $x264Path %x264ParA% %x264Var$sChar%"} #AVSYUV+x264+multiple
+    mda {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x265Path %x265ParA% %x265Var$sChar%"} #AVSPmd+x265+multiple, 上游无"-"
+    mdb {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x264Path %x264ParA% %x264Var$sChar%"} #AVSPmd+x264+multiple, 上游无"-"
+    mea {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x265Path %x265ParA% %x265Var$sChar%"} #OLSARG+x265+multiple
+    meb {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x264Path %x264ParA% %x264Var$sChar%"} #OLSARG+x264+multiple
+    Default {Write-Error "`r`n× `$mode, `$impOps或`$extOPS中的某个变量值无法识别, 重试"; pause; exit}
 }
-
 #「启动G」将已知可用的上下游线路列举并进行排列组合
 [array] $upPipeStr=@("$fmpgPath %ffmpegVarA% %ffmpegParA%", "$vprsPath %vspipeVarA% %vspipeParA%", "$avsyPath %avsyuvVarA% %avsyuvParA%", "$avspPath %avsmodVarA% %avsmodParA%","$svfiPath %olsargVarA% %olsargParA%") | Where-Object {$_.Length -gt 26}
-[string]$sChar="AAA" #以防止意外情况下出现变量空值错误, 所以提前给变量赋值
 Switch ($mode) {     #用字长过滤掉dnPipeStr中不存在的线路, 大批量版使用sChar变量所以原始字符串要比单文件版多一个字
     s {[array]$dnPipeStr=@("$x265Path %x265ParA% %x265VarA%",      "$x264Path %x264ParA% %x264VarA%")      | Where-Object {$_.Length -gt 22}}
     m {[array]$dnPipeStr=@("$x265Path %x265ParA% %x265Var$sChar%", "$x264Path %x264ParA% %x264Var$sChar%") | Where-Object {$_.Length -gt 23}}
