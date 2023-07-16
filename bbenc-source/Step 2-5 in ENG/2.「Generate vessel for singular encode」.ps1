@@ -94,16 +94,24 @@ $updnTbl.Columns.Add($availRts); $updnTbl.Columns.Add($upColumn); $updnTbl.Colum
 
 Read-Host "`r`nCheck whether the correct programs are imported and [Enter] to proceed, restart otherwise"
 
-#「Bootstrap E」Choose downstream program of file pipe, x264 or x265
-Do {$ENCops=$x265Path=$x264Path=""
-    Switch (Read-Host "Choose a downstream pipe program [A: x265/hevc | B: x264/avc]") {
-        a {$ENCops="a"; Write-Output "`r`nSelecting x265--route A. Opening a selection window to [locate x265.exe]"; $x265Path=whereisit}
-        b {$ENCops="b"; Write-Output "`r`nSelecting x264--route B. Opening a selection window to [locate x264.exe]"; $x264Path=whereisit}
-        default {Write-Warning "× Bad input, try again"}
+#「Bootstrap E」Choose up-downstream program for the encoding commandline, generates impOPS, extOPS variable for route selection parameter
+$impOPS=$extOPS=""
+Do {Switch (Read-Host "Choose an upstream program for encoding [A | B | C | D | E], the rest will be commented out in generated batch") {
+            a {if ($fmpgPath -ne "") {$impOPS="a"} else {nosuchrouteerr}}
+            b {if ($vprsPath -ne "") {$impOPS="b"} else {nosuchrouteerr}}
+            c {if ($avsyPath -ne "") {$impOPS="c"} else {nosuchrouteerr}}
+            d {if ($avspPath -ne "") {$impOPS="d"} else {nosuchrouteerr}}
+            e {if ($svfiPath -ne "") {$impOPS="e"} else {nosuchrouteerr}}
+            default {badinputwarning}
     }
-} While ($ENCops -eq "")
-$encEXT=$x265Path+$x264Path
-Write-Output "`r`n√ Selected $encEXT`r`n"
+    if ($impOPS -ne "") {#No-execusion when upstream input has failed, move to loop end and trigger a loopback instead
+        Switch (Read-Host "`r`nChoose a downstream program for encoding [A | B], the rest will be commented out in generated batch") {
+            a {if ($x265Path -ne "") {$extOPS="a"} else {nosuchrouteerr}}
+            b {if ($x264Path -ne "") {$extOPS="b"} else {nosuchrouteerr}}
+            default {badinputwarning}
+        }
+    }
+} While (($impOPS -eq "") -or ($extOPS -eq ""))
 
 #「Bootstrap F」Locate path to export temporary multiplexed MP4 files for x265. x264 usually has libav & therefore filtered by $ENCops
 #               Step 3 locates the path to export encoded files
