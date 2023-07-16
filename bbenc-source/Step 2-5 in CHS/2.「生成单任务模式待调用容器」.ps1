@@ -2,7 +2,8 @@
 $mode="s" #单任务模式
 Function badinputwarning{Write-Warning "`r`n× 输入错误, 重试"}
 Function nosuchrouteerr {Write-Error   "`r`n× 该线路不存在, 重试"}
-Function tmpmuxreminder {return "x265线路下仅支持生成.hevc文件，若要封装为.mkv, 则受ffmpeg限制需要先封装为.mp4`r`n"}
+Function nonintinputerr {Write-Error   "`r`n× 输入了非整数或空值"}
+Function tmpmuxreminder {return        "x265线路下仅支持生成.hevc文件，若要封装为.mkv, 则受ffmpeg限制需要先封装为.mp4`r`n"}
 Function modeparamerror {Write-Error   "`r`n× 崩溃: 变量`$mode损坏, 无法区分单任务和大批量模式"; pause; exit}
 Function skip {return "`r`n. 跳过"}
 Function namecheck([string]$inName) {
@@ -51,27 +52,10 @@ Write-Output "VSpipe      [.vpy] --y4m               - | x265.exe --y4m - --outp
 Write-Output "avs2yuv     [.avs] -csp<串> -depth<整> - | x265.exe --input-res <串> --fps <整/小/分数> - --output"
 Write-Output "avs2pipemod [.avs] -y4mp                 | x265.exe --y4m - --output <<上游无`"-`">>`r`n"
 
-#「启动A」生成1~n个"enc_[序号].bat"单文件版不需要
-#if ($mode -eq "m") {
-#    [array]$validChars='A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'
-#    [int]$qty=0 #从0而非1开始数
-#    Do {[int]$qty = (Read-Host -Prompt "指定[生成压制批处理]的整数数量, 从1开始数, 最大为15625次编码")
-#        if ($qty -eq 0) {"输入了非整数或空值"} elseif ($qty -gt 15625) {Write-Error "× 编码次数超过15625"; pause; exit}
-#    } While ($qty -eq 0)
-#    #「启动B」选择是否在导出文件序号上补零, 由于int变量$qty得不到字长Length, 所以先转string再取值
-#    if ($qty -gt 9) {#个位数下关闭补零
-#        Do {[string]$leadCHK=""; [int]$ldZeros=0
-#            Switch (Read-Host "选择之前[y启用了 | n关闭了]导出压制文件名的[序号补0]. 如导出十位数文件时写作01, 02...") {
-#                y {$leadCHK="y"; Write-Output "√ 启用补零`r`n"; $ldZeros=$qty.ToString().Length}
-#                n {$leadCHK="n"; Write-Output "× 关闭补零`r`n"}
-#                default {badinputwarning}
-#            }
-#        } While ($leadCHK -eq "")
-#        [string]$zroStr="0"*$ldZeros #得到.ToString('000')所需的'000'部分, 如果关闭补零则$zroStr为0, 补零计算仍然存在但没有效果
-#    } else {[string]$zroStr="0"}
-#}
+#「启动A-B」仅在大批量模式下用, 单文件模式下跳过
+
 #「启动C」定位导出主控文件用路径, 需要区分单任务和大批量模式
-Read-Host "将打开[导出待调用批处理]的路径选择窗. 按Enter继续"
+Read-Host "将打开[导出待调用批处理]的路径选择窗. [Enter]继续"
 if     ($mode -eq "s") {      $bchExpPath = (whichlocation)+"enc_0S.bat"}
 elseif ($mode -eq "m") {$bchExpPath = (whichlocation)+'enc_$s.bat'} #大批量模式下, 使用单引号来防止变量$s在此处被激活
 else                   {modeparamerror}
@@ -96,7 +80,7 @@ Do {Do {
             default {badinputwarning}
         }
     } While ($x265Path+$x264Path -eq "")
-    if ((Read-Host "`r`n√ 按Enter以导入更多线路(推荐), 输入y再Enter以进行下一步") -eq "y") {$impEND="y"} else {$impEND="n"} #用户选择是否完成导入操作并退出
+    if ((Read-Host "`r`n√ [Enter]以导入更多线路(推荐), 输入[y][Enter]以进行下一步") -eq "y") {$impEND="y"} else {$impEND="n"} #用户选择是否完成导入操作并退出
 } While ($impEND -eq "n")
 #生成一张表来表示所有已知路线
 $updnTbl = New-Object System.Data.DataTable
@@ -108,7 +92,7 @@ $updnTbl.Columns.Add($availRts); $updnTbl.Columns.Add($upColumn); $updnTbl.Colum
 [void]$updnTbl.Rows.Add(" C:",$avsyPath,""); [void]$updnTbl.Rows.Add(" D:",$avspPath,""); [void]$updnTbl.Rows.Add(" E:",$svfiPath,"")
 ($updnTbl | Out-String).Trim() #1. Trim去掉空行, 2. pipe到Out-String以强制$updnTbl在Read-Host启动前发出
 
-Read-Host "`r`n按Enter以检查或确认所有导入的程序正确, 否则重运行此脚本"
+Read-Host "`r`n[Enter]以检查或确认所有导入的程序正确, 否则重运行此脚本"
 
 #「启动E」选择上下游线路, 通过impOPS, extOPS来判断注释掉剩余未选择的路线
 $impOPS=$extOPS=""

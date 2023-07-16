@@ -1,10 +1,16 @@
 ﻿cls #Dev's Github: https://github.com/iAvoe
 $mode="m" #Multiple encoding mode
+Function badinputwarning{Write-Warning "`r`n× Bad input, try again"}
+Function nosuchrouteerr {Write-Error   "`r`n× No such route, try again"}
+Function nonintinputerr {Write-Error   "`r`n× Input was not an integer"}
+Function tmpmuxreminder {return        "x265 downstream supports .hevc output only. If you are multiplexing .mkv, then a .mp4 multiplexing is needed due to ffmpeg's restriction`r`n"}
+Function modeparamerror {Write-Error   "`r`n× Crash: Variable `$mode broken, unable to distingulish operating mode"; pause; exit}
+Function skip {return "`r`n. Skipped"}
 Function namecheck([string]$inName) {
     $badChars = '[{0}]' -f [regex]::Escape(([IO.Path]::GetInvalidFileNameChars() -join ''))
     ForEach ($_ in $badChars) {if ($_ -match $inName) {return $false}}
     return $true
-} #Checking if input filename compliants to Windows file naming scheme
+} #Checking if input filename compliants to Windows file naming scheme, not needed in multiple encoding mode
 
 Function whereisit($startPath='DESKTOP') {
     #Opens a System.Windows.Forms GUI to pick a file
@@ -26,38 +32,6 @@ Function whichlocation($startPath='DESKTOP') {
     return $startPath.SelectedPath
 }
 
-Function settmpoutputname([string]$mode) {
-    $DebugPreference="Continue" #Write-Output/Host does not work in a function, using Write-Debug instead
-
-    Do {Switch (Read-Host "Choose [A: Copy from a file | B: Input] as the temporary MP4's filename") {
-            a { Write-Debug "√ Opening a selection window to [get filename from a file]"
-                $vidEXP=whereisit
-                $vidEXP=[io.path]::GetFileNameWithoutExtension($vidEXP)
-                if ($mode -eq "m") {$vidEXP+='_$serial'} #! Using single quotes in codeline here to prevent variable `$serial from being executed
-                Write-Debug "`r`nIn multi-encode mode, choosing A will add a trailing counter in filename`r`n"
-            }
-            b { if ($mode -eq "m") {#Multi-encoding mode
-                    Do {[string]$vidEXP=Read-Host "`r`nSpecify filename w/out extension (multi-encode mode)  `r`n1. Specify episode counter `$serial in desired location`r`n2. `$serial should be padded from trailing alphabets.`r`n3. Space is needed inbetween 2 square brackets`r`n  e.g., [YYDM-11FANS] [Yuru Yuri 2]`$serial[BDRIP 720P]"
-                        $chkme=namecheck($vidEXP)
-                        if  (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false)) {Write-Warning "Missing variable `$serial under multi-encode mode; No value entered, Or intercepted illegal characters / | \ < > : ? * `""}
-                    } While (($vidEXP.Contains("`$serial") -eq $false) -or ($chkme -eq $false))
-                }
-                if ($mode -eq "s") {# Single encoding mode
-                    Do {[string]$vidEXP=Read-Host "`r`nSpecify filename w/out extension (single encoding mode)`r`nSpace is needed inbetween 2 square brackets`r`ne.g., [YYDM-11FANS] [Yuru Yuri 2]01[BDRIP 720P]"
-                        $chkme=namecheck($vidEXP)
-                        if  (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false)) {Write-Warning "Detecting variable `$serial in single-encode mode; No value entered, Or intercepted illegal characters / | \ < > : ? * `""}
-                    } While (($vidEXP.Contains("`$serial") -eq $true) -or ($chkme -eq $false))
-                }
-                #[string]$serial=($s).ToString($zroStr) #Example of parsing leading zeros to $serial. Used in for loop below (supplies variable $s)
-                #$vidEXP=$ExecutionContext.InvokeCommand.ExpandString($vidEXP) #Activating $serial as a variable with expand string method. Used in for loop below
-            }
-            default {Write-Warning "× Bad input, try again`r`n"}
-        }
-    } While ($vidEXP -eq "")
-    Write-Debug "√ Added exporting filename $vidEXP`r`n"
-    return $vidEXP
-}
-
 #「@MrNetTek」Use high-DPI rendering, to fix blurry System.Windows.Forms
 Add-Type -TypeDefinition @'
 using System.Runtime.InteropServices;
@@ -76,16 +50,14 @@ Write-Output "ffmpeg convert from variable to constant framt rate: -vsync cfr`r`
 Write-Output "Encode interlaced source with x265: --tff/--bff; x264: --interlaced<tff/bff>`r`n"
 Write-Output "VSpipe      [.vpy] --y4m                    - | x265.exe --y4m - --output"
 Write-Output "avs2yuv     [.avs] -csp<string> -depth<int> - | x265.exe --input-res <string> --fps <int/float/fraction> - --output"
-Write-Output "avs2pipemod [.avs] -y4mp                      | x265.exe --y4m - --output`r`n"
-Write-Output "Under x265 downstream, manually changing preference `$MUXops=[`r`n| a: Muxtiplex after encode (default)`r`n| b: Multiplex & delete raw hevc stream after encode`r`n| c: Encode only (comment multiplex commandline out, auto-selected under x264 downstream)]`r`n"
-$MUXops="a"
+Write-Output "avs2pipemod [.avs] -y4mp                      | x265.exe --y4m - --output <<No `"-`" on upstream commandline>>`r`n"
 
 #「Bootstrap A」Generate 1~n amount of "enc_[numbers].bat". Not needed in singular encode mode
 if ($mode -eq "m") {
     [array]$validChars='A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'
     [int]$qty=0 #Start counting from 0 instead of 1
-    Do {[int]$qty = (Read-Host -Prompt "Specify the amount of [generated encoding batches]. Range from 1~15625")
-        if ($qty -eq 0) {"Non-integer or no value was entered"} elseif ($qty -gt 15625) {Write-Error "× Greater than 15625 individual encodes"}
+    Do {[int]$qty = (Read-Host -Prompt "Specify the amount of [generated encoding batches] (1~15625)")
+        if ($qty -eq 0) {nonintinputerr} elseif ($qty -gt 15625) {Write-Error "× Greater than 15625 individual encodes"}
     } While (($qty -eq 0) -or ($qty -gt 15625))
     #「Bootstrap B」Locate path to export batch files
     if ($qty -gt 9) {#Skip questionare for single digit $qtys
@@ -93,7 +65,7 @@ if ($mode -eq "m") {
             Switch (Read-Host "Choose [y|n] to [add leading zeros] on exporting filename's episode counter. E.g., use 01, 02... for 2-digit episodes") {
                 y {$leadCHK="y"; Write-Output "√ enable leading 0s`r`n"; $ldZeros=$qty.ToString().Length}
                 n {$leadCHK="n"; Write-Output "× disable leading 0s`r`n"}
-                default {Write-Warning "Bad input, try again"}
+                default {badinputwarning}
             }
         } While ($leadCHK -eq "")
         [string]$zroStr="0"*$ldZeros #Gaining '000' protion for ".ToString('000')" method. $zroStr would be 0 if leading zero feature is deactivated, the calculation still haves but takes no effect
