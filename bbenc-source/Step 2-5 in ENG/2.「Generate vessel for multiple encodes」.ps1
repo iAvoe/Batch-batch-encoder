@@ -71,24 +71,45 @@ if ($mode -eq "m") {
         [string]$zroStr="0"*$ldZeros #Gaining '000' protion for ".ToString('000')" method. $zroStr would be 0 if leading zero feature is deactivated, the calculation still haves but takes no effect
     } else {[string]$zroStr="0"}
 }
-#「Bootstrap C」Locate path to export batch files
-Read-Host "`r`nHit Enter to proceed open a window that locates [path for exporting batch files]..."
-$exptPath = whichlocation
-Write-Output "√ Selected $exptPath`r`n"
+#「Bootstrap C」Locate path to export batch files, distingulishing single & multiple encoding mode is needed
+Read-Host "`r`n[Enter] proceed open a window that locates [path for exporting batch files]..."
+if     ($mode -eq "s") {$bchExpPath = (whichlocation)+"enc_0S.bat"}
+elseif ($mode -eq "m") {$bchExpPath = (whichlocation)+'enc_$s.bat'} #Under multiple encding mode, using single quote on var $s 
+else                   {modeparamerror}
+Write-Output "`r`n√ Path & filename generated as: $bchExpPath"
 
-#「Bootstrap D」Choose upstream program of file pipe, y4m pipe & ffprobe analysis were both used for info-gathering fallback. Only Step 3 chooses video file to import
-Do {$impEXT=$fmpgPath=$vprsPath=$avsyPath=$avspPath=$svfiPath=""
-    Switch (Read-Host "Choose an upstream pipe program [A: ffmpeg | B: vspipe | C: avs2yuv | D: avs2pipemod | E: SVFI]") {
-        a {Write-Output "`r`nChoosing ffmpeg------route A. Opening a selection window to [locate ffmpeg.exe]";      $fmpgPath=whereisit}
-        b {Write-Output "`r`nChoosing vspipe------route B. Opening a selection window to [locate vspipe.exe]";      $vprsPath=whereisit}
-        c {Write-Output "`r`nChoosing avs2yuv-----route C. Opening a selection window to [locate avs2yuv.avs]";     $avsyPath=whereisit}
-        d {Write-Output "`r`nChoosing avs2pipemod-route D. Opening a selection window to [locate avs2pipemod.exe]"; $avspPath=whereisit}
-        e {Write-Output "`r`nChoosing svfi--------route E. Opening a selection window to [locate one_line_shot_args.exe]`r`ni.e. under Steam distro: X:\SteamLibrary\steamapps\common\SVFI\one_line_shot_args.exe"; $svfiPath=whereisit}
-        default {Write-Output "Bad input, try again"}
-    }
-    $impEXT=$fmpgPath+$vprsPath+$avsyPath+$avspPath+$svfiPath
-} While ($impEXT -eq "")
-Write-Output "`r`n√ Selected $impEXT`r`n"
+#「Bootstrap D」Loop importing pipe up-downstream programs
+$fmpgPath=$vprsPath=$avsyPath=$avspPath=$svfiPath=$x265Path=$x264Path=""
+Do {Do {
+        Switch (Read-Host "`r`nImport upstream program [A: ffmpeg | B: vspipe | C: avs2yuv | D: avs2pipemod | E: SVFI], repeated selection will trigger a skip") {
+            a {if ($fmpgPath -eq "") {Write-Output "`r`nffmpeg------up route A. Opening a window to [locate ffmpeg.exe]";            $fmpgPath=whereisit} else {skip}}
+            b {if ($vprsPath -eq "") {Write-Output "`r`nvspipe------up route B. Opening a window to [locate vspipe.exe]";            $vprsPath=whereisit} else {skip}}
+            c {if ($avsyPath -eq "") {Write-Output "`r`navs2yuv-----up route C. Opening a window to [locate avs2yuv.avs]";           $avsyPath=whereisit} else {skip}}
+            d {if ($avspPath -eq "") {Write-Output "`r`navs2pipemod-up route D. Opening a window to [locate avs2pipemod.exe]";       $avspPath=whereisit} else {skip}}
+            e {if ($svfiPath -eq "") {Write-Output "`r`nsvfi--------up route E. Opening a window to [locate one_line_shot_args.exe]";$svfiPath=whereisit} else {skip}}
+            default {badinputwarning}
+        }
+    } While ($fmpgPath+$vprsPath+$avsyPath+$avspPath+$svfiPath -eq "")
+    Do {
+        Switch (Read-Host "`r`nImport downstream program [A: x265/hevc | B: x264/avc], repeated selection will trigger a skip") {
+            a {if ($x265Path -eq "") {Write-Output "`r`nx265--------down route A. Opening a window to [locate x265.exe]";            $x265Path=whereisit} else {skip}}
+            b {if ($x264Path -eq "") {Write-Output "`r`nx264--------down route B. Opening a window to [locate x264.exe]";            $x264Path=whereisit} else {skip}}
+            default {badinputwarning}
+        }
+    } While ($x265Path+$x264Path -eq "")
+    if ((Read-Host "`r`n√ [Enter] import more routes (recommneded); Or [y][Enter] to move on") -eq "y") {$impEND="y"} else {$impEND="n"} #User decides when to exit loop
+} While ($impEND -eq "n")
+#Generate a datatable to indicate imported programs
+$updnTbl = New-Object System.Data.DataTable
+$availRts= [System.Data.DataColumn]::new("Routes")
+$upColumn= [System.Data.DataColumn]::new("UNIX Pipe Upstream")
+$dnColumn= [System.Data.DataColumn]::new("UNIX Pipe Dnstream")
+$updnTbl.Columns.Add($availRts); $updnTbl.Columns.Add($upColumn); $updnTbl.Columns.Add($dnColumn)
+[void]$updnTbl.Rows.Add(" A:",$fmpgPath,$x265Path); [void]$updnTbl.Rows.Add(" B:",$vprsPath,$x264Path)
+[void]$updnTbl.Rows.Add(" C:",$avsyPath,""); [void]$updnTbl.Rows.Add(" D:",$avspPath,""); [void]$updnTbl.Rows.Add(" E:",$svfiPath,"")
+($updnTbl | Out-String).Trim() #1. Trim used to trim out empty rows, 2. Piping to Out-String to force $updnTbl to return the result before Read-Host below gets executed
+
+Read-Host "`r`nCheck whether the correct programs are imported and [Enter] to proceed, restart otherwise"
 
 #「Bootstrap E」Choose downstream program of file pipe, x264 or x265
 Do {$ENCops=$x265Path=$x264Path=""
@@ -110,7 +131,7 @@ if ($ENCops -eq "a") {
             a { $MUXhevc="a" #x265 downstream, consideration of whether to generate temporary MP4 is needed
 
                 # "MUXops A/B" has been assigned on top, specified manually
-                Read-Host "Hit Enter to proceed open a window that locates [path to export temporary MP4 files]..."
+                Read-Host "[Enter] proceed open a window that locates [path to export temporary MP4 files]..."
                 $EXPpath = whichlocation
                 Write-Output "√ Selected $EXPpath`r`n"
 

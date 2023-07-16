@@ -80,7 +80,7 @@ Do {Do {
             default {badinputwarning}
         }
     } While ($x265Path+$x264Path -eq "")
-    if ((Read-Host "`r`n√ [Enter]以导入更多线路(推荐), 输入[y][Enter]以进行下一步") -eq "y") {$impEND="y"} else {$impEND="n"} #用户选择是否完成导入操作并退出
+    if ((Read-Host "`r`n√ [Enter]导入更多线路(推荐); 或[y][Enter]以进行下一步") -eq "y") {$impEND="y"} else {$impEND="n"} #用户选择是否完成导入操作并退出
 } While ($impEND -eq "n")
 #生成一张表来表示所有已知路线
 $updnTbl = New-Object System.Data.DataTable
@@ -92,7 +92,7 @@ $updnTbl.Columns.Add($availRts); $updnTbl.Columns.Add($upColumn); $updnTbl.Colum
 [void]$updnTbl.Rows.Add(" C:",$avsyPath,""); [void]$updnTbl.Rows.Add(" D:",$avspPath,""); [void]$updnTbl.Rows.Add(" E:",$svfiPath,"")
 ($updnTbl | Out-String).Trim() #1. Trim去掉空行, 2. pipe到Out-String以强制$updnTbl在Read-Host启动前发出
 
-Read-Host "`r`n[Enter]以检查或确认所有导入的程序正确, 否则重运行此脚本"
+Read-Host "`r`n检查或确认所有导入的程序正确后按[Enter], 否则重运行此脚本"
 
 #「启动E」选择上下游线路, 通过impOPS, extOPS来判断注释掉剩余未选择的路线
 $impOPS=$extOPS=""
