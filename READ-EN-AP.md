@@ -96,8 +96,36 @@ Apdx β: <a href='https://nazorip.site/archives/169/'>ffprobe stream media probi
  - Pass array to string variable after loop finishes: ` [string]$MtlnString=$StrArray `
  - `` `n `` enables the line switching, but also creates a space start from the 2nd line: ` $MtlnString=$MtlnString -replace " some", "some" `
 
-**ffmpeg raw-hevc-to-MKV restriction**
- - This socfgmrnugyew restriction made this project so much more difficult to code
+**PowerShell write a table with custom headings**
+
+    $newTable = New-Object System.Data.DataTable
+    $HeadingA = [System.Data.DataColumn]::new("Cust. Heading A")
+    $HeadingB = [System.Data.DataColumn]::new("Cust. Heading B")
+    $HeadingC = [System.Data.DataColumn]::new("Cust. Heading C")
+    $newTable.Columns.Add($HeadingA); $newTable.Columns.Add($HeadingC); $newTable.Columns.Add($HeadingC)
+    [void]$newTable.Rows.Add("Row 1 content A","Row 1 content B",$Row1VaribleA); [void]$newTable.Rows.Add("Row 2 content A","Row 2 content B",$Row2VaribleA)
+    [void]$newTable.Rows.Add("Row 3 content A","Row 3 content B",$Row3VaribleA); [void]$newTable.Rows.Add("Row 4 content A","Row 4 content B",$Row4VaribleA)
+    ($newTable | Out-String).Trim() #1. Trim removes empty lines, 2. pipe to Out-String to force "$newTable" returns value before any Read-Host executes before it
+
+**PowerShell add collapsed & non-collapsing items to Array**
+
+    $ArrayX=@(("$non-collapse-var"+'$collapse-var'), ("$non-collapse-var-B"+'$collapse-var-B'))
+    #The doublequoted variable gets expanded into values and registered into the aray item
+    #The secondary brackets changes execusion order, prevents PowerShell from confusing `+` and `, `, otherwise only one single array item would be generated above
+
+**PowerShell expand the collapsed variables in Array & print with line breaks**
+
+    for ($_=0; $_ -lt $ArrayX.Length; $_++) {
+        $ExecutionContext.InvokeCommand.ExpandString(($ArrayX | Out-String))
+    }   #The secondary bracket changes execusion order, this makes PowerShell first completes the Array-to-Sting，then expand the collapsed variables into values
+
+**PowerShell Windows envirmental filename check function**
+
+    Function namecheck([string]$inName) {
+        $badChars = '[{0}]' -f [regex]::Escape(([IO.Path]::GetInvalidFileNameChars() -join ''))
+        ForEach ($_ in $badChars) {if ($_ -match $inName) {return $false}}
+        return $true
+    }
 
 -----
 

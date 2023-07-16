@@ -143,7 +143,7 @@ Switch ($mode+$impOps+$extOPS) {
 [array] $upPipeStr=@("$fmpgPath %ffmpegVarA% %ffmpegParA%", "$vprsPath %vspipeVarA% %vspipeParA%", "$avsyPath %avsyuvVarA% %avsyuvParA%", "$avspPath %avsmodVarA% %avsmodParA%","$svfiPath %olsargVarA% %olsargParA%") | Where-Object {$_.Length -gt 26}
 Switch ($mode) {     #用字长过滤掉dnPipeStr中不存在的线路, 大批量版使用sChar变量所以原始字符串要比单文件版多一个字
     s {[array]$dnPipeStr=@("$x265Path %x265ParA% %x265VarA%",        "$x264Path %x264ParA% %x264VarA%")         | Where-Object {$_.Length -gt 22}}
-    m {[array]$dnPipeStr=@("$x265Path%x265ParA%"+' %x265Var$sChar%', "$x264Path %x264ParA%"+' %x264Var$sChar%') | Where-Object {$_.Length -gt 23}}
+    m {[array]$dnPipeStr=@(("$x265Path%x265ParA%"+' %x265Var$sChar%'), ("$x264Path %x264ParA%"+' %x264Var$sChar%')) | Where-Object {$_.Length -gt 23}}
     Default {modeparamerror}
 }
 [array]$altRoute=@() #注释符 + `$updnPipeStr值 = 备选线路. 生成所有的备选线路命令行

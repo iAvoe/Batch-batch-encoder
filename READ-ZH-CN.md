@@ -104,10 +104,38 @@
  - 循环跑完后直接赋值到字符串变量: [string]$MtlnString=$StrArray
  - \`n实现了换行，但从第二行开始会于开头生成多余的空格，用-replace去掉: $MtlnString=MtlnString -replace " some", "some"
 
------
+**PowerShell生成自定义标题的表格**
 
-**★为何不用 C++，TypeScript，JS**
- - 没学过 =_=；反正现成的PowerShell就能用
+    $新表格 = New-Object System.Data.DataTable
+    $标题A= [System.Data.DataColumn]::new("自定义标题A")
+    $标题B= [System.Data.DataColumn]::new("自定义标题B")
+    $标题C= [System.Data.DataColumn]::new("自定义标题C")
+    $新表格.Columns.Add($标题A); $新表格.Columns.Add($标题B); $新表格.Columns.Add($标题C)
+    [void]$新表格.Rows.Add("行1内容A","行1内容B",$行1变量A); [void]$新表格.Rows.Add("行2内容A","行2内容B",$行2变量A)
+    [void]$新表格.Rows.Add("行3内容A","行3内容B",$行3变量A); [void]$新表格.Rows.Add("行4内容A","行4内容B",$行4变量A)
+    ($新表格 | Out-String).Trim() #1. Trim去掉空行, 2. pipe到Out-String以强制"$新表格"在其下方的Read-Host启动前发出
+
+**PowerShell在列表Array中添加坍缩和不坍缩的变量**
+
+    $列表X=@(("$不坍缩变量A$不坍缩变量B"+'$坍缩变量A'), ("$不坍缩变量C$不坍缩变量D"+'$坍缩变量B'))
+    #其中双引号下的变量不会坍缩，直接得到变量值形成固定的字符串
+    #二级括号用于防止PowerShell混淆 `+` 和 `, `, 否则上面整个命令只会生成一个阵列项
+
+**PowerShell将列表Array中含坍缩变量的项扩张(expand)并打印出来**
+
+    for ($_=0; $_ -lt $列表x.Length; $_++) {
+        $ExecutionContext.InvokeCommand.ExpandString(($列表x | Out-String))
+    }   #二级括号用于调整执行顺序, 即"将未扩张/Expand变量"先打印出来，然后再输入到变量扩张命令里
+
+**PowerShell检测文件名是否符合Windows命名规则的函数**
+
+    Function namecheck([string]$inName) {
+        $badChars = '[{0}]' -f [regex]::Escape(([IO.Path]::GetInvalidFileNameChars() -join ''))
+        ForEach ($_ in $badChars) {if ($_ -match $inName) {return $false}}
+        return $true
+    }
+
+-----
 
 ## ★更新信息
 **v1.2910**
