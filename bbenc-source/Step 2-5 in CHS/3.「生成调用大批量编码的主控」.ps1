@@ -232,22 +232,22 @@ $fprbPath=whereisit
 #             由于stream作为标题会被写入CSV，所以自动忽略A项
 #             例: $parsProbe = "D:\ffprobe.exe -i `"F:\Asset\Video\BDRip私种\[Beatrice-Raws] Anne Happy [BDRip 1920x1080 x264 FLAC]\[Beatrice-Raws] Anne Happy 01 [BDRip 1920x1080 x264 FLAC].mkv`" -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
 #             例: $parsProbe = "D:\ffprobe.exe -i `"N:\SolLevante_HDR10_r2020_ST2084_UHD_24fps_1000nit.mov`" -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
-#                 Invoke-Expression $parsProbe > "C:\temp_v_info.csv"
-#                 Notepad "C:\temp_v_info.csv"
+#                 Invoke-Expression $parsProbe > "$env:USERPROFILE\temp_v_info.csv"
+#                 Notepad "$env:USERPROFILE\temp_v_info.csv"
 Switch ($is_mov) {
     $true {
         [String]$parsProbe = $fprbPath+" -i `"$impEXTs`" -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries -of csv"
-        Invoke-Expression $parsProbe > "C:\temp_v_info_is_mov.csv" #由于多数Windows系统只有C盘, 所以临时生成CSV在C盘
-        $ffprobeCSV = Import-Csv "C:\temp_v_info_is_mov.csv" -Header A,B,C,D,E,F,G,H,I
+        Invoke-Expression $parsProbe > "$env:USERPROFILE\temp_v_info_is_mov.csv" #由于多数Windows系统只有C盘, 所以临时生成CSV在C盘
+        $ffprobeCSV = Import-Csv "$env:USERPROFILE\temp_v_info_is_mov.csv" -Header A,B,C,D,E,F,G,H,I
     }
     $false{
         [String]$parsProbe = $fprbPath+" -i `"$impEXTs`" -select_streams v:0 -v error -hide_banner -show_streams -show_entries stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng -of csv"
-        Invoke-Expression $parsProbe > "C:\temp_v_info.csv"        #由于多数Windows系统只有C盘, 所以临时生成CSV在C盘
-        $ffprobeCSV = Import-Csv "C:\temp_v_info.csv" -Header A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,AA
+        Invoke-Expression $parsProbe > "$env:USERPROFILE\temp_v_info.csv"        #由于多数Windows系统只有C盘, 所以临时生成CSV在C盘
+        $ffprobeCSV = Import-Csv "$env:USERPROFILE\temp_v_info.csv" -Header A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,AA
     }
 }
-if     (Test-Path "C:\temp_v_info.csv")        {Remove-Item "C:\temp_v_info.csv"}
-elseif (Test-Path "C:\temp_v_info_is_mov.csv") {Remove-Item "C:\temp_v_info_is_mov.csv"}
+if     (Test-Path "$env:USERPROFILE\temp_v_info.csv")        {Remove-Item "$env:USERPROFILE\temp_v_info.csv"}
+elseif (Test-Path "$env:USERPROFILE\temp_v_info_is_mov.csv") {Remove-Item "$env:USERPROFILE\temp_v_info_is_mov.csv"}
 
 #「ffprobeB3」根据视频帧数自动填写x265的--subme
 $x265subme=x265submecalc -CSVfps $ffprobeCSV.H
@@ -268,7 +268,7 @@ Write-Output "√ 已添加x264参数: $fps $WxH`r`n√ 已添加x265参数: $co
 
 #「ffprobeC1」自动替换SVFI渲染配置文件的target_fps, 并导出新文件. 唯SVFI线路需要
 if ($IMPchk -eq "e") {
-    $iniEXP="C:\bbenc_svfi_targetfps_mod_"+(Get-Date).ToString('yyyy.MM.dd.hh.mm.ss')+".ini"
+    $iniEXP="$env:USERPROFILE\bbenc_svfi_targetfps_mod_"+(Get-Date).ToString('yyyy.MM.dd.hh.mm.ss')+".ini"
     $olsfps="target_fps="+$ffprobeCSV.H
     $iniCxt=Get-Content $olsINI
     $iniTgt=$iniCxt | Select-String target_fps | Select-Object -ExpandProperty Line

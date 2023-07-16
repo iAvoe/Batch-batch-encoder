@@ -1,16 +1,16 @@
-﻿cls
-Function testwritemodify {
-    Param ([Parameter(Mandatory=$true)]$tstxt)
-    $DebugPreference="Continue" #Cannot use Write-Output/Host or " " inside a function as it would trigger a value return, modify Write-Debug instead
-    $modifyAcl=$true
-    if ((Test-Path $tstxt) -eq $true) {
-        Try {[io.file]::OpenWrite($tstxt).close()} Catch {$modifyAcl=$false}
-        Remove-Item $tstxt
-        if ($modifyAcl -eq $true) {return 3} elseif ($modifyAcl -eq $false){return 2}
-    } else {return 1}
+﻿cls #升级到管理员权限
+if (-Not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    if ([int](Get-CimInstance -Class Win32_OperatingSystem | Select-Object -ExpandProperty BuildNumber) -ge 6000) {
+        Start-Process PowerShell -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"cd '$pwd'; & '$PSCommandPath';`"";
+        Exit;
+    }
 }
-$tstxt="C:\tmp-testWriteModify.txt"
-Write-Output "Testing write access only, this file should be deleted - 检测写入权限用, 该文件应被删除">$tstxt
+Function testwritemodify ($inputPath) {$report=""
+    $CurrentUserRights = ((Get-Acl $inputPath).Access | Select IdentityReference,AccessControlType,FileSystemRights | ?{$_.IdentityReference -match $env:USERNAME} | Format-List | Out-String).Trim()
+    if ($CurrentUserRights.Contains("Modify"))      {$report+="`r`n√ 用户 $env:USERNAME 拥有对 $inputPath 的一般读写权限"} else {$report+="`r`n× 用户 $env:USERNAME 没有对 $inputPath 的一般读写权限"}
+    if ($CurrentUserRights.Contains("FullControl")) {$report+="`r`n√ 用户 $env:USERNAME 拥有对 $inputPath 的完全控制权限"} else {$report+="`r`n× 用户 $env:USERNAME 没有对 $inputPath 的完全控制权限"}
+    return $report
+}
 
 Function loweruaclvl {
     Try{Set-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System" -Name "ConsentPromptBehaviorAdmin" -Type DWord -Value 0
@@ -29,15 +29,45 @@ Function raiseuaclvl {
     } Catch {return 0}
     return 1
 }
-
-$txtst=(testwritemodify -tstxt $tstxt)
-if     ($txtst -eq 3) {Write-Output "√ Write & modify privilege to C drive is normal - C盘文件写入和编辑权限正常`r`n"}
-elseif ($txtst -eq 2) {Write-Warning "× Write privilege to C drive is normal, but missing modify privilege - C盘文件写入权限正常, 但没有编辑权限`r`n"}
-elseif ($txtst -eq 1) {Write-Warning "× No write access to C drive - 没有C盘写入权限`r`n"; pause; exit} 
-
+#检查用户PowerShell版本
 if ($PSVersionTable.PSVersion -lt 5.1) {Write-Warning "× PowerShell version is below 5.1, this script may not work - PowerShell版本低于5.1, 可能无法运行`r`n"}
 else {Write-Output "√ PowerShell version is 5.1 or higher - PowerShell版本为5.1或更高`r`n"}
+pause
 
+#检查用户权限是否正常
+Write-Output "`r`n检查当前用户于C盘根目录中的文件系统权限(仅用于排查故障)...`r`nInspecting current user's file system permission on C:\ (Debug only)..."
+$RootDirPerm=(testwritemodify -inputPath "C:\")
+Write-Output "检查当前用户于%USERPROFILE%中的文件系统权限(要求必须正常)...`r`nInspecting current user's file system permission on %USERPROFILE% (Has to be normal for this script)..."
+$profilePerm=testwritemodify -inputPath $env:USERPROFILE
+if ($profilePerm -notmatch "√") {Write-Warning "`r`n？ 低权限: 用户没有C盘根目录的读写权限, 但不影响本脚本"}
+else {Write-Output "`r`n----------于C盘根目录的权限正常-----------"}
+$RootDirPerm
+if ($profilePerm -notmatch "√") {Write-Warning "`r`n× 系统损坏: 用户没有%USERPROFILE%的完全控制权限"}
+else {Write-Output "`r`n-----于%USERPROFILE%文件夹的权限正常------"}
+$profilePerm
+pause
+
+#检查并更改UAC
+Do {Switch (Read-Host "`r`n「User Access Control」由于每次运行PowerShell脚本都会弹出用户账户控制警告，选择: `r`n「User Access Control」Each time running PSscripts would panic UAC, select: `r`n[A: 关闭/Disable UAC | B: 不更改/Don't make changes | C: 恢复(公用电脑)/Restore UAC (public computers)]") {
+                                                                                                                
+        a {$UACops=1;       Write-Output "`r`nLowering UAC level... `r`n正在降低用户账户控制通知级别..."; $uacc=loweruaclvl} #UAC_ON=1, UAC_OFF=0
+        c {$UACops=3;       Write-Output "`r`nRestoring UAC level...`r`n正在恢复用户账户控制通知级别..."; $uacc=raiseuaclvl} #UAC_ON=1, UAC_OFF=0
+        b {$UACops=2;       Write-Output "`r`nSkipped`r`n已跳过!"}
+        default {$UACops=0; Write-Output " × Bad input, try again`r`n × 输入错误, 重试"}
+    }
+} While ($UACops -eq 0)
+
+$UACreg=(Get-ItemProperty HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System | Select ConsentPromptBehaviorAdmin,ConsentPromptBehaviorUser,PromptOnSecureDesktop,EnableLUA)
+if     ($UACreg.EnableLUA -eq 1) {Write-Output "`r`nUAC is currently ON. `r`n用户账户控制通知目前已启用."}
+elseif ($UACreg.EnableLUA -eq 0) {Write-Output "`r`nUAC is currently OFF.`r`n用户账户控制通知目前已关闭."}
+
+if ($uacc -eq $UACreg.EnableLUA) {#确认用户账户控制返回结果$uacc与注册表符合. Cross referencing registry for UAC on/off status, to make sure $uacc works
+    if     (($UACops -eq 1) -and ($uacc -eq 1)) {Write-Warning "`r`n × Failed to lower UAC level. Please type UAC in Start menu, and lower the warning manually...`r`n关闭用户账户控制通知失败. 请在开始菜单输入UAC，然后手动降低警告阈限."}
+    elseif (($UACops -eq 3) -and ($uacc -eq 0)) {Write-Warning "`r`n × Restore UAC level failed.  Please type UAC in Start menu, and raise the warning manually...`r`n恢复用户账户控制通知失败. 请在开始菜单输入UAC，然后手动提高警告阈限."}
+} else {Write-Warning "`r`nNo operations were made, result check is skipped. `r`n未进行操作, 已跳过检测操作结果返回步骤."}
+pause
+
+#剩余的基本检查
 "Workstation name / 计算机名: "+$env:computername+", "+(Get-WmiObject -class Win32_OperatingSystem).Caption
 Write-Output "`r`n-------------Motherboard主板--------------"
 $MB = Get-WmiObject Win32_Baseboard | Select Status,Product,Manufacturer,Model,SerialNumber,Version
@@ -124,22 +154,4 @@ elseif ($procNodes -eq 8) {$pools="--pools +,-,-,-,-,-,-,-"}
 elseif ($procNodes -gt 8) {Write-Warning "? Detecting an unusal amount of installed processor nodes ($procNodes), please add option --pools manually`r`n？ 检测到异常: 安装了超过8颗处理器($procNodes), 需手动填写--pools"} #Cannot use else, otherwise -eq 1 gets accounted for "unusual amount of comp nodes"
 if ($procNodes -gt 1) {Write-Output "√ Detected $procNodes installed processors, added x265 option: $pools`r`n√ 检测到安装了 $procNodes 颗处理器, 已添加x265参数: $pools"}
 
-Write-Warning "`r`n接下来的操作会更改注册表/The following operation involves registry value alteration"
-Do {Switch (Read-Host "`r`n「User Access Control」由于每次运行PowerShell脚本都会弹出用户账户控制警告，选择/Each time running PSscripts would panic UAC, select:`r`n`r`n[A: 关闭/Disable UAC | B: 不更改/Don't make changes | C: 恢复(公用电脑)/Restore UAC (public computers)]") {
-        a {$UACops=1; Write-Output "`r`nLowering UAC level...`r`n正在降低用户账户控制通知级别..."; $uacc=loweruaclvl} #UAC_ON=1, UAC_OFF=0
-        c {$UACops=3; Write-Output "`r`nRestoring UAC level...`r`n正在恢复用户账户控制通知级别..."; $uacc=raiseuaclvl} #UAC_ON=1, UAC_OFF=0
-        b {$UACops=2; Write-Output "`r`nSkipped`r`n已跳过!"}
-        default {$UACops=0; Write-Output " × Bad input`r`n × 输入错误, 重试"}
-    }
-} While ($UACops -eq 0)
-
-$UACreg=(Get-ItemProperty HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System | Select ConsentPromptBehaviorAdmin,ConsentPromptBehaviorUser,PromptOnSecureDesktop,EnableLUA)
-if     ($UACreg.EnableLUA -eq 1) {Write-Output "`r`nUAC is currently ON. `r`n用户账户控制通知目前已启用."}
-elseif ($UACreg.EnableLUA -eq 0) {Write-Output "`r`nUAC is currently OFF.`r`n用户账户控制通知目前已关闭."}
-
-if ($uacc -eq $UACreg.EnableLUA) {#确认用户账户控制返回结果$uacc与注册表符合. Cross referencing registry for UAC on/off status, to make sure $uacc works
-    if     (($UACops -eq 1) -and ($uacc -eq 1)) {Write-Warning "`r`n × Failed to lower UAC level. Please type UAC in Start menu, and lower the warning manually...`r`n关闭用户账户控制通知失败. 请在开始菜单输入UAC，然后手动降低警告阈限."}
-    elseif (($UACops -eq 3) -and ($uacc -eq 0)) {Write-Warning "`r`n × Restore UAC level failed.  Please type UAC in Start menu, and raise the warning manually...`r`n恢复用户账户控制通知失败. 请在开始菜单输入UAC，然后手动提高警告阈限."}
-} else {Write-Warning "`r`nNo operations were made, result check is skipped. `r`n未进行操作, 已跳过检测操作结果返回步骤."}
-
-pause
+Read-Host "？ 如果参数--pme，--pools的代码没有报错，说明PowerShell状态正常，没有问题，可以运行步骤2`r`n？ If --pme, --pools generating codeline didn't return with error, then PowerShell is running normally and ready for Step 2"

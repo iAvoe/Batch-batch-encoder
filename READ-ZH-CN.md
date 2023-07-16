@@ -138,6 +138,12 @@
 -----
 
 ## ★更新信息
+**v1.2940**
+<ul>
+    <li>√ 重写了整个步骤1</li>
+    <li>√ 步骤3中ffprobe导出临时csv文件的代码部分从输出到C盘根目录改成了USERPROFILE，以解决Windows11和少数Windows10的写入权限问题</li>
+</ul>
+
 **v1.2910**
 <ul>
     <li>√ 步骤2S, 2M操作逻辑变更：删除 "temporary multiplex" 命令行生成，改为选中x265下游后生成提示</li>

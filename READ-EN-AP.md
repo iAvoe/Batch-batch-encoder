@@ -130,6 +130,13 @@ Apdx β: <a href='https://nazorip.site/archives/169/'>ffprobe stream media probi
 -----
 
 ## ★Updates / change log
+**v1.2940**
+<ul>
+    <li>√ 重写了整个步骤1</li>
+    <li>√ 步骤3中ffprobe导出临时csv文件的代码部分从输出到C盘根目录改成了USERPROFILE，以解决Windows11和少数Windows10的写入权限问题</li>
+</ul>
+
+**v1.2910**
 <ul>
     <li>√ Logical change in Step 2S & 2M to delete the "temporary multiplex" commandline generation: to show a reminder after selecting x265 downstream</li>
     <li>√ Created a keyRoute & altRoute cmdline generation method:<ul>
