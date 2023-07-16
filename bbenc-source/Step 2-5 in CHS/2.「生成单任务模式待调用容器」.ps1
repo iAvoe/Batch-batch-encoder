@@ -116,16 +116,16 @@ Do {Switch (Read-Host "选择启用一条pipe上游线路 [A | B | C | D | E], �
 #「启动F」调用impOPS, extOPS生成被选中线路的命令行
 $keyRoute=""; $sChar="AAA" #防止意外情况下的启动F, G出现变量空值错误, 所以提前给变量赋值
 Switch ($mode+$impOps+$extOPS) {
-    saa {$keyRoute="$fmpgPath %ffmpegVarA% %ffmpegParA% - | $x265Path %x265ParA% %x265VarA%"}      #ffmpeg+x265+single
-    sab {$keyRoute="$fmpgPath %ffmpegVarA% %ffmpegParA% - | $x264Path %x264ParA% %x264VarA%"}      #ffmpeg+x264+single
-    sba {$keyRoute="$vprsPath %vspipeVarA% %vspipeParA% - | $x265Path %x265ParA% %x265VarA%"}      #VSPipe+x265+single
-    sbb {$keyRoute="$vprsPath %vspipeVarA% %vspipeParA% - | $x264Path %x264ParA% %x264VarA%"}      #VSPipe+x264+single
-    sca {$keyRoute="$avsyPath %avsyuvVarA% %avsyuvParA% - | $x265Path %x265ParA% %x265VarA%"}      #AVSYUV+x265+single
-    scb {$keyRoute="$avsyPath %avsyuvVarA% %avsyuvParA% - | $x264Path %x264ParA% %x264VarA%"}      #AVSYUV+x264+single
-    sda {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x265Path %x265ParA% %x265VarA%"}      #AVSPmd+x265+single,   上游无"-"
-    sdb {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x264Path %x264ParA% %x264VarA%"}      #AVSPmd+x264+single,   上游无"-"
-    sea {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x265Path %x265ParA% %x265VarA%"}      #OLSARG+x265+single
-    seb {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x264Path %x264ParA% %x264VarA%"}      #OLSARG+x264+single
+    saa {$keyRoute="$fmpgPath %ffmpegVarA% %ffmpegParA% - | $x265Path %x265ParA% %x265VarA%"}         #ffmpeg+x265+single
+    sab {$keyRoute="$fmpgPath %ffmpegVarA% %ffmpegParA% - | $x264Path %x264ParA% %x264VarA%"}         #ffmpeg+x264+single
+    sba {$keyRoute="$vprsPath %vspipeVarA% %vspipeParA% - | $x265Path %x265ParA% %x265VarA%"}         #VSPipe+x265+single
+    sbb {$keyRoute="$vprsPath %vspipeVarA% %vspipeParA% - | $x264Path %x264ParA% %x264VarA%"}         #VSPipe+x264+single
+    sca {$keyRoute="$avsyPath %avsyuvVarA% %avsyuvParA% - | $x265Path %x265ParA% %x265VarA%"}         #AVSYUV+x265+single
+    scb {$keyRoute="$avsyPath %avsyuvVarA% %avsyuvParA% - | $x264Path %x264ParA% %x264VarA%"}         #AVSYUV+x264+single
+    sda {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x265Path %x265ParA% %x265VarA%"}         #AVSPmd+x265+single,   上游无"-"
+    sdb {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x264Path %x264ParA% %x264VarA%"}         #AVSPmd+x264+single,   上游无"-"
+    sea {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x265Path %x265ParA% %x265VarA%"}         #OLSARG+x265+single
+    seb {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x264Path %x264ParA% %x264VarA%"}         #OLSARG+x264+single
     maa {$keyRoute="$fmpgPath %ffmpegVarA% %ffmpegParA% - | $x265Path %x265ParA%"+' %x265Var$sChar%'} #ffmpeg+x265+multiple, 单引号防止$sChar被提前激活
     mab {$keyRoute="$fmpgPath %ffmpegVarA% %ffmpegParA% - | $x264Path %x264ParA%"+' %x264Var$sChar%'} #ffmpeg+x264+multiple
     mba {$keyRoute="$vprsPath %vspipeVarA% %vspipeParA% - | $x265Path %x265ParA%"+' %x265Var$sChar%'} #VSPipe+x265+multiple

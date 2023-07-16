@@ -113,37 +113,48 @@ Do {Switch (Read-Host "Choose an upstream program for encoding [A | B | C | D | 
     }
 } While (($impOPS -eq "") -or ($extOPS -eq ""))
 
-#「Bootstrap F」Locate path to export temporary multiplexed MP4 files for x265. x264 usually has libav & therefore filtered by $ENCops
-#               Step 3 locates the path to export encoded files
-[string]$vidEXP=[string]$serial=[string]$MUXhevc=""
-
-if ($ENCops -eq "a") {
-    Do {Switch (Read-Host "Select [ A: I'm planning to use MKV container format later (A hevc-to-MKV workaround process for ffmpeg by generating temporary MP4 files)`r`n | B: I'm not planning to use MKV format later ]") {
-            a { $MUXhevc="a" #x265 downstream, consideration of whether to generate temporary MP4 is needed
-
-                # "MUXops A/B" has been assigned on top, specified manually
-                Read-Host "[Enter] proceed open a window that locates [path to export temporary MP4 files]..."
-                $EXPpath = whichlocation
-                Write-Output "√ Selected $EXPpath`r`n"
-
-                $vidEXP = settmpoutputname($mode) #Configure file output name for the temporary MP4
-
-            }b{ $MUXhevc="b"
-                $MUXops ="c"#Generate a commented-out multiplexing command
-            }
-            Default {
-                Write-Warning "`r`n× Bad input, try again`r`n"
-                $MUXhevc=""
-            }
-        }
-    } While ($MUXhevc -eq "")
-} elseif ($ENCops -eq "b") {#x264 downstream
-    $MUXhevc="b"            #no temporary MP4 files are needed
-    $MUXops="c"             #generate a commented-out multiplexing command
+#「Bootstrap F」Use impOPS, extOPS to generate the selected route as new variable keyRoute
+$keyRoute=""; $sChar="AAA" #An accident-proof measure where in bootstrap F, G expands $sChar too early, which may cause empty value error
+Switch ($mode+$impOps+$extOPS) {
+    saa {$keyRoute="$fmpgPath %ffmpegVarA% %ffmpegParA% - | $x265Path %x265ParA% %x265VarA%"}         #ffmpeg+x265+single
+    sab {$keyRoute="$fmpgPath %ffmpegVarA% %ffmpegParA% - | $x264Path %x264ParA% %x264VarA%"}         #ffmpeg+x264+single
+    sba {$keyRoute="$vprsPath %vspipeVarA% %vspipeParA% - | $x265Path %x265ParA% %x265VarA%"}         #VSPipe+x265+single
+    sbb {$keyRoute="$vprsPath %vspipeVarA% %vspipeParA% - | $x264Path %x264ParA% %x264VarA%"}         #VSPipe+x264+single
+    sca {$keyRoute="$avsyPath %avsyuvVarA% %avsyuvParA% - | $x265Path %x265ParA% %x265VarA%"}         #AVSYUV+x265+single
+    scb {$keyRoute="$avsyPath %avsyuvVarA% %avsyuvParA% - | $x264Path %x264ParA% %x264VarA%"}         #AVSYUV+x264+single
+    sda {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x265Path %x265ParA% %x265VarA%"}         #AVSPmd+x265+single,   No "-" in AVSPipeMod upstream
+    sdb {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x264Path %x264ParA% %x264VarA%"}         #AVSPmd+x264+single,   No "-" in AVSPipeMod upstream
+    sea {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x265Path %x265ParA% %x265VarA%"}         #OLSARG+x265+single
+    seb {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x264Path %x264ParA% %x264VarA%"}         #OLSARG+x264+single
+    maa {$keyRoute="$fmpgPath %ffmpegVarA% %ffmpegParA% - | $x265Path %x265ParA%"+' %x265Var$sChar%'} #ffmpeg+x265+multiple, single quoting to yield expansion
+    mab {$keyRoute="$fmpgPath %ffmpegVarA% %ffmpegParA% - | $x264Path %x264ParA%"+' %x264Var$sChar%'} #ffmpeg+x264+multiple
+    mba {$keyRoute="$vprsPath %vspipeVarA% %vspipeParA% - | $x265Path %x265ParA%"+' %x265Var$sChar%'} #VSPipe+x265+multiple
+    mbb {$keyRoute="$vprsPath %vspipeVarA% %vspipeParA% - | $x264Path %x264ParA%"+' %x264Var$sChar%'} #VSPipe+x264+multiple
+    mca {$keyRoute="$avsyPath %avsyuvVarA% %avsyuvParA% - | $x265Path %x265ParA%"+' %x265Var$sChar%'} #AVSYUV+x265+multiple
+    mcb {$keyRoute="$avsyPath %avsyuvVarA% %avsyuvParA% - | $x264Path %x264ParA%"+' %x264Var$sChar%'} #AVSYUV+x264+multiple
+    mda {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x265Path %x265ParA%"+' %x265Var$sChar%'} #AVSPmd+x265+multiple, No "-" in AVSPipeMod upstream
+    mdb {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x264Path %x264ParA%"+' %x264Var$sChar%'} #AVSPmd+x264+multiple, No "-" in AVSPipeMod upstream
+    mea {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x265Path %x265ParA%"+' %x265Var$sChar%'} #OLSARG+x265+multiple
+    meb {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x264Path %x264ParA%"+' %x264Var$sChar%'} #OLSARG+x264+multiple
+    Default {Write-Error "`r`n× Crash: `$mode, `$impOps or `$extOPS has an unidentifible or missing value"; pause; exit}
 }
+#「Bootstrap G」Generate all possible possible upstream--downstream commandline layouts, which are the alternate routes
+[array] $upPipeStr=@("$fmpgPath %ffmpegVarA% %ffmpegParA%", "$vprsPath %vspipeVarA% %vspipeParA%", "$avsyPath %avsyuvVarA% %avsyuvParA%", "$avspPath %avsmodVarA% %avsmodParA%","$svfiPath %olsargVarA% %olsargParA%") | Where-Object {$_.Length -gt 26}
+Switch ($mode) {#Filter the non-existant route in dnPipeStr with length property, multile encoding mode has downstream commandline with $sChar variable which is 1 character less the nsingle encode mode, make use of the if split
+    s {[array]$dnPipeStr=@( "$x265Path %x265ParA% %x265VarA%",          "$x264Path %x264ParA% %x264VarA%")          | Where-Object {$_.Length -gt 22}}
+    m {[array]$dnPipeStr=@(("$x265Path%x265ParA%"+' %x265Var$sChar%'), ("$x264Path %x264ParA%"+' %x264Var$sChar%')) | Where-Object {$_.Length -gt 23}} #single quoting to yield expansion, extra () are used to prevent "+" & "," mixing up in Array
+    Default {modeparamerror}
+}
+[array]$altRoute=@() #Commenting sign + `$updnPipeStr = altRoute. Thus generates all the alternate routes
+for     ($x=0; $x -lt ($upPipeStr.Length); $x++) {#upstream/horizontal iteration of possibilities
+    for ($y=0; $y -lt ($dnPipeStr.Length); $y++) {#downstream/vertical iteration of possibilities
+        if ($upPipeStr -notlike "avsmod") {$altRoute+="REM "+$upPipeStr[$x]+" - | "+$dnPipeStr[$y]} #No "-" in AVSPipeMod upstream
+        else                              {$altRoute+="REM "+$upPipeStr[$x]+"   | "+$dnPipeStr[$y]} #No "-" in AVSPipeMod upstream
+    }
+}
+"√ Number of usable/alternate routes are: "+($altRoute.Count.ToString()) | Out-String #Variable `$keyRoute & `$altRoute are ready, only differs in single & multiple mode where variable expansion is needed in multiple encoding mode
 
-$tmpStrmOut=$vidEXP+".hevc" #Path, filename & extension of temporary .hevc stream output (Stream Output - export stream to MUXwrt commandline)
-$tempMuxOut=$vidEXP+".mp4"  #Path, filename & extension of temporary MP4 file multiplexed (This get commented out when Switch above is not A)
+if ($extOPS="a") {tmpmuxreminder} #Provide reminder for multiplexing to .mkv when selecting x265/hevc donwstream keyRoute
 
 #single-encode mode's temporary MP4 multiplex ffmpeg options, under x264, x265 routing. $MUXwrt was initialized as "" above
 #single-encode mode doesn't have variable $sChar
@@ -163,7 +174,7 @@ del `"$EXPpath$tmpStrmOut`""
 }
 
 #[string]$banner=[string]$cVO=[string]$fVO=[string]$xVO=[string]$aVO=""
-[string]$trueExpPath="" #trueExpPath is the actual variable used to export temporary MP4s, to not write "+"s into exporting files, as $exptPath cannot be connecting to enc_ without a "+"
+#[string]$bchExpPath="" #trueExpPath is the actual variable used to export temporary MP4s, to not write "+"s into exporting files, as $exptPath cannot be connecting to enc_ without a "+"
 
 #export batch file w/ utf-8NoBOM text codec
 $utf8NoBOM=New-Object System.Text.UTF8Encoding $false 
@@ -199,9 +210,8 @@ if %ERRORLEVEL%==3 cmd /k
 if %ERRORLEVEL%==2 pause
 if %ERRORLEVEL%==1 endlocal && exit /b"
 
-$trueExpPath=$exptPath+"enc_0S.bat" #Another variable assignment is needed to not write "+"s into exporting files, as $exptPath cannot be connecting to enc_ without a +
-#Out-File -InputObject $enc_gen -FilePath $trueExpPath -Encoding utf8
-[IO.File]::WriteAllLines($trueExpPath, $enc_gen, $utf8NoBOM) #Force exporting utf-8NoBOM text codec
+#Out-File -InputObject $enc_gen -FilePath $bchExpPath -Encoding utf8
+[IO.File]::WriteAllLines($bchExpPath, $enc_gen, $utf8NoBOM) #Force exporting utf-8NoBOM text codec
 
 Write-Output "Completed, as long as up-downstream remains the same, any controller batch generated by step 3 could always use enc_0S.bat / enc_X.bat"
 pause
