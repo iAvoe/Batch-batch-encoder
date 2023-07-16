@@ -101,36 +101,43 @@ Apdx β: <a href='https://nazorip.site/archives/169/'>ffprobe stream media probi
 
 -----
 
-## ☆At what cost?
-
- - Donated my winter break in a ~~vicious~~ cycle of adding features --> new feature creates bug --> debug --> add comments
- - This script suite is quite complex compared to most encoding programs, making it difficult to work with at beginning
- - A lot of cmdlets, variables are creeated for formatting cmdlines, by requirements from especially ffmpeg
- - The fear that I'll be joked at developing a twenty-hexadecimal (alphabet) carrying mathmatical operation within a for-loop to support 15000+ individual encodes
-   - just to elinimate numbers in batch variables
- - To make multiplexing/containing script robust/very capable, a 168-line ~~turbo encabulator~~ function was developed after a hellish endurance-challenging debugs (mostly due to my lack of systematilly study of coding)
- - As I've being told, supporting this project in future would be difficult
-<br>
-
-**★Why not choosing develop w/ C++, TypeScript, JS**
- - I haven't studied them =_=, also the environment setup would make too much change to the OS（？）；PowerShell & PS ISE are the opposite
- - I know docker exists, but telling docker about my phone number just to begin study c++ is a no
-<br>
-
-**☆Why not choosing to develop w/ Python, like installing Python is not that hard**
-
-Intalling Python is pretty straightforward, however in terms of IDEs:
- - Most people have never used Atom IDE, and some says it has performance issues on Windows
- - Python does not have a usable built-in IDE
- - VSCode needs too much effort of customizations, and their message poping is quite annoying for entry-level users（I'm used to it, though）
- - np++'s author is into white political bulls, and Vim is pure toture for entry-users
- - Sublime is premium and probably even less people uses it
-
-This level of gatekeeping is a waste of time and efort for people who don't actually develop codes; In contrast, we have a clean, efficient and prety easy to use PowerShell ISE that is just better for entry-level users
-
------
-
 ## ★Updates / change log
+<ul>
+    <li>√ Logical change in Step 2S & 2M to delete the "temporary multiplex" commandline generation: to show a reminder after selecting x265 downstream</li>
+    <li>√ Created a keyRoute & altRoute cmdline generation method:<ul>
+        <li>√ Program importing loop & switch statement update:<ul>
+            <li>√ Merged upstream & downstream import into one single loop</li>
+            <li>√ User now can import multiple upstream & downstream programs</li>
+            <li>√ User now can select which route to use for this time, and switching routes manually in seconds in the generated batch</li>
+            <li>√ The script will return a table clearly shows upstream & downstream routes available based on previous import</li>
+            <li>√ A bit improved error handling for rare occasions</li></ul>
+        </li></ul>
+    </li>
+    <li>√ A Switch that automatically takes operating mode, user selected upstream, & downstream (and their requirements) into account to generate the keyRoute variable<ul>
+        <li>√ Variable collapse for `$sChar is programmed for multiple encoding mode due to the early variable assignment and string generation within the same variable are executed</li></ul>
+    </li>
+    <li>√ A loop that generates the altRoute variable:<ul>
+        <li>√ Automatically figure out possible (commented-out) UNIX pipe combinations, which allows the user to quickly replace the keyRoute in the generated batch, as the "map of all programs" feature</li>
+        <li>√ Variable collapse for `$sChar ... again</li></ul>
+    </li>
+    <li>√ The generated batch file step headings, and EOF PSScript prompt are also improved with info on how to manange and handle these generated batch for a long time</li>
+    <li>√ Added a detect-&-differ keyRoute & altRoute variable generation where AVS2pipeMod upstream has a different format of UNIX pipe in step 2</li>
+    <li>√ Improved whichlocation Function (locate path): the Windows Form window now shows up on top instead of behind the current PowerShell/ISE window</li>
+    <li>√ Implemented much better Array to String, Table to String printing with Out-String<ul>
+        <li>√ Solved "Array to string and expand variable in 1 line" problem with brackets outside the Array pipe to Out-String, then nested with variable exansion function</li></ul>
+    </li>
+    <li>√ Centralized all common errors & warnings into Function calls in Step 2, this greatly simplfied code management</li>
+    <li>√ Added a detect-&-differ dnPipeStr variable generation by detecting empty pipe streams by string length, where the multiple-encoding mode is 1 char longer than single-encoding mode</li>
+    <li>√ Added a detect-&-differ for text write-lines codeblock that generates batch file(s) in step 2, where multiple encoding mode requires a variable expansion on variable "s" to become the filename</li>
+    <li>√ Tested and minor-tweaked the entire step 2</li>
+    <li>√ Examined the logical & variable connectivity with step 3 and everything was good</li>
+    <li>√ Completed the entire CHS Step 2S --> CHS Step 2M code migration</li>
+    <li>√ Completed the entire CHS Step 2S --> ENG Step 2S code migration</li>
+    <li>√ Completed the entire CHS Step 2S --> ENG Step 2S lang migration</li>
+    <li>√ Completed the entire CHS Step 2M --> ENG Step 2M code migration</li>
+    <li>√ Completed the entire CHS Step 2M --> ENG Step 2M lang migration</li>
+</ul>
+
 **v1.2380**
 <ul>
     <li>Lots of changes in commenting, prompt-txt to make it concise and more readable (around 150 lines)</li>
