@@ -103,8 +103,8 @@ Do {Do {
 #生成一张表来表示所有已知路线
 $updnTbl = New-Object System.Data.DataTable
 $availRts= [System.Data.DataColumn]::new("Routes")
-$upColumn= [System.Data.DataColumn]::new("UNIX Pipe Upstream")
-$dnColumn= [System.Data.DataColumn]::new("UNIX Pipe Dnstream")
+$upColumn= [System.Data.DataColumn]::new("\UNIX Pipe Upstream")
+$dnColumn= [System.Data.DataColumn]::new("\UNIX Pipe Dnstream")
 $updnTbl.Columns.Add($availRts); $updnTbl.Columns.Add($upColumn); $updnTbl.Columns.Add($dnColumn)
 [void]$updnTbl.Rows.Add(" A:",$fmpgPath,$x265Path); [void]$updnTbl.Rows.Add(" B:",$vprsPath,$x264Path)
 [void]$updnTbl.Rows.Add(" C:",$avsyPath,""); [void]$updnTbl.Rows.Add(" D:",$avspPath,""); [void]$updnTbl.Rows.Add(" E:",$svfiPath,"")

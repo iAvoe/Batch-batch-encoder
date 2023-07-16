@@ -57,7 +57,7 @@ Write-Output "avs2pipemod [.avs] -y4mp                 | x265.exe --y4m - --outp
 
 #「启动C」定位导出主控文件用路径, 需要区分单任务和大批量模式
 Read-Host "将打开[导出待调用批处理]的路径选择窗. [Enter]继续"
-if     ($mode -eq "s") {      $bchExpPath = (whichlocation)+"enc_0S.bat"}
+if     ($mode -eq "s") {$bchExpPath = (whichlocation)+"enc_0S.bat"}
 elseif ($mode -eq "m") {$bchExpPath = (whichlocation)+'enc_$s.bat'} #大批量模式下, 使用单引号来防止变量$s在此处被激活
 else                   {modeparamerror}
 Write-Output "`r`n√ 选择的路径与导出文件名为 $bchExpPath"
@@ -86,8 +86,8 @@ Do {Do {
 #生成一张表来表示所有已知路线
 $updnTbl = New-Object System.Data.DataTable
 $availRts= [System.Data.DataColumn]::new("Routes")
-$upColumn= [System.Data.DataColumn]::new("UNIX pipe upstream")
-$dnColumn= [System.Data.DataColumn]::new("UNIX pipe downstream")
+$upColumn= [System.Data.DataColumn]::new("\UNIX pipe upstream")
+$dnColumn= [System.Data.DataColumn]::new("\UNIX pipe downstream")
 $updnTbl.Columns.Add($availRts); $updnTbl.Columns.Add($upColumn); $updnTbl.Columns.Add($dnColumn)
 [void]$updnTbl.Rows.Add(" A:",$fmpgPath,$x265Path); [void]$updnTbl.Rows.Add(" B:",$vprsPath,$x264Path)
 [void]$updnTbl.Rows.Add(" C:",$avsyPath,""); [void]$updnTbl.Rows.Add(" D:",$avspPath,""); [void]$updnTbl.Rows.Add(" E:",$svfiPath,"")
