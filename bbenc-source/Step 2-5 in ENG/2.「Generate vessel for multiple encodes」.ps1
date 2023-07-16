@@ -1,10 +1,11 @@
 ﻿cls #Dev's Github: https://github.com/iAvoe
 $mode="m" #Multiple encoding mode
-Function badinputwarning{Write-Warning "`r`n× Bad input, try again"}
-Function nosuchrouteerr {Write-Error   "`r`n× No such route, try again"}
-Function nonintinputerr {Write-Error   "`r`n× Input was not an integer"}
-Function tmpmuxreminder {return        "x265 downstream supports .hevc output only. If you are multiplexing .mkv, then a .mp4 multiplexing is needed due to ffmpeg's restriction`r`n"}
-Function modeparamerror {Write-Error   "`r`n× Crash: Variable `$mode broken, unable to distingulish operating mode"; pause; exit}
+Function badinputwarning {Write-Warning "`r`n× Bad input, try again"}
+Function nosuchrouteerr  {Write-Error   "`r`n× No such route, try again"}
+Function nonintinputerr  {Write-Error   "`r`n× Input was not an integer"}
+Function tmpmuxreminder  {return        "x265 downstream supports .hevc output only. If you are multiplexing .mkv, then a .mp4 multiplexing is needed due to ffmpeg's restriction`r`n"}
+Function modeparamerror  {Write-Error   "`r`n× Crash: Variable `$mode broken, unable to distingulish operating mode"; pause; exit}
+Function modeimpextopserr{Write-Error   "`r`n× Crash: `$mode, `$impOps or `$extOPS has an unidentifible or missing value"; pause; exit}
 Function skip {return "`r`n. Skipped"}
 Function namecheck([string]$inName) {
     $badChars = '[{0}]' -f [regex]::Escape(([IO.Path]::GetInvalidFileNameChars() -join ''))
@@ -153,7 +154,7 @@ Switch ($mode+$impOps+$extOPS) {
     mdb {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x264Path %x264ParA%"+' %x264Var$sChar%'} #AVSPmd+x264+multiple, No "-" in AVSPipeMod upstream
     mea {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x265Path %x265ParA%"+' %x265Var$sChar%'} #OLSARG+x265+multiple
     meb {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x264Path %x264ParA%"+' %x264Var$sChar%'} #OLSARG+x264+multiple
-    Default {Write-Error "`r`n× Crash: `$mode, `$impOps or `$extOPS has an unidentifible or missing value"; pause; exit}
+    Default {modeimpextopserr}
 }
 #「Bootstrap G」Generate all possible possible upstream--downstream commandline layouts, which are the alternate routes
 [array] $upPipeStr=@("$fmpgPath %ffmpegVarA% %ffmpegParA%", "$vprsPath %vspipeVarA% %vspipeParA%", "$avsyPath %avsyuvVarA% %avsyuvParA%", "$avspPath %avsmodVarA% %avsmodParA%","$svfiPath %olsargVarA% %olsargParA%") | Where-Object {$_.Length -gt 26}
@@ -176,48 +177,25 @@ if ($extOPS="a") {tmpmuxreminder} #Provide reminder for multiplexing to .mkv whe
 #「Bootstrap H.m」3 dimension axis placed in for-loop realized with $validChars[x]+$validChars[y]+$validChars[z]
 #Simulated mathmatical carrying by: +1 to x-axis, +1 to y-axis & clear x after x-axis gets filled up; +1 to z-axis & clear x&y after filling up y-axis.
 [int]$x=[int]$y=[int]$z=0
-$utf8NoBOM=New-Object System.Text.UTF8Encoding $false #导出utf-8NoBOM文本编码hack
+$utf8NoBOM=New-Object System.Text.UTF8Encoding $false #Enfore the output of UTB-8NoBom
 
 #Iteration begins, carry as any axis reaches letter 27. Switch occupies temp-variable $_ which cannot be used to initialize this loop. Counts as a 3-digit twenty-hexagonal
 For ($s=0; $s -lt $qty; $s++) {
     #$x+=1 is commented out at beginning as values are being parsed to filenames, therefore placed at the trailing of loop
     if ($x -gt 25) {$y+=1; $x=0}
     if ($y -gt 25) {$z+=1; $y=$x=0}
-    [string]$sChar=$validChars[$z]+$validChars[$y]+$validChars[$x]
-
-    [string]$serial=($s).ToString($zroStr)
-    
-    $vidEXX=$ExecutionContext.InvokeCommand.ExpandString($vidEXP) #$vidEXP contains $serial. Expand is needed to convert $serial from string to variable
-
-    $tmpStrmOut=$vidEXX+$sChar+".hevc" #multi-encode mode's temporary multiplex solution
-    $tempMuxOut=$vidEXX+$sChar+".mp4"
-
-    #Manually change `$MUXops specified on top, C is auto-selected under x264 downstream
-    if       ($MUXops -eq "a") {$MUXwrt = "$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$vidEXP.hevc`"
-    ::del `"$EXPpath$vidEXP.hevc`""
-    } elseif ($MUXops -eq "b") {$MUXwrt = "$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$vidEXP.hevc`"
-    del `"$EXPpath$vidEXP.hevc`""
-    } elseif ($MUXops -eq "c") {$MUXwrt="::$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$vidEXP.hevc`"
-    ::del `"$EXPpath$vidEXP.hevc`""
-    } else {
-        Write-Error "× Script broken: incorrect `$MUXops value"; pause; exit
-    }
-    
-    #x265, x264 routing under multiple-encoding mode. Implemented differently from single encode mode. $MUXwrt was initialized before loops starts
-    #Single encode mode doesn't have variable $sChar
-    if ($ENCops -eq "a") {$ENCwrt="$impEXT %ffmpegVar$sChar% %ffmpegParA% - | $x265Path %x265ParA% %x265Var$sChar%"}
-    elseif ($ENCops -eq "b") {$ENCwrt="$impEXT %ffmpegVar$sChar% %ffmpegParA% - | $x264Path %x264ParA% %x264Var$sChar%"}
-    else {Write-Error "× Failure: missing selection of video encoding program"; pause; exit}
-
-    $bchExpPath="" #trueExpPath is the actual variable used to export temporary MP4s, to not write "+"s into exporting files, as $exptPath cannot be connecting to enc_ without a "+"
-
+    [string]$sChar=$validChars[$z]+$validChars[$y]+$validChars[$x] #Start constructing variable $sChar in this loop
+    #Due to the delection of (redundant) feature to generate temporary multiplexed container, variable $serial is no longer needed and therefore deleted
+    #keyRoute & altRoute with collapsed $sChar will be expanded at lower printing statement
+    #When expanding $sChar variable, Array would generate a multi-line text without line change, therefore a pipe to Out-String and then activatng the $sChar variable is needed, multiple encode only
     $banner = "-----------Starting encode "+$sChar+"-----------"
-    Write-Output "  Generating enc_$s.bat (Upstream $impEXT)"
+    Write-Output "  Generating enc_$s.bat"
 
     $enc_gen="REM 「Title」
 @echo.
 @echo "+$banner+"
-REM 「Debug」Comment out during normal usage
+
+REM 「Debug section」Comment out during normal usage
 REM @echo %ffmpegParA% %ffmpegVarA%
 REM @echo %ffmpegVar"+$sChar+"%
 REM @echo %vspipeParA% %vspipeVarA%
@@ -234,14 +212,14 @@ REM @echo %x264ParA% %x264VarA%
 REM @echo %x264Var"+$sChar+"%
 REM pause
 
-REM 「Encode」Comment out during debugging
-REM Var is used to specify dynamic values such as input-output and tuned-by-source options
+REM 「Encode-KeyRoutes」Comment out during debugging
+REM Var is used to specify dynamic values such as input-output, per-video encoding options
 
-"+$ENCwrt+"
+"+$ExecutionContext.InvokeCommand.ExpandString(($keyRoute | Out-String))+"
 
-REM 「Temp-MP4-mux」Works with x265 (pipe downstream)
+REM 「Encode-ALTRoutes」Copy and replace from lower to upper commandline wihtout REM commenting to change encoding programs
 
-"+$MUXwrt+"
+"+$ExecutionContext.InvokeCommand.ExpandString(($altRoute | Out-String))+"
 
 REM Choose「y:Continue/n:Pause/z:END」Auto-continue after 5s, false input are blocked by choice statement, pause allows continue.
 
@@ -252,9 +230,11 @@ if %ERRORLEVEL%==2 pause
 if %ERRORLEVEL%==1 endlocal && exit /b"
 
     #Out-File -InputObject $enc_gen -FilePath $bchExpPath -Encoding utf8
-    [IO.File]::WriteAllLines($bchExpPath, $enc_gen, $utf8NoBOM) #Force exporting utf-8NoBOM text codec
+    if     ($mode -eq "m") {[IO.File]::WriteAllLines($ExecutionContext.InvokeCommand.ExpandString($bchExpPath), $enc_gen, $utf8NoBOM)}#Expanding variable $s is needed in multiple encoding mode
+    elseif ($mode -eq "s") {[IO.File]::WriteAllLines($bchExpPath, $enc_gen, $utf8NoBOM)}
+    else {modeparamerror}
     $x+=1
 }#Closing For-loop
 
-Write-Output "Completed, as long as up-downstream remains the same, any controller batch generated by step 3 could always use enc_0S.bat / enc_X.bat"
+Write-Output "Completed, as long as up-downstream program doesn't update, any controller batch generated by step 3 could always use enc_0S.bat / enc_X.bat"
 pause

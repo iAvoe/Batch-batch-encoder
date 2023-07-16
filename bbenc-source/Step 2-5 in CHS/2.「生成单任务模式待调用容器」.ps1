@@ -1,10 +1,11 @@
 ﻿cls #开发人员的Github: https://github.com/iAvoe
 $mode="s" #单任务模式
-Function badinputwarning{Write-Warning "`r`n× 输入错误, 重试"}
-Function nosuchrouteerr {Write-Error   "`r`n× 该线路不存在, 重试"}
-Function nonintinputerr {Write-Error   "`r`n× 输入了非整数或空值"}
-Function tmpmuxreminder {return        "x265线路下仅支持生成.hevc文件，若要封装为.mkv, 则受ffmpeg限制需要先封装为.mp4`r`n"}
-Function modeparamerror {Write-Error   "`r`n× 崩溃: 变量`$mode损坏, 无法区分单任务和大批量模式"; pause; exit}
+Function badinputwarning {Write-Warning "`r`n× 输入错误, 重试"}
+Function nosuchrouteerr  {Write-Error   "`r`n× 该线路不存在, 重试"}
+Function nonintinputerr  {Write-Error   "`r`n× 输入了非整数或空值"}
+Function tmpmuxreminder  {return        "x265线路下仅支持生成.hevc文件，若要封装为.mkv, 则受ffmpeg限制需要先封装为.mp4`r`n"}
+Function modeparamerror  {Write-Error   "`r`n× 崩溃: 变量`$mode损坏, 无法区分单任务和大批量模式"; pause; exit}
+Function modeimpextopserr{Write-Error   "`r`n× 崩溃: `$mode, `$impOps或`$extOPS中的某个变量值无法识别"; pause; exit}
 Function skip {return "`r`n. 跳过"}
 Function namecheck([string]$inName) {
     $badChars = '[{0}]' -f [regex]::Escape(([IO.Path]::GetInvalidFileNameChars() -join ''))
@@ -136,7 +137,7 @@ Switch ($mode+$impOps+$extOPS) {
     mdb {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x264Path %x264ParA%"+' %x264Var$sChar%'} #AVSPmd+x264+multiple, 上游无"-"
     mea {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x265Path %x265ParA%"+' %x265Var$sChar%'} #OLSARG+x265+multiple
     meb {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x264Path %x264ParA%"+' %x264Var$sChar%'} #OLSARG+x264+multiple
-    Default {Write-Error "`r`n× `$mode, `$impOps或`$extOPS中的某个变量值无法识别, 重试"; pause; exit}
+    Default {modeimpextopserr}
 }
 #「启动G」将已知可用的上下游线路列举并进行排列组合, 以生成备选线路
 [array] $upPipeStr=@("$fmpgPath %ffmpegVarA% %ffmpegParA%", "$vprsPath %vspipeVarA% %vspipeParA%", "$avsyPath %avsyuvVarA% %avsyuvParA%", "$avspPath %avsmodVarA% %avsmodParA%","$svfiPath %olsargVarA% %olsargParA%") | Where-Object {$_.Length -gt 26}
@@ -192,9 +193,9 @@ if %ERRORLEVEL%==2 pause
 if %ERRORLEVEL%==1 endlocal && exit /b"
 
 #Out-File -InputObject $enc_gen -FilePath $bchExpPath -Encoding utf8
-if     ($mode -eq "m") {[IO.File]::WriteAllLines($ExecutionContext.InvokeCommand.ExpandString($bchExpPath), $enc_gen, $utf8NoBOM)}
-elseif ($mode -eq "s") {[IO.File]::WriteAllLines($bchExpPath, $enc_gen, $utf8NoBOM)}#1.强制导出utf-8NoBOM编码, 2.大批量模式下激活$s变量
+if     ($mode -eq "m") {[IO.File]::WriteAllLines($ExecutionContext.InvokeCommand.ExpandString($bchExpPath), $enc_gen, $utf8NoBOM)}#大批量模式下激活$s变量
+elseif ($mode -eq "s") {[IO.File]::WriteAllLines($bchExpPath, $enc_gen, $utf8NoBOM)}
 else {modeparamerror}
 
-Write-Output "完成，只要线路不变，步骤3生成的各种批处理（步骤4）就可以一直调用enc_0S.bat / enc_X.bat"
+Write-Output "完成，只要线路中的程序不更新，步骤3生成的各种批处理（步骤4）就可以一直调用enc_0S.bat / enc_X.bat"
 pause

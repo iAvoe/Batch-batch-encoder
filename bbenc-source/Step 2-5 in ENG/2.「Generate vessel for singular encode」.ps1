@@ -1,10 +1,11 @@
 ﻿cls #Dev's Github: https://github.com/iAvoe
 $mode="s" #Signular encoding mode
-Function badinputwarning{Write-Warning "`r`n× Bad input, try again"}
-Function nosuchrouteerr {Write-Error   "`r`n× No such route, try again"}
-Function nonintinputerr {Write-Error   "`r`n× Input was not an integer"}
-Function tmpmuxreminder {return        "x265 downstream supports .hevc output only. If you are multiplexing .mkv, then a .mp4 multiplexing is needed due to ffmpeg's restriction`r`n"}
-Function modeparamerror {Write-Error   "`r`n× Crash: Variable `$mode broken, unable to distingulish operating mode"; pause; exit}
+Function badinputwarning {Write-Warning "`r`n× Bad input, try again"}
+Function nosuchrouteerr  {Write-Error   "`r`n× No such route, try again"}
+Function nonintinputerr  {Write-Error   "`r`n× Input was not an integer"}
+Function tmpmuxreminder  {return        "x265 downstream supports .hevc output only. If you are multiplexing .mkv, then a .mp4 multiplexing is needed due to ffmpeg's restriction`r`n"}
+Function modeparamerror  {Write-Error   "`r`n× Crash: Variable `$mode broken, unable to distingulish operating mode"; pause; exit}
+Function modeimpextopserr{Write-Error   "`r`n× Crash: `$mode, `$impOps or `$extOPS has an unidentifible or missing value"; pause; exit}
 Function skip {return "`r`n. Skipped"}
 Function namecheck([string]$inName) {
     $badChars = '[{0}]' -f [regex]::Escape(([IO.Path]::GetInvalidFileNameChars() -join ''))
@@ -136,7 +137,7 @@ Switch ($mode+$impOps+$extOPS) {
     mdb {$keyRoute="$avspPath %avsmodVarA% %avsmodParA%   | $x264Path %x264ParA%"+' %x264Var$sChar%'} #AVSPmd+x264+multiple, No "-" in AVSPipeMod upstream
     mea {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x265Path %x265ParA%"+' %x265Var$sChar%'} #OLSARG+x265+multiple
     meb {$keyRoute="$svfiPath %olsargVarA% %olsargParA% - | $x264Path %x264ParA%"+' %x264Var$sChar%'} #OLSARG+x264+multiple
-    Default {Write-Error "`r`n× Crash: `$mode, `$impOps or `$extOPS has an unidentifible or missing value"; pause; exit}
+    Default {modeimpextopserr}
 }
 #「Bootstrap G」Generate all possible possible upstream--downstream commandline layouts, which are the alternate routes
 [array] $upPipeStr=@("$fmpgPath %ffmpegVarA% %ffmpegParA%", "$vprsPath %vspipeVarA% %vspipeParA%", "$avsyPath %avsyuvVarA% %avsyuvParA%", "$avspPath %avsmodVarA% %avsmodParA%","$svfiPath %olsargVarA% %olsargParA%") | Where-Object {$_.Length -gt 26}
@@ -156,28 +157,9 @@ for     ($x=0; $x -lt ($upPipeStr.Length); $x++) {#upstream/horizontal iteration
 
 if ($extOPS="a") {tmpmuxreminder} #Provide reminder for multiplexing to .mkv when selecting x265/hevc donwstream keyRoute
 
-#single-encode mode's temporary MP4 multiplex ffmpeg options, under x264, x265 routing. $MUXwrt was initialized as "" above
-#single-encode mode doesn't have variable $sChar
-if     ($ENCops -eq "a") {$ENCwrt="$impEXT %ffmpegVarA% %ffmpegParA% - | $x265Path %x265ParA% %x265VarA%"}
-elseif ($ENCops -eq "b") {$ENCwrt="$impEXT %ffmpegVarA% %ffmpegParA% - | $x264Path %x264ParA% %x264VarA%"}
-else                     {Write-Error "× Failure: missing selection of video encoding program"; pause; exit}
-
-#Manually change `$MUXops specified on top, C is auto-selected under x264 downstream
-if ($MUXops -eq "a") {$MUXwrt="$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$tempMuxOut`"
-::del `"$EXPpath$tmpStrmOut`""
-} elseif ($MUXops -eq "b") {$MUXwrt="$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$tempMuxOut`"
-del `"$EXPpath$tmpStrmOut`""
-} elseif ($MUXops -eq "c") {$MUXwrt="::$impEXT %ffmpegVarA% %ffmpegParB% `"$EXPpath$tempMuxOut`"
-::del `"$EXPpath$tmpStrmOut`""
-} else {
-    Write-Error "`r`n× Script broken: bad `$MUXops value [A|B|C], please correct manually"; pause; exit
-}
-
-#[string]$banner=[string]$cVO=[string]$fVO=[string]$xVO=[string]$aVO=""
-#[string]$bchExpPath="" #trueExpPath is the actual variable used to export temporary MP4s, to not write "+"s into exporting files, as $exptPath cannot be connecting to enc_ without a "+"
-
-#export batch file w/ utf-8NoBOM text codec
-$utf8NoBOM=New-Object System.Text.UTF8Encoding $false 
+#「Bootstrap H.s」Export batch file w/ utf-8NoBOM text codec
+#When expanding $sChar variable, Array would generate a multi-line text without line change, therefore a pipe to Out-String and then activatng the $sChar variable is needed, multiple encode only
+$utf8NoBOM=New-Object System.Text.UTF8Encoding $false #Enfore the output of UTB-8NoBom
 Write-Output "`r`n... Generating enc_0S.bat`r`n"
 $enc_gen="REM 「Title」
 @echo.
@@ -193,14 +175,14 @@ REM @echo %x265ParA% %x265VarA%
 REM @echo %x264ParA% %x264VarA%
 REM pause
 
-REM 「Encode」Comment out during debugging
-REM Var is used to specify dynamic values such as input-output and tuned-by-source options
+REM 「Encode-KeyRoutes」Comment out during debugging
+REM Var is used to specify dynamic values such as input-output, per-video encoding options
 
-"+$ENCwrt+"
+"+$ExecutionContext.InvokeCommand.ExpandString(($keyRoute | Out-String))+"
 
-REM 「Temp-MP4-mux」Works with x265 (downstream of pipe)
+REM 「Encode-ALTRoutes」Copy and replace from lower to upper commandline wihtout REM commenting to change encoding programs
 
-"+$MUXwrt+"
+"+$ExecutionContext.InvokeCommand.ExpandString(($altRoute | Out-String))+"
 
 REM Choose「y:Continue/n:Pause/z:END」Continuing after 5s sleep, false input are blocked by choice statement, pause allows continue.
 
@@ -211,7 +193,9 @@ if %ERRORLEVEL%==2 pause
 if %ERRORLEVEL%==1 endlocal && exit /b"
 
 #Out-File -InputObject $enc_gen -FilePath $bchExpPath -Encoding utf8
-[IO.File]::WriteAllLines($bchExpPath, $enc_gen, $utf8NoBOM) #Force exporting utf-8NoBOM text codec
+if     ($mode -eq "m") {[IO.File]::WriteAllLines($ExecutionContext.InvokeCommand.ExpandString($bchExpPath), $enc_gen, $utf8NoBOM)}#Expanding variable $s is needed in multiple encoding mode
+elseif ($mode -eq "s") {[IO.File]::WriteAllLines($bchExpPath, $enc_gen, $utf8NoBOM)}
+else {modeparamerror}
 
-Write-Output "Completed, as long as up-downstream remains the same, any controller batch generated by step 3 could always use enc_0S.bat / enc_X.bat"
+Write-Output "Completed, as long as up-downstream program doesn't update, any controller batch (step 4) generated by step 3 could always use enc_0S.bat / enc_X.bat"
 pause
