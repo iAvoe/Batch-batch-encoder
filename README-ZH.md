@@ -32,7 +32,10 @@
 
 ## 用法
 
-如果你需要确保安全性，则可以通过微软官方的 [PSScriptAnalyzer](https://learn.microsoft.com/en-us/powershell/utility-modules/psscriptanalyzer/overview?view=ps-modules) 检测工具来验证。
+如果你需要确保安全性，则可以通过微软官方的 [PSScriptAnalyzer](https://learn.microsoft.com/en-us/powershell/utility-modules/psscriptanalyzer/overview?view=ps-modules) 检测工具来验证：
+```
+Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings PSGallery -Recurse
+```
 
 1. Windows 11 下需要确保安装了对应文件名语言的语言包（Windows 10）
     1. 例如，阿拉伯语文件名：`设置 → 时间和语言 →[左栏] 语言 → 添加语言 → 阿拉伯语`
@@ -84,7 +87,8 @@
 - 通过追加额外的 CSV，避免了步骤 4 脚本的重复导入，避免了 ffprobe 导出 CSV 兼容问题
 - 改进了步骤 1 的操作逻辑
 - 已完成 ffmpeg、vspipe 上游到全部下游的运行测试
-  - 待完成 avs2yuv、avs2pipemod、SVFI 的测试，不过理论上由于逻辑几乎完全一致，所以应该能跑...
+  - TODO：待完成 avs2yuv、avs2pipemod、SVFI 的测试，不过理论上由于逻辑几乎完全一致，所以应该能跑...
+- TODO：重写步骤 5（封装命令），弃用所有 Invoke-Expression 来增加安全性
 
 **v0.2940**
 <ul>
