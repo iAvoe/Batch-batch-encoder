@@ -70,7 +70,7 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 <p align="center"><img src="bmc_qr.png" alt="支持一下 -_-"><br><img src="pp_tip_qr.png" alt="支持一下 =_="></p>
 
 ## 更新信息
-**v1.3.1**
+**v1.3.2**
 - 重写了所有代码
 - 使用了数组、哈希表等等更合理的数据结构
 - 改进了报错逻辑
@@ -88,6 +88,9 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 - 通过追加额外的 CSV，避免了步骤 4 脚本的重复导入，避免了 ffprobe 导出 CSV 兼容问题
 - 改进了步骤 1 的操作逻辑
 - 改进了 Y4M 管道支持
+- 完善了封装命令的操作逻辑、流程
+- 增加了更多优化操作相关的提示文本
+- 强化了文件导入脚本的逻辑
 - 行为变更：将 RAW 管道所需参数作为附录（Appendix）一并记录到输出批处理中
 - 添加了 SVT-AV1 的 ColorMatrix、Transfer、Primaries 参数生成功能
 - 已完成 ffmpeg、vspipe 上游到全部下游的运行测试

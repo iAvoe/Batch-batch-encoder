@@ -167,15 +167,17 @@ function Main {
     }
 
     Show-Info "开始导入上游编码工具（由于使用了哈希表，导入顺序会被打乱）..."
+    Write-Host " 提示：Select-File 支持 -InitialDirectory 参数，在此脚本中添加即可优化导入操作步骤" -ForegroundColor DarkGray
+    Write-Host " 如果难以实现脚本修好，你还可以创建文件夹快捷方式"
     
     # 存储 vspipe 版本与其 API 版本
     $vspipeInfo = $null
 
     # 上游工具
-    $i = 0
+    $i=0
     foreach ($tool in @($upstreamTools.Keys)) {
         $i++
-        $choice = Read-Host "[上游] ($i/$($upstreamTools.Count)) 导入 $tool？(y=是, 回车跳过)"
+        $choice = Read-Host " [上游] ($i/$($upstreamTools.Count)) 导入 $tool？（y=是，Enter 跳过）"
         if ($choice -eq 'y') {
             $upstreamTools[$tool] =
                 if ($tool -eq 'svfi') {
@@ -208,7 +210,7 @@ function Main {
     $i = 0
     foreach ($tool in @($downstreamTools.Keys)) {
         $i++
-        $choice = Read-Host "[下游] ($i/$($downstreamTools.Count)) 导入 $tool？(y=是, n=否, 回车跳过)"
+        $choice = Read-Host " [下游] ($i/$($downstreamTools.Count)) 导入 $tool？（y=是，Enter 跳过）"
         if ($choice -eq 'y') {
             $downstreamTools[$tool] = Select-File -Title "选择 $tool 可执行文件" -ExeOnly
             Show-Success "$tool 已导入: $($downstreamTools[$tool])"
@@ -358,7 +360,9 @@ echo.
 pause
 
 endlocal
-exit /b
+echo 按任意键进入命令提示符，输入 exit 退出...
+pause >nul
+cmd /k
 '@ -f (Get-Date -Format 'yyyy-MM-dd HH:mm'), $selectedPreset, $command, $remCommands
     
     # 保存文件

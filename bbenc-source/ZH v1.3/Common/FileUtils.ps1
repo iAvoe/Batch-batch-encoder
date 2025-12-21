@@ -39,6 +39,20 @@ function Select-File(
         [switch]$IniOnly,
         [switch]$BatOnly
     ) {
+    
+    # 如果是文件路径则取其父目录；如果路径不存在回到 Desktop
+    if ($InitialDirectory) {
+        if (Test-Path $InitialDirectory -PathType Leaf) {
+            $InitialDirectory = Split-Path $InitialDirectory -Parent
+        }
+        if (-not (Test-Path $InitialDirectory -PathType Container)) {
+            $InitialDirectory = [Environment]::GetFolderPath('Desktop')
+        }
+    }
+    else {
+        $InitialDirectory = [Environment]::GetFolderPath('Desktop')
+    }
+
     $dialog = New-Object System.Windows.Forms.OpenFileDialog
     $dialog.Title = $Title
     $dialog.InitialDirectory = $InitialDirectory
@@ -57,7 +71,7 @@ function Select-File(
         if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
             return $dialog.FileName
         }
-        $choice = Read-Host "未选择文件，按回车重试或输入 'q' 退出"
+        $choice = Read-Host "未选择文件，按回车重试或输入 'q' 强制退出"
         if ($choice -eq 'q') { exit 1 }
     }
     while ($true)
@@ -78,7 +92,7 @@ function Select-Folder([string]$Description = "选择文件夹", [string]$Initia
             if (-not $path.EndsWith('\')) { $path += '\' }
             return $path
         }
-        $choice = Read-Host "未选择文件夹，按回车重试或输入 'q' 退出"
+        $choice = Read-Host "未选择文件夹，按回车重试或输入 'q' 强制退出"
         if ($choice -eq 'q') { exit 1 }
     }
     while ($true)

@@ -130,7 +130,6 @@ function ConvertTo-Fraction {
 }
 
 # 生成上游程序导入、下游程序导出命令（管道命令已经在先前脚本中写完，目录不存在则自动创建）
-# TODO：脚本执行出错：无法为程序 vspipe 生成 IO 参数
 function Get-EncodingIOArgument {
     Param (
         [ValidateSet(
