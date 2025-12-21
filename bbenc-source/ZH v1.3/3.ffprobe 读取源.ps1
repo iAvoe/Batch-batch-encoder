@@ -15,9 +15,9 @@
 # $ffprobeCSV.B：width
 # $ffprobeCSV.C：height  
 # $ffprobeCSV.D：pixel format (pix_fmt)
-# $ffprobeCSV.E：(empty/stream indicator)
-# $ffprobeCSV.F：color_space
-# $ffprobeCSV.G：color_transfer
+# $ffprobeCSV.E：color_space
+# $ffprobeCSV.F：color_transfer
+# $ffprobeCSV.G：color_primaries
 # $ffprobeCSV.H：avg_frame_rate
 # $ffprobeCSV.I：nb_frames (for MOV) or first frame count field (for others)
 # $ffprobeCSV.AA：NUMBER_OF_FRAMES-eng (only for non-MOV files)
@@ -271,6 +271,16 @@ function Main {
             'stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng',
             '-of', 'csv'
         )}
+    # $ffprobeArgsDebug =
+    #    if ($isMOV) {@(
+    #        '-i', $videoSource, '-select_streams', 'v:0', '-v', 'error', '-hide_banner', '-show_streams', '-show_entries',
+    #        'stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries', '-of', 'ini'
+    #    )}
+    #    else {@(
+    #        '-i', $videoSource, '-select_streams', 'v:0', '-v', 'error', '-hide_banner', '-show_streams', '-show_entries',
+    #        'stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng',
+    #        '-of', 'ini'
+    #    )}
     
     # 由于 ffprobe 读取不同源所产生的列数不一，导致读取额外插入的信息随机错位，因此需要独立的 CSV（s_info）来储存源信息
     $sourceCSVExportPath = Join-Path $Global:TempFolder "temp_s_info.csv"
@@ -281,7 +291,13 @@ function Main {
         else {
             Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info.csv"
         }
-    
+    # $ffprobeCSVExportPathDebug =
+    #     if ($isMOV) {
+    #         Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_mov_debug.csv"
+    #     }
+    #     else {
+    #         Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_debug.csv"
+    #     }
 
     # 若 CSV 已存在，要求手动确认后清理，避免覆盖
     Confirm-FileDelete (Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_mov.csv")
@@ -302,6 +318,7 @@ function Main {
     # 执行 ffprobe 并插入视频源路径
     try {
         $ffprobeOutputCSV = (& $ffprobePath @ffprobeArgs).Trim()
+        # $ffprobeOutputCSVDebug = (& $ffprobePath @ffprobeArgsDebug).Trim()
 
         # 构建源 CSV 行
         $sourceInfoCSV = @"
@@ -309,6 +326,8 @@ function Main {
 "@
         
         Write-TextFile -Path $ffprobeCSVExportPath -Content $ffprobeOutputCSV -UseBOM $true
+        # [System.IO.File]::WriteAllLines($ffprobeCSVExportPathDebug, $ffprobeOutputCSVDebug)
+
         Write-TextFile -Path $sourceCSVExportPath -Content $sourceInfoCSV -UseBOM $true
         Show-Success "CSV 文件已生成：$ffprobeCSVExportPath`n$sourceCSVExportPath"
 

@@ -12,36 +12,30 @@
 # 加载共用代码
 . "$PSScriptRoot\Common\Core.ps1"
 
-# 其它初始化（不用？）：$knownUpstreamCodes = @('a','b','c','d','e')
-
 # 需要结合视频数据统计的参数，注意管道参数已经在先前脚本完成，这里不写
 $x264Params = [PSCustomObject]@{
-    # Profile = ""
-    Keyint = ""
-    RCLookahead = ""
-    ColorMatrix = ""
-    Transfer = ""
-    FPS = ""
+    FPS = "" # 丢帧帧率用如 24000/1001 的字符串
     Resolution = ""
     TotalFrames = ""
-    InputCSP = ""
+    RAWCSP = "" # 位深、色彩空间
+    Keyint = ""
+    RCLookahead = ""
+    SEICSP = "" # ColorMatrix、Transfer
     BaseParam = ""
     Input = "-"
     Output = ""
     OutputExtension = ".mp4"
 }
 $x265Params = [PSCustomObject]@{
-    # Profile = ""
+    FPS = "" # 丢帧帧率用如 24000/1001 的字符串
+    Resolution = ""
+    TotalFrames = ""
+    RAWCSP = ""
     Keyint = ""
     RCLookahead = ""
     MERange = ""
     Subme = ""
-    InputCSP = ""
-    ColorMatrix = ""
-    Transfer = ""
-    FPS = ""
-    Resolution = ""
-    TotalFrames = ""
+    SEICSP = ""
     PME = ""
     Pools = ""
     BaseParam = ""
@@ -50,10 +44,12 @@ $x265Params = [PSCustomObject]@{
     OutputExtension = ".hevc"
 }
 $svtav1Params = [PSCustomObject]@{
-    # Profile = ""
+    FPS = "" # 丢帧帧率用 --fps-num --fps-denom 而不是 --fps
+    RAWCSP = "" # --color-format --input-depth
     Keyint = ""
     Resolution = ""
     TotalFrames = ""
+    SEICSP = "" # --matrix-coefficients --transfer-characteristics
     BaseParam = ""
     Input = "-i -"
     Output = ""
@@ -69,7 +65,7 @@ $vspipeParams = [PSCustomObject]@{
 }
 $avsyuvParams = [PSCustomObject]@{
     Input = ""
-    CSP_BitDepth = ""
+    CSP = ""
 }
 $avsmodParams = [PSCustomObject]@{
     Input = ""
@@ -257,13 +253,16 @@ function Get-x264BaseParam {
     $enableFGO = $false
     if ($askUserFGO) {
         Write-Host ""
-        Write-Host " 少数修改版 x264 编码器支持基于高频信息量的率失真优化（Film Grain Optimization）" -ForegroundColor DarkCyan
-        Write-Host " 用 x264.exe --fullhelp | findstr fgo 检测 --fgo 参数是否被支持" -ForegroundColor DarkCyan
-        if ((Read-Host " 输入 'y' 以启用 --fgo（提高画质），或 Enter 以禁用（不支持、不确定则禁）") -match '^[Yy]$') {
+        Write-Host " 少数修改版（Mod）x264 支持基于高频信息量的率失真优化（Film Grain Optimization）" -ForegroundColor Cyan
+        Write-Host " 用 x264.exe --fullhelp | findstr fgo 检测 --fgo 参数是否被支持" -ForegroundColor Yellow
+        if ((Read-Host " 输入 'y' 以启用 --fgo（提高画质），或 Enter 以禁用（不支持或无法确定则禁）") -match '^[Yy]$') {
             $enableFGO = $true
-            Show-Info "启用了 x264 参数 --fgo"
+            Show-Info "启用 x264 参数 --fgo"
         }
-        else { Show-Info "不启用 x264 参数 --fgo" }
+        else { Show-Info "不用 x264 参数 --fgo" }
+    }
+    else {
+        Write-Host " 已跳过 --fgo 请柬..."
     }
     $fgo10 = if ($enableFGO) {" --fgo 10"} else {""}
     $fgo15 = if ($enableFGO) {" --fgo 15"} else {""}
@@ -288,9 +287,10 @@ function Get-x264BaseParam {
     }
 }
 
-# 获取基础参数：ffmpeg.exe -y -i ".\in.mp4" -an -f yuv4mpegpipe -strict -1 - | x265.exe --profile 〇 --subme 〇 --merange 〇 --keyint 〇 --rc-lookahead 〇 [Get-x265BaseParam] --y4m --input - --output ".\out.hevc"
+# 获取基础参数：ffmpeg.exe -y -i ".\in.mp4" -an -f yuv4mpegpipe -strict -1 - | x265.exe [Get-...] [Get-x265BaseParam] --y4m --input - --output ".\out.hevc"
 function Get-x265BaseParam {
     Param ([Parameter(Mandatory=$true)]$pickOps)
+    # TODO：添加 DJATOM? Mod 的深度自定义 AQ
     $default = "--high-tier --preset slow --me umh --subme 5 --weightb --aq-mode 4 --bframes 5 --ref 3"
     switch ($pickOps) {
         # 通用 General Purpose，bframes 5
@@ -323,17 +323,20 @@ function Get-svtav1BaseParam {
         [Parameter(Mandatory=$true)]$pickOps,
         [switch]$askUserDLF
     )
-
+    
     $enableDLF2 = $false
+    Write-Host ""
     if ($askUserDLF -and $pickOps -ne 'b') {
-        Write-Host ""
-        Write-Host " 少数修改版 SVT-AV1 编码器支持高精度去块滤镜 --enable-dlf 2"  -ForegroundColor DarkCyan
-        Write-Host " 用 SvtAv1EncApp.exe --help | findstr enable-dlf 即可检测`'2`'是否受支持" -ForegroundColor DarkCyan
-        if ((Read-Host " 输入 'y' 以启用 --enable-dlf 2（提高画质），或 Enter 使用常规去块滤镜（不支持、不确定则禁）") -match '^[Yy]$') {
+        Write-Host " 少数修改版 SVT-AV1 编码器（如 SVT-AV1-Essential）支持高精度去块滤镜 --enable-dlf 2"  -ForegroundColor Cyan
+        Write-Host " 用 SvtAv1EncApp.exe --help | findstr enable-dlf 即可检测`'2`'是否受支持" -ForegroundColor Yellow
+        if ((Read-Host " 输入 'y' 以启用 --enable-dlf 2（提高画质），或 Enter 使用常规去块滤镜（不支持或无法确定则禁）") -match '^[Yy]$') {
             $enableDLF2 = $true
             Show-Info "启用了 SVT-AV1 参数 --enable-dlf 2"
         }
         else { Show-Info "启用 SVT-AV1 参数 --enable-dlf 1" }
+    }
+    else {
+        Write-Host " 已跳过 --enable-dlf 2 请柬..."
     }
     $deblock = if ($enableDLF2) {"--enable-dlf 2"} else {"--enable-dlf 1"}
 
@@ -408,7 +411,7 @@ function Get-x265SVTAV1Profile {
     )
     # 移除可能的 "-pix_fmt " 前缀（尽管实际情况不会遇到）
     $pixfmt = $CSVpixfmt -replace '^-pix_fmt\s+', ''
-    
+
     # 解析色度采样格式和位深度
     $chromaFormat = $null
     $depth = 8  # 默认 8bit
@@ -472,7 +475,7 @@ function Get-x265SVTAV1Profile {
     $profileBase = ""
     $inputCsp = ""
 
-    # 根据色度格式和位深度返回对应的 HEVC profile
+    # 根据色度格式和位深度返回对应的 profile
     if ($isSVTAV1) {
         return ("--profile " + $svtav1Profile)
     }
@@ -747,40 +750,181 @@ function Get-InputResolution {
     return "--input-res ${CSVw}x${CSVh}"
 }
 
+# 添加对 SVT-AV1 的丢帧帧率支持，丢帧帧率直接保留字符串
 function Get-FPSParam {
-    Param ([Parameter(Mandatory=$true)]$CSVfps, [Parameter(Mandatory=$false)][string]$Target='')
+    Param (
+        [Parameter(Mandatory=$true)]$CSVfps,
+        [Parameter(Mandatory=$true)]
+        [ValidateSet("ffmpeg","x264","avc","x265","hevc","svtav1","SVT-AV1")]
+        [string]$Target
+    )
+    $fpsValue = $CSVfps
+    
+    # SVT-AV1 需要特殊处理：使用 --fps-num 和 --fps-denom 分开写
+    if ($Target -in @("svtav1", "SVT-AV1")) {
+        if ($fpsValue -match '^(\d+)/(\d+)$') {
+            # 如果是分数格式（如 24000/1001）
+            return "--fps-num $($matches[1]) --fps-denom $($matches[2])"
+        }
+        else {
+            # 直接输入了小数：转换为分数
+            switch ($fpsValue) {
+                "23.976" { return "--fps-num 24000 --fps-denom 1001" }
+                "29.97"  { return "--fps-num 30000 --fps-denom 1001" }
+                "59.94"  { return "--fps-num 60000 --fps-denom 1001" }
+                default  { 
+                    # 对于其他值，使用整数
+                    $intFps = [Math]::Round([double]$fpsValue)
+                    return "--fps $intFps" 
+                }
+            }
+        }
+    }
+    
+    # x264、x265、ffmpeg 都可以直接使用分数字符串或小数
     switch ($Target) {
-        "ffmpeg" { return "-r $CSVfps" }
-        default { return "--fps $CSVfps" }
+        "ffmpeg" { return "-r $fpsValue" }
+        default  { return "--fps $fpsValue" } # x264 整数+分数、x265 整数+分数、SVT-AV1 整数
     }
 }
 
-function Get-ColorMatrixParam {
+function Get-ColorSpaceSEI {
     Param (
         [Parameter(Mandatory=$true)]$CSVColorMatrix,
-        [ValidateSet("avc","x264","hevc","x265")][string]$Codec="hevc"
-    )
-    $Codec = $Codec.ToLower();
-    
-    # x264 中使用 undef 而非 unknown
-    if (($Codec -eq 'avc' -or $Codec -eq 'x264') -and ($CSVColorMatrix -eq "unknown")) {
-        return "--colormatrix undef"
-    }
-    return "--colormatrix $CSVColorMatrix"
-}
-
-function Get-TransferParam {
-    Param (
         [Parameter(Mandatory=$true)]$CSVTransfer,
-        [ValidateSet("avc","x264","hevc","x265")][string]$Codec="hevc"
+        [Parameter(Mandatory=$true)]$CSVPrimaries,
+        [ValidateSet("avc","x264","hevc","x265","av1","svtav1","SVT-AV1")][string]$Codec
     )
-    $Codec = $Codec.ToLower();
-
-    # x264 中使用 undef 而非 unknown
-    if (($Codec -eq 'avc' -or $Codec -eq 'x264') -and ($CSVTransfer -eq "unknown")) {
-        return "--transfer undef"
+    $Codec = $Codec.ToLower()
+    $result = @()
+    
+    # 处理 ColorMatrix
+    if (($Codec -eq 'avc' -or $Codec -eq 'x264')) {
+        if (($CSVColorMatrix -eq "unknown") -or ($CSVColorMatrix -eq "bt2020nc")) {
+            $result += "--colormatrix undef" # 未知情况不写作 unknown
+        }
+        else { # fcc，bt470bg，smpte170m，smpte240m，GBR，YCgCo，bt2020c，smpte2085，chroma-derived-nc，chroma-derived-c，ICtCp
+            $result += "--colormatrix $CSVColorMatrix"
+        }
     }
-    return "--transfer $CSVTransfer"
+    elseif (($Codec -eq 'hevc') -or ($Codec -eq 'x265')) {
+        if ($CSVColorMatrix -eq "bt2020nc") {
+            $result += "--colormatrix unknown"
+        }
+        else { # 同 x264
+            $result += "--colormatrix $CSVColorMatrix"
+        }
+
+    }
+    elseif (($Codec -eq "av1") -or ($Codec -eq "svtav1")) {
+        $c = switch ($CSVColorMatrix) {
+            identity     { 0 }
+            bt709        { 1 }
+            unspec       { 2 }
+            fcc          { 4 }
+            bt470bg      { 5 }
+            bt601        { 6 }
+            smpte240m    { 7 }
+            ycgco        { 8 }
+            "bt2020-ncl" { 9 }
+            "bt2020-cl"  { 10 }
+            smpte2085    { 11 }
+            "chroma-ncl" { 12 }
+            "chroma-cl"  { 13 }
+            ictcp        { 14 }
+            default { 
+                Show-Warning "无法匹配矩阵格式：$CSVColorMatrix，使用默认（bt709）"
+                1
+            }
+        }
+        $result += "--matrix-coefficients $c"
+    }
+    
+    # 处理 Transfer
+    if (($Codec -eq 'avc' -or $Codec -eq 'x264')) {
+        if ($CSVTransfer -eq "unknown") {
+            # bt470m，bt470bg，smpte170m，smpte240m，linear，log100，log316，iec61966-2-4，bt1361e，iec61966-2-1，bt2020-10，bt2020-12，smpte2084，smpte428，arib-std-b67
+            $result += "--transfer undef"
+        }
+        else { # 同 x264
+            $result += "--transfer $CSVTransfer"
+        }
+    }
+    elseif (($Codec -eq 'hevc') -or ($Codec -eq 'x265')) {
+        $result += "--transfer $CSVTransfer"
+    }
+    elseif (($Codec -eq "av1") -or ($Codec -eq "svtav1")) {
+        $t = switch ($CSVTransfer) {
+            bt709           { 1 }
+            unspec          { 2 }
+            bt470m          { 4 }
+            bt470bg         { 5 }
+            bt601           { 6 }
+            smpte240m       { 7 }
+            linear          { 8 }
+            log100          { 9 }
+            "log100-sqrt10" { 10 }
+            "iec61966-2-4"  { 11 }
+            "iec61966-2-1"  { 13 }
+            "bt2020-10"     { 14 }
+            "bt2020-12"     { 15 }
+            smpte2084       { 16 }
+            smpte428        { 17 }
+            hlg             { 18 }
+            default { 
+                Show-Warning "无法匹配传输特质：$CSVTransfer，使用默认（bt709）"
+                1
+            }
+        }
+        $result += "--transfer-characteristics $t"
+    }
+    # 处理 Color Primaries
+    if (($Codec -eq 'avc') -or ($Codec -eq 'x264')) {
+
+        if (($CSVPrimaries -eq "unknown") -or ($CSVPrimaries -eq "unspec")) {
+            $result += "--colorprim undef"
+        }
+        else {
+            $result += "--colorprim $CSVPrimaries"
+        }
+
+    }
+    elseif (($Codec -eq 'hevc') -or ($Codec -eq 'x265')) {
+
+        if (($CSVPrimaries -eq "unknown") -or ($CSVPrimaries -eq "unspec")) {
+            $result += "--colorprim unknown"
+        }
+        else {
+            $result += "--colorprim $CSVPrimaries"
+        }
+
+    }
+    elseif (($Codec -eq "av1") -or ($Codec -eq "svtav1")) {
+
+        $p = switch ($CSVPrimaries) {
+            bt709      { 1 }
+            unspec     { 2 }
+            unknown    { 2 }
+            bt470m     { 4 }
+            bt470bg    { 5 }
+            bt601      { 6 }
+            smpte240m  { 7 }
+            film       { 8 }
+            bt2020     { 9 }
+            xyz        { 10 }
+            smpte431   { 11 }
+            smpte432   { 12 }
+            ebu3213    { 22 }
+            default {
+                Show-Warning "无法匹配三原色：$CSVPrimaries，使用默认（bt709）"
+                1
+            }
+        }
+
+        $result += "--color-primaries $p"
+    }
+    
+    return ($result -join " ")
 }
 
 # 输入已经是 ffmpeg CSP 了
@@ -797,11 +941,12 @@ function Get-ffmpegCSP {
     return "-pix_fmt " + $pixfmt
 }
 
-function Get-InputCSPBitDepth {
+function Get-RAWCSPBitDepth {
     Param (
         [Parameter(Mandatory=$true)]$CSVpixfmt,
         [bool]$isEncoderInput=$true,
-        [bool]$isAvs2YuvInput=$false
+        [bool]$isAvs2YuvInput=$false,
+        [bool]$isSVTAV1=$false
     )
 
     # 移除可能的 "-pix_fmt " 前缀（尽管实际情况不会遇到）
@@ -850,11 +995,33 @@ function Get-InputCSPBitDepth {
         }
     }
 
+
     if ($isEncoderInput) {
-        return ("--input-csp " + $chromaFormat + " --input-depth " + $depth)
+        if ($isSVTAV1) { # SVT-AV1 使用 --color-format 和 --input-depth
+            return "--color-format $chromaFormat --input-depth $depth"
+        }
+        else { # x265 使用 --input-csp 和 --input-depth
+            $cspMap = @{
+                '420' = 'i420'
+                '422' = 'i422'
+                '444' = 'i444'
+                '400' = 'i400'
+            }
+            $csp = $cspMap[$chromaFormat]
+            if (-not $csp) { $csp = 'i420' }
+            return ("--input-csp " + $csp + " --input-depth " + $depth)
+        }
     }
     elseif ($isAvs2YuvInput) {
-        return ("-csp " + $chromaFormat + " -depth " + $depth) 
+        $cspMap = @{
+            '420' = 'i420'
+            '422' = 'i422'
+            '444' = 'i444'
+            '400' = 'i400'
+        }
+        $csp = $cspMap[$chromaFormat]
+        if (-not $csp) { $csp = 'AUTO' }
+        return ("-csp " + $csp + " -depth " + $depth) 
     }
     return ""
 }
@@ -915,6 +1082,11 @@ function Get-IsPlaceHolderSource {
         -not (Test-Path -LiteralPath $sourceCSV.SourcePath)
 }
 
+# 简单通过排除法获取管道类型，因此如果添加只支持 RAW YUV 管道的上游工具需要修改
+function Get-IsRAWSource ([string]$validateUpstreamCode) {
+    return $validateUpstreamCode -eq 'e'
+}
+
 function Main {
     Show-Border
     Write-Host "参数计算与批处理注入工具" -ForegroundColor Cyan
@@ -962,12 +1134,14 @@ function Main {
     $svtav1Params.Resolution = Get-InputResolution -CSVw $ffprobeCSV.B -CSVh $ffprobeCSV.C -isSVTAV1 $true
     $x265Params.MERange = Get-x265MERange -CSVw $ffprobeCSV.B -CSVh $ffprobeCSV.C
     $ffmpegParams.FPS = Get-FPSParam -CSVfps $ffprobeCSV.H -Target ffmpeg
-    $x265Params.FPS = Get-FPSParam -CSVfps $ffprobeCSV.H
-    $x264Params.FPS = Get-FPSParam -CSVfps $ffprobeCSV.H
-    $x265Params.ColorMatrix = Get-ColorMatrixParam -CSVColorMatrix $ffprobeCSV.F -Codec x265
-    $x264Params.ColorMatrix = Get-ColorMatrixParam -CSVColorMatrix $ffprobeCSV.F -Codec x264
-    $x265Params.Transfer = Get-TransferParam -CSVTransfer $ffprobeCSV.G -Codec x265
-    $x264Params.Transfer = Get-TransferParam -CSVTransfer $ffprobeCSV.G -Codec x264
+    $svtav1Params.FPS = Get-FPSParam -CSVfps $ffprobeCSV.H -Target svtav1
+    $x265Params.FPS = Get-FPSParam -CSVfps $ffprobeCSV.H -Target x265
+    $x264Params.FPS = Get-FPSParam -CSVfps $ffprobeCSV.H -Target x264
+
+    Show-Debug "矩阵格式：：$($ffprobeCSV.E)；传输特质：$($ffprobeCSV.F)；三原色：$($ffprobeCSV.G)"
+    $svtav1Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -Codec svtav1
+    $x265Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -Codec x265
+    $x264Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -Codec x264
     $x265Params.Subme = Get-x265Subme -CSVfps $ffprobeCSV.H
     [int]$x265SubmeInt = Get-x265Subme -CSVfps $ffprobeCSV.H -getInteger $true
     Show-Debug "源视频帧率为：$(ConvertTo-Fraction $ffprobeCSV.H)"
@@ -984,9 +1158,10 @@ function Main {
 
     # 获取色彩空间格式
     $ffmpegParams.CSP = Get-ffmpegCSP -CSVpixfmt $ffprobeCSV.D
-    $x265Params.InputCSP = Get-InputCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false
-    $x264Params.InputCSP = Get-InputCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false
-    $avsyuvParams.CSP_BitDepth = Get-InputCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $false -isAvs2YuvInput $true
+    $svtav1Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $true
+    $x265Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
+    $x264Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
+    $avsyuvParams.CSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $false -isAvs2YuvInput $true -isSVTAV1 $false
 
     # 验证并调整 SVFI 线路的 INI 文件
     $olsargParams.ConfigInput = Edit-SvfiRenderConfig -ffprobeCSV $ffprobeCSV -sourceCSV $sourceCSV
@@ -996,6 +1171,7 @@ function Main {
     $avsmodParams.DLLInput = "-dll $quotedDllPath"
 
     # 定位导出编码任务批处理文件、编码输出路径
+    Write-Host ""
     Show-Info "配置编码结果导出路径..."
     $encodeOutputPath = Select-Folder -Description "选择压制结果的导出位置"
 
@@ -1023,9 +1199,10 @@ function Main {
         $displayName = "Encode " + (Get-Date -Format 'yyyy-MM-dd HH:mm')
     }
 
-    $switchOPS = Read-Host " 指定压制结果的文件名——[a：从文件拷贝 | b：手写 | Enter：$displayName]"
+    $encodeOutputNameCode =
+        Read-Host " 指定压制结果的文件名——[a：从文件拷贝 | b：手写 | Enter：$displayName]"
     # 确保 if 关键字前后无特殊不可见字符
-    if ($switchOPS -eq 'a') { # 选择视频源文件
+    if ($encodeOutputNameCode -eq 'a') { # 选择视频源文件
         Show-Info "选择一个文件以拷贝文件名..."
         do {
             $fileForName = Select-File -Title "选择一个文件以拷贝文件名"
@@ -1040,7 +1217,7 @@ function Main {
         # 提取文件名
         $encodeOutputFileName = [io.path]::GetFileNameWithoutExtension($fileForName)
     }
-    elseif ($switchOPS -eq 'b') { # 手动输入
+    elseif ($encodeOutputNameCode -eq 'b') { # 手动输入
         $encodeOutputFileName = Read-Host " 请输入文件名（不含后缀）"
     }
     # 默认文件名
@@ -1065,9 +1242,7 @@ function Main {
     $svtav1Params.Output = Get-EncodingIOArgument -program 'svtav1' -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $svtav1Params.OutputExtension
 
     # 构建管道下游程序基础参数
-    
     $x264Params.BaseParam = Invoke-BaseParamSelection -CodecName "x264" -GetParamFunc ${function:Get-x264BaseParam} -ExtraParams @{ askUserFGO = $true }
-
     $x265Params.BaseParam = Invoke-BaseParamSelection -CodecName "x265" -GetParamFunc ${function:Get-x265BaseParam}
     $svtav1Params.BaseParam = Invoke-BaseParamSelection -CodecName "SVT-AV1" -GetParamFunc ${function:Get-svtav1BaseParam} -ExtraParams @{ askUserDLF = $true }
 
@@ -1077,15 +1252,26 @@ function Main {
     # 1. 管道上游工具
     $ffmpegFinalParam = "$($ffmpegParams.FPS) $($ffmpegParams.Input) $($ffmpegParams.CSP)"
     $vspipeFinalParam = "$($vspipeParams.Input)"
-    $avsyuvFinalParam = "$($avsyuvParams.Input) $($avsyuvParams.CSP_BitDepth)"
+    $avsyuvFinalParam = "$($avsyuvParams.Input) $($avsyuvParams.CSP)"
     $avsmodFinalParam = "$($avsmodParams.Input) $($avsmodParams.DLLInput)"
     $olsargFinalParam = "$($olsargParams.Input) $($olsargParams.ConfigInput)"
     # 2. x264（Input 必须放在最末尾）
-    $x264FinalParam = "$($x264Params.Keyint) $($x264Params.FPS) $($x264Params.InputCSP) $($x264Params.ColorMatrix) $($x264Params.Transfer) $($x264Params.Resolution) $($x264Params.TotalFrames) $($x264Params.BaseParam) $($x264Params.Output) $($x264Params.Input)"
+    $x264FinalParam = "$($x264Params.Keyint) $($x264Params.SEICSP) $($x264Params.BaseParam) $($x264Params.Output) $($x264Params.Input)"
     # 3. x265
-    $x265FinalParam = "$($x265Params.Keyint) $($x265Params.RCLookahead) $($x265Params.MERange) $($x265Params.Subme) $($x265Params.InputCSP) $($x265Params.ColorMatrix) $($x265Params.Transfer) $($x265Params.FPS) $($x265Params.Resolution) $($x265Params.TotalFrames) $($x265Params.PME) $($x265Params.Pools) $($x265Params.BaseParam) $($x265Params.Input) $($x265Params.Output)"
+    $x265FinalParam = "$($x265Params.Keyint) $($x265Params.SEICSP) $($x265Params.RCLookahead) $($x265Params.MERange) $($x265Params.Subme) $($x265Params.PME) $($x265Params.Pools) $($x265Params.BaseParam) $($x265Params.Input) $($x265Params.Output)"
     # 4. SVT-AV1
-    $svtav1FinalParam = "$($svtav1Params.Keyint) $($svtav1Params.Resolution) $($svtav1Params.TotalFrames) $($svtav1Params.BaseParam) $($svtav1Params.Input) $($svtav1Params.Output)"
+    $svtav1FinalParam = "$($svtav1Params.Keyint) $($svtav1Params.SEICSP) $($svtav1Params.BaseParam) $($svtav1Params.Input) $($svtav1Params.Output)"
+
+    $x264RawPipeApdx = "$($x264Params.FPS) $($x264Params.RAWCSP) $($x264Params.Resolution) $($x264Params.TotalFrames)"
+    $x265RawPipeApdx = "$($x265Params.FPS) $($x265Params.RAWCSP) $($x265Params.Resolution) $($x265Params.TotalFrames)"
+    $svtav1RawPipeApdx = "$($svtav1Params.FPS) $($svtav1Params.RAWCSP) $($svtav1Params.Resolution) $($svtav1Params.TotalFrames)"
+    # N. RAW 管道兼容
+    Show-Debug "sourceCSV.UpstreamCode：$($sourceCSV.UpstreamCode)"
+    if (Get-IsRAWSource -validateUpstreamCode $sourceCSV.UpstreamCode) {
+        $x264FinalParam = $x264RawPipeApdx + " " + $x264FinalParam
+        $x265FinalParam = $x265RawPipeApdx + " " + $x265FinalParam
+        $svtav1FinalParam = $svtav1RawPipeApdx + " " + $svtav1FinalParam
+    }
 
     # Show-Debug $ffmpegFinalParam
     # Show-Debug $vspipeFinalParam
@@ -1127,9 +1313,17 @@ set avs2pipemod_params=$avsmodFinalParam
 set svfi_params=$olsargFinalParam
 
 set x264_params=$x264FinalParam
+
 set x265_params=$x265FinalParam
+
 set svtav1_params=$svtav1FinalParam
+
 REM ========================================================
+REM [自动注入] RAW 管道辅助参数（手动添加）
+REM ========================================================
+REM x264_appendix=$x264RawPipeApdx
+REM x265_appendix=$x265RawPipeApdx
+REM svtav1_appendix=$svtav1RawPipeApdx
 "@
 
 
