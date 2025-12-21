@@ -83,6 +83,7 @@ Do {Do {
     } While ($x265Path+$x264Path -eq "")
     if ((Read-Host "`r`n√ [Enter] import more routes (recommneded); Or [y][Enter] to move on") -eq "y") {$impEND="y"} else {$impEND="n"} #User decides when to exit loop
 } While ($impEND -eq "n")
+
 #Generate a datatable to indicate imported programs
 $updnTbl = New-Object System.Data.DataTable
 $availRts= [System.Data.DataColumn]::new("Routes")
@@ -91,7 +92,7 @@ $dnColumn= [System.Data.DataColumn]::new("\UNIX Pipe Dnstream")
 $updnTbl.Columns.Add($availRts); $updnTbl.Columns.Add($upColumn); $updnTbl.Columns.Add($dnColumn)
 [void]$updnTbl.Rows.Add(" A:",$fmpgPath,$x265Path); [void]$updnTbl.Rows.Add(" B:",$vprsPath,$x264Path)
 [void]$updnTbl.Rows.Add(" C:",$avsyPath,""); [void]$updnTbl.Rows.Add(" D:",$avspPath,""); [void]$updnTbl.Rows.Add(" E:",$svfiPath,"")
-($updnTbl | Out-String).Trim() #1. Trim used to trim out empty rows, 2. Piping to Out-String to force $updnTbl to return the result before Read-Host below gets executed
+"`r`n"+($updnTbl | Out-String).Trim() #1. Trim used to trim out empty rows, 2. Piping to Out-String to force $updnTbl to return the result before Read-Host below gets executed
 
 Read-Host "`r`nCheck whether the correct programs are imported and [Enter] to proceed, restart otherwise"
 

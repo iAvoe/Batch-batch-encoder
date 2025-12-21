@@ -2,75 +2,75 @@
 使用了YUV for MPEG (Y4M) pipe方案, 所以此处只提供yuv相关选项
 nv12, nv16选项x265也支持, 但需要手动更改为rawviddeo pipe方案
 
-选项A - yuv420p8
+yuv420p8
  - 色彩通道数 = 3, 位深密度 = 8bit (#00+2^8=#FF)
  - ffmpeg下-pix_fmt yuv420p, x265下--input-csp i420
  - √ x264 x265
 
-选项B - yuv420p10
+yuv420p10
  - 色彩通道数 = 3, 位深密度 = 10bit (#00+2^10=#FF)
  - ffmpeg下-pix_fmt yuv420p10le, x265下--input-csp i420
  - √ x264 x265
 
-选项C - yuv420p12
+yuv420p12
  - 色彩通道数 = 3, 位深密度 = 12bit (#00+2^12=#FF)
  - ffmpeg下-pix_fmt yuv420p12le, x265下--input-csp i420
  - √ x265
 
-选项D - yuv422p8
+yuv422p8
  - 色彩通道数 = 3, 位深密度 = 8bit (#00+2^8=#FF)
  - ffmpeg下-pix_fmt yuv422p, x265下--input-csp i422
  - √ x264 x265
 
-选项E - yuv422p10
+yuv422p10
  - 色彩通道数 = 3, 位深密度 = 10bit (#00+2^10=#FF)
  - ffmpeg下-pix_fmt yuv422p10le, x265下--input-csp i422
  - √ x264 x265
 
-选项F - yuv422p12
+yuv422p12
  - 色彩通道数 = 3, 位深密度 = 12bit (#00+2^12=#FF)
  - ffmpeg下-pix_fmt yuv422p12le, x265下--input-csp i422
  - √ x265
 
-选项G - yuv444p8
+yuv444p8
  - 色彩通道数 = 3, 位深密度 = 8bit (#00+2^8=#FF)
  - ffmpeg下-pix_fmt yuv444p, x265下--input-csp i444
  - √ x264 x265
 
-选项H - yuv444p10
+yuv444p10
  - 色彩通道数 = 3, 位深密度 = 10bit (#00+2^10=#FF)
  - ffmpeg下-pix_fmt yuv444p10le, x265下--input-csp i444
  - √ x264 x265
 
-选项I - yuv444p12
+yuv444p12
  - 色彩通道数 = 3, 位深密度 = 12bit (#00+2^10=#FF)
  - ffmpeg下-pix_fmt yuv444p12le, x265下--input-csp i444
  - √ x265
 
-选项J - yuv400 (黑白) 
+yuv400 (黑白) 
  - 色彩通道数 = 1, 位深密度 = 8bit (#00+2^8=#FF)
  - ffmpeg下-pix_fmt gray, x265下--input-csp i400
  - 不兼容HEVC Main/Main10 Profile
  - √ x264 x265
 
-选项K - yuv400 (黑白) 
+yuv400 (黑白) 
  - 色彩通道数 = 1, 位深密度 = 10bit (#00+2^10=#FF)
  - ffmpeg下-pix_fmt gray10le, x265下--input-csp i400
  - 不兼容HEVC Main/Main10 Profile
  - √ x264 x265
 
-选项L - yuv400 (黑白) 
+yuv400 (黑白) 
  - 色彩通道数 = 1, 位深密度 = 12bit (#00+2^12=#FF)
  - ffmpeg下-pix_fmt gray12le, x265下--input-csp i400
  - 不兼容HEVC Main/Main10 Profile
  - √ x265
 
-选项M - nv12 (需手动更改为rawvideo pipe方案) 
+nv12 (需手动更改为rawvideo pipe方案) 
  - 色彩通道数 = 2, 位深密度 = 12bit (#00+2^12=#FF)
  - ffmpeg下-pix_fmt nv12, x265下--input-csp nv12
  - √ x265
 
-选项N - nv16 (需手动更改为rawvideo pipe方案) 
+nv16 (需手动更改为rawvideo pipe方案) 
  - 色彩通道数 = 2, 位深密度 = 16bit (#00+2^16=#FF)
  - ffmpeg下-pix_fmt nv16, x265下--input-csp nv16
  - √ x265
