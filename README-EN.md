@@ -1,6 +1,6 @@
 # Batch Batch Encoder
 
-This tool analyzes video to perform actual x264, x265, SVT-AV1 parameter customizations. Assisted with filter-less VS/AVS script generation, semi-auto multiplex/encapsulation, and offers GUI and color-coded CLI for extra user guidance. This tool automates tedious format alignment, simplifies operations, and starts your encoding ASAP.
+This tool analyzes source video to perform actual customized video encoding solutions. It automates tedious format alignment, simplifies operations, and starts your encoding ASAP.
 
 ## Environment
 
