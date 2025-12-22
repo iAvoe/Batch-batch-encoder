@@ -1,13 +1,13 @@
-﻿# 由于测试时容易丢失 :PipePresets 变量，因此允许重载
+﻿# Reloading is allowed because the :PipePresets variable is easily lost during testing.
 # if ($script:__CORE_LOADED) { return }
 # $script:__CORE_LOADED = $true
 
 # UTF-8 No BOM
 $Global:utf8NoBOM = New-Object System.Text.UTF8Encoding($false)
-# 强制使用 UTF-8 带 BOM，以便 CMD 正确识别
+# Use UTF-8 with BOM so that CMD can correctly recognize it.
 $Global:utf8BOM = New-Object System.Text.UTF8Encoding($true)
 
-# 定义工具链组合（必须与导入时的 Key 一致）
+# Define the toolchain composition (must match the key used during import)
 $Global:PipePresets = @{
     'ffmpeg_x264'        = @{ ID=1;  Upstream='ffmpeg';      Downstream='x264' }
     'ffmpeg_x265'        = @{ ID=2;  Upstream='ffmpeg';      Downstream='x265' }
@@ -26,14 +26,14 @@ $Global:PipePresets = @{
     'svfi_svtav1'        = @{ ID=15; Upstream='svfi';        Downstream='svtav1' }
 }
 
-# 定义缓存文件夹，如果不存在就创建
+# Define a cache folder; Create if missing
 $Global:TempFolder = $env:USERPROFILE + "\bbenc\"
 if (-not (Test-Path -PathType Container $Global:TempFolder)) {
     New-Item -ItemType Directory -Force -Path $Global:TempFolder
 }
 Clear-Host
 
-# 加载子模块
+# Load sub modules
 $base = $PSScriptRoot
 . "$base\Console.ps1"
 . "$base\UI.ps1"

@@ -4,7 +4,7 @@
 
 # UTF-8 No BOM
 $Global:utf8NoBOM = New-Object System.Text.UTF8Encoding($false)
-# 强制使用 UTF-8 带 BOM，以便 CMD 正确识别
+# UTF-8 带 BOM，以便 CMD 正确识别
 $Global:utf8BOM = New-Object System.Text.UTF8Encoding($true)
 
 # 定义工具链组合（必须与导入时的 Key 一致）

@@ -2,7 +2,7 @@
     Add-Type -AssemblyName System.Windows.Forms
 }
 
-# 高 DPI 支持（只注册一次）
+# High-DPI GUI support (Register only once)
 if (-not ("DpiHelper" -as [type])) {
     Add-Type @"
 using System.Runtime.InteropServices;
