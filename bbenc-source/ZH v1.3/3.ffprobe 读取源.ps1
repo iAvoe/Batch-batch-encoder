@@ -42,7 +42,7 @@ function Get-BlankAVSVSScript {
     # 生成 AVS 内容（LWLibavVideoSource 需要双引号包裹路径）
     $blankAVSScript = "LWLibavVideoSource($quotedImport) # 自动生成的占位脚本，按需修改"
     # 生成 VapourSynth 内容（使用原始字符串 literal r"..." 以避免转义问题）
-    # 如果 Get-QuotedPath 返回例如 "C:\path\file.mp4"，则 r$quotedImport 将成为 r"C:\path\file.mp4"
+    # 若 Get-QuotedPath 返回例如 "C:\path\file.mp4"，则 r$quotedImport 将成为 r"C:\path\file.mp4"
     $blankVSScript = @"
 import vapoursynth as vs
 core = vs.core
@@ -169,7 +169,7 @@ function Main {
     $scriptSource = $null # 脚本文件路径，如果有则在导出的 CSV 中覆盖视频源
     $encodeImportSourcePath = $null
 
-    # 如果上游是 vspipe / avs2yuv / avs2pipemod，提供生成无滤镜脚本选项
+    # 若上游是 vspipe / avs2yuv / avs2pipemod，提供生成无滤镜脚本选项
     if ($isScriptUpstream) {
         do {
             # 首先选择视频源文件（用于ffprobe分析）

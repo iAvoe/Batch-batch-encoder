@@ -29,6 +29,20 @@ $Script:DownstreamPipeParams = @{
     }
 }
 
+# Import encoding tools
+$upstreamTools = [ordered]@{
+    'ffmpeg' = $null
+    'vspipe' = $null
+    'avs2yuv' = $null
+    'avs2pipemod' = $null
+    'svfi' = $null
+}
+$downstreamTools = [ordered]@{
+    'x264' = $null
+    'x265' = $null
+    'svtav1' = $null
+}
+
 # Pipe format compatibility map
 function Get-PipeType($upstream) {
     switch ($upstream) {
@@ -151,20 +165,6 @@ function Main {
     $batchFullPath = Join-Path -Path $outputPath -ChildPath "encode_single.bat"
 
     Show-Success "Output file defined: $batchFullPath"
-    
-    # Import encoding tools
-    $upstreamTools = @{
-        'ffmpeg' = $null
-        'vspipe' = $null
-        'avs2yuv' = $null
-        'avs2pipemod' = $null
-        'svfi' = $null
-    }
-    $downstreamTools = @{
-        'x264' = $null
-        'x265' = $null
-        'svtav1' = $null
-    }
 
     Show-Info "Start importing upstream tools..."
     Write-Host " Hint: You may use add -InitialDirectory parameter to customize the import statements" -ForegroundColor DarkGray
@@ -173,11 +173,13 @@ function Main {
     # Store vspipe version, API version
     $vspipeInfo = $null
 
+
     # Upstream tools import
     $i=0
     foreach ($tool in @($upstreamTools.Keys)) {
         $i++
-        $choice = Read-Host " [Upstream] ($i/$($upstreamTools.Count)) Import $tool? (y=yes，Enter=Skip)"
+        # Caution: "?" destroys variable names
+        $choice = Read-Host "`r`n [Upstream] ($i/$($upstreamTools.Count)) Import $($tool)? (y=yes，Enter=Skip)"
         if ($choice -eq 'y') {
             $upstreamTools[$tool] =
                 if ($tool -eq 'svfi') {
@@ -205,17 +207,15 @@ function Main {
     }
     
     Show-Info "Start importing downstream tools..."
-    $i = 0
+    $i=0
     foreach ($tool in @($downstreamTools.Keys)) {
         $i++
-        $choice = Read-Host " [Downstream] ($i/$($downstreamTools.Count)) Import $tool? (y=yes，Enter=Skip)"
+        $choice = Read-Host "`r`n [Downstream] ($i/$($downstreamTools.Count)) Import $($tool)? (y=yes，Enter=Skip)"
         if ($choice -eq 'y') {
             $downstreamTools[$tool] = Select-File -Title "Select $tool executable" -ExeOnly
             Show-Success "$tool imported: $($downstreamTools[$tool])"
         }
     }
-
-    # TODO
 
     # Merge all tools (using manual merge to avoid object reference/type issues caused by Clone())
     $tools = @{}

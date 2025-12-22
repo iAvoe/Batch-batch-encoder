@@ -518,7 +518,7 @@ function Get-x265SVTAV1Profile {
         }
     }
 
-   # 如果使用 intra-only 编码，则添加 -intra 后缀
+   # 若使用 intra-only 编码，则添加 -intra 后缀
     if ($isIntraOnly) {
         if ($profileBase -eq "main444-8") {
             $profileBase = "main444-intra"
@@ -764,7 +764,7 @@ function Get-FPSParam {
     # SVT-AV1 需要特殊处理：使用 --fps-num 和 --fps-denom 分开写
     if ($Target -in @("svtav1", "SVT-AV1")) {
         if ($fpsValue -match '^(\d+)/(\d+)$') {
-            # 如果是分数格式（如 24000/1001）
+            # 若是分数格式（如 24000/1001）
             return "--fps-num $($matches[1]) --fps-denom $($matches[2])"
         }
         else { # 直接输入了小数：转换为分数
@@ -1186,7 +1186,7 @@ function Main {
     
     $defaultName = [io.path]::GetFileNameWithoutExtension($sourceCSV.SourcePath)
     # 由于自动生成的脚本源存在，因此文件名会变成 "blank_vs_script/blank_avs_script" 而非视频文件名
-    # 如果匹配到这种文件名则消除默认（Enter）选项
+    # 若匹配到这种文件名则消除默认（Enter）选项
     $isPlaceholderSource = Get-IsPlaceHolderSource -defaultName $defaultName
     $encodeOutputFileName = ""
     
@@ -1333,7 +1333,7 @@ REM svtav1_appendix=$svtav1RawPipeApdx
 
     # 查找替换锚点
     # 策略：找到 "REM 参数示例" 行，替换为参数块
-    # 如果模板变更，则回退到在 @echo off 后面插入
+    # 若模板变更，则回退到在 @echo off 后面插入
     $newBatchContent = $batchContent
 
     # 字样匹配

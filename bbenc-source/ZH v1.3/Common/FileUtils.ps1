@@ -11,7 +11,7 @@ function Get-QuotedPath {
     return "`"$Path`""
 }
 
-# 如果文件存在则确认是否删除
+# 若文件存在则确认是否删除
 function Confirm-FileDelete {
     param([string]$Path)
 
@@ -40,7 +40,7 @@ function Select-File(
         [switch]$BatOnly
     ) {
     
-    # 如果是文件路径则取其父目录；如果路径不存在回到 Desktop
+    # 若是文件路径则取其父目录；如果路径不存在回到 Desktop
     if ($InitialDirectory) {
         if (Test-Path $InitialDirectory -PathType Leaf) {
             $InitialDirectory = Split-Path $InitialDirectory -Parent

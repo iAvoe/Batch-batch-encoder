@@ -28,6 +28,21 @@ $Script:DownstreamPipeParams = @{
     }
 }
 
+    
+# 编码工具
+$upstreamTools = [ordered]@{
+    'ffmpeg' = $null
+    'vspipe' = $null
+    'avs2yuv' = $null
+    'avs2pipemod' = $null
+    'svfi' = $null
+}
+$downstreamTools = [ordered]@{
+    'x264' = $null
+    'x265' = $null
+    'svtav1' = $null
+}
+
 # 不同工具支持的管道格式
 function Get-PipeType($upstream) {
     switch ($upstream) {
@@ -151,20 +166,6 @@ function Main {
     $batchFullPath = Join-Path -Path $outputPath -ChildPath "encode_single.bat"
 
     Show-Success "输出文件：$batchFullPath"
-    
-    # 导入编码工具
-    $upstreamTools = @{
-        'ffmpeg' = $null
-        'vspipe' = $null
-        'avs2yuv' = $null
-        'avs2pipemod' = $null
-        'svfi' = $null
-    }
-    $downstreamTools = @{
-        'x264' = $null
-        'x265' = $null
-        'svtav1' = $null
-    }
 
     Show-Info "开始导入上游编码工具（由于使用了哈希表，导入顺序会被打乱）..."
     Write-Host " 提示：Select-File 支持 -InitialDirectory 参数，在此脚本中添加即可优化导入操作步骤" -ForegroundColor DarkGray
@@ -195,7 +196,7 @@ function Main {
             Show-Success "$tool 已导入: $($upstreamTools[$tool])"
         }
 
-        # 如果是 vspipe，检测 API 版本
+        # 若是 vspipe，检测 API 版本
         if ($tool -eq 'vspipe' -and $upstreamTools[$tool]) {
             Write-Host ""
             Show-Info "检测 VapourSynth 管道参数..."
@@ -204,7 +205,7 @@ function Main {
         }
     }
     
-    Show-Info "开始导入下游编码工具（由于使用了哈希表，导入顺序会被打乱）..."
+    Show-Info "开始导入下游编码工具..."
 
     # 下游工具
     $i = 0
