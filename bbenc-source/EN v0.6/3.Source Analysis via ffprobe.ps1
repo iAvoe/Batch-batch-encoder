@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-    FFProbe video source analysis script
+    FFProbe source analyzer script
 .DESCRIPTION
     Analyzes the source video and exports file to %USERPROFILE%\temp_v_info(_is_mov).csv, i.e., width, height, csp info, sei info, etc.
 .AUTHOR
@@ -24,7 +24,7 @@
 # $sourceCSV.SourcePath: source video path (could be vpy/avs scripts)
 # $sourceCSV.UpstreamCode: upstream tool
 # $sourceCSV.Avs2PipeModDLLPath: avisynth.dll needed by Avs2PipeMod
-# $sourceCSV.SvfiConfigPath：one_line_shot_args (SVFI)'s render config (X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini)
+# $sourceCSV.SvfiConfigPath: one_line_shot_args (SVFI)'s render config (X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini)
 
 # Load globals, including $utf8NoBOM、Get-QuotedPath、Select-File、Select-Folder...
 . "$PSScriptRoot\Common\Core.ps1"
@@ -42,7 +42,7 @@ function Get-BlankAVSVSScript {
     $VSScriptPath = Join-Path $Global:TempFolder "blank_vs_script.vpy"
     # Generate AVS content (LWLibavVideoSource requires the path to be enclosed in double quotes)
 
-    $blankAVSScript = "LWLibavVideoSource($quotedImport) # Auto-generated filter-less script, modify if needed"
+    $blankAVSScript = "LWLibavVideoSource($quotedImport) # Generated filter-less script, modify if needed"
     # Generate VapourSynth content (use raw string literal r"..." to avoid escaping issues)
 
     # If Get-QuotedPath returns strings like "C:\path\file.mp4", then modify r$quotedImport to r"C:\path\file.mp4"
@@ -61,7 +61,7 @@ src.set_output()
         Show-Info "Generating filter-less script: `n $AVSScriptPath`n $VSScriptPath"
         Write-TextFile -Path $AVSScriptPath -Content $blankAVSScript -UseBOM $false
         Write-TextFile -Path $VSScriptPath -Content $blankVSScript -UseBOM $false
-        Show-Success "Filter-less script generated to %USERPROFILE%"
+        Show-Success "Filter-less script created to %USERPROFILE%"
 
         # Check line breaks, must be CRLF for Windows
         Show-Debug "Validate script file format..."
@@ -79,7 +79,7 @@ src.set_output()
         }
     }
     catch {
-        Show-Error "Failed to generate filter-less script: $_"
+        Show-Error "Failed to create filter-less script: $_"
         return $null
     }
 }
@@ -87,34 +87,34 @@ src.set_output()
 #region Main
 function Main {
     Show-Border
-    Write-Host ("ffprobe 源读取工具，导出 " + $Global:TempFolder + "temp_v_info(_is_mov).csv 供后续步骤调用") -ForegroundColor Cyan
+    Write-Host (" ffprobe source analyzer, exports " + $Global:TempFolder + "temp_v_info(_is_mov).csv") -ForegroundColor Cyan
+    Write-Host " for later script to take reference on"
     Show-Border
     Write-Host ""
 
-    # 显示编码示例
-    # Show-Info "常用编码命令示例："
-    # Write-Host "ffmpeg -i [输入] -an -f yuv4mpegpipe -strict unofficial - | x265.exe --y4m - -o"
-    # Write-Host "vspipe [脚本.vpy] --y4m - | x265.exe --y4m - -o"
-    # Write-Host "avs2pipemod [脚本.avs] -y4mp | x265.exe --y4m - -o"
-    # Write-Host ""
+    Show-Info "Example of common encoding commandlines:"
+    Write-Host "ffmpeg -i [source] -an -f yuv4mpegpipe -strict unofficial - | x265.exe --y4m - -o"
+    Write-Host "vspipe [script.vpy] --y4m - | x265.exe --y4m - -o"
+    Write-Host "avs2pipemod [script.avs] -y4mp | x265.exe --y4m - -o"
+    Write-Host ""
 
-    # 根据管道上游程序选择源类型
+    # Select source type based on upstream tool
     $sourceTypes = @{
-        'A' = @{ Name = 'ffmpeg'; Ext = ''; Message = "任意源" }
-        'B' = @{ Name = 'vspipe'; Ext = '.vpy'; Message = ".vpy 源" }
-        'C' = @{ Name = 'avs2yuv'; Ext = '.avs'; Message = ".avs 源" }
-        'D' = @{ Name = 'avs2pipemod'; Ext = '.avs'; Message = ".avs 源" }
-        'E' = @{ Name = 'SVFI'; Ext = ''; Message = "视频源" }
+        'A' = @{ Name = 'ffmpeg'; Ext = ''; Message = "Any source" }
+        'B' = @{ Name = 'vspipe'; Ext = '.vpy'; Message = ".vpy source" }
+        'C' = @{ Name = 'avs2yuv'; Ext = '.avs'; Message = ".avs source" }
+        'D' = @{ Name = 'avs2pipemod'; Ext = '.avs'; Message = ".avs source" }
+        'E' = @{ Name = 'SVFI'; Ext = ''; Message = "Video source" }
     }
 
-    # 获取源文件类型
+    # Get source file type
     $selectedType = $null
     do {
-        Show-Info "选择要启用的管道上游程序（确认源符合程序要求）："
+        Show-Info "Select the designated tool as the pipe upstream..."
         $sourceTypes.GetEnumerator() | Sort-Object Key | ForEach-Object {
             Write-Host "  $($_.Key): $($_.Value.Name)"
         }
-        $choice = (Read-Host " 请输入选项").ToUpper()
+        $choice = (Read-Host " Selection (A/B/C/D/E)").ToUpper()
 
         if ($sourceTypes.ContainsKey($choice)) {
             $selectedType = $sourceTypes[$choice]
@@ -124,7 +124,7 @@ function Main {
     }
     while ($true)
     
-    # 获取上游程序代号（写入 CSV）；为 Avs2PipeMod 导入必须的 DLL
+    # Get upstream tool code（(from CSV); Import DDL for Avs2PipeMod
     $upstreamCode = $null
     $Avs2PipeModDLL = $null
     $OneLineShotArgsINI = $null
@@ -137,27 +137,28 @@ function Main {
         'avs2yuv'      { $upstreamCode = 'c' }
         'avs2pipemod'  {
             $upstreamCode = 'd'
-            Show-Info "请指定 avisynth.dll 的路径..."
+            Show-Info "Please locate the path to avisynth.dll..."
 
             do {
-                $Avs2PipeModDLL = Select-File -Title "选择 avisynth.dll" -InitialDirectory ([Environment]::GetFolderPath('System')) -DllOnly
+                $Avs2PipeModDLL = Select-File -Title "Select avisynth.dll" -InitialDirectory ([Environment]::GetFolderPath('System')) -DllOnly
                 if (-not $Avs2PipeModDLL) {
-                    $placeholderScript = Read-Host "未选择 DLL。按 Enter 重试，输入 'q' 强制退出"
+                    $placeholderScript = Read-Host "No DLL file selected. Press Enter to retry, input 'q' to force exit"
                     if ($placeholderScript -eq 'q') { exit }
                 }
             }
             while (-not $Avs2PipeModDLL)
 
-            Show-Success "已记录 avisynth.dll 路径: $Avs2PipeModDLL"
+            Show-Success "Path for avisynth.dll added: $Avs2PipeModDLL"
         }
         'SVFI'         {
             $upstreamCode = 'e'
-            Show-Info "请指定 SVFI 渲染配置 INI 文件的路径，`r`n      如 X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini"
+            Show-Info "Please locate the path to SVFI render configuration INI file"
+            Write-Host " For Steam installation, it would be, X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini"
 
             do {
-                $OneLineShotArgsINI = Select-File -Title "选择 SVFI 渲染配置文件 (.ini)" -IniOnly
+                $OneLineShotArgsINI = Select-File -Title "Select SVFI render configuration (.ini)" -IniOnly
                 if (-not $OneLineShotArgsINI) {
-                    $placeholderScript = Read-Host "未选择 INI。按 Enter 重试，输入 'q' 强制退出"
+                    $placeholderScript = Read-Host "No INI file selected. Press Enter to retry, input 'q' to force exit"
                     if ($placeholderScript -eq 'q') { exit }
                 }
             }
@@ -166,56 +167,55 @@ function Main {
         default        { $upstreamCode = 'a' }
     }
 
-    # 定义变量
-    $videoSource = $null # ffprobe 将分析这个视频文件
-    $scriptSource = $null # 脚本文件路径，如果有则在导出的 CSV 中覆盖视频源
+    $videoSource = $null # ffprobe will analyze this one
+    $scriptSource = $null # script source for encoding, but cannot be read by ffprobe
     $encodeImportSourcePath = $null
 
-    # 如果上游是 vspipe / avs2yuv / avs2pipemod，提供生成无滤镜脚本选项
+    # If upstream is set to vspipe / avs2yuv / avs2pipemod, offer filter-less script generation option
     if ($isScriptUpstream) {
         do {
-            # 首先选择视频源文件（用于ffprobe分析）
-            Show-Info "选择（脚本引用的）视频源文件（ffprobe 将分析此文件）"
+            # Select the video source file to analysis
+            Show-Info "Select the video source file (referenced by the script) for ffprobe to analyze"
             while ($null -eq $videoSource) {
-                $videoSource = Select-File -Title "选择视频源文件（例如 .mp4/.mkv/.mov）"
-                if ($null -eq $videoSource) { Show-Error "未选择视频文件" }
+                $videoSource = Select-File -Title "Select video source (.mp4/.mkv/.mov)"
+                if ($null -eq $videoSource) { Show-Error "No video source selected" }
             }
         
-            # 询问用户是否要生成无滤镜脚本
-            $mode = Read-Host "输入 'y' 导入自定义脚本，输入 'n' 或 Enter 为视频源生成无滤镜脚本"
+            # Ask user to generate or import existing script
+            $mode = Read-Host "Input 'y' to import a custom script; `r`n Enter to generate a filter-less script for this video source"
         
-            if ($mode -eq 'y') { # 导入自定义脚本
+            if ($mode -eq 'y') { # Custom script
                 do {
-                    $scriptSource = Select-File -Title "定位脚本文件（.avs/.vpy...）"
+                    $scriptSource = Select-File -Title "Locate the script file (.avs/.vpy...)"
                     if (-not $scriptSource) {
-                        Show-Error "未选择文件"
+                        Show-Error "No script file selected"
                         continue
                     }
                 
-                    # 验证文件扩展名
+                    # Validate file extension
                     $ext = [IO.Path]::GetExtension($scriptSource).ToLower()
                     if ($selectedType.Name -in @('avs2yuv', 'avs2pipemod') -and $ext -ne '.avs') {
-                        Show-Error "对于 $($selectedType.Name)，需要 .avs 脚本文件"
+                        Show-Error "Incorrect script file, expecting .avs script for $($selectedType.Name)"
                         $scriptSource = $null
                     }
                     elseif ($selectedType.Name -eq 'vspipe' -and $ext -ne '.vpy') {
-                        Show-Error "对于 vspipe，需要 .vpy 脚本文件"
+                        Show-Error "Incorrect script file, expecting .vpy script for vspipe"
                         $scriptSource = $null
                     }
                 }
                 while (-not $scriptSource)
             
-                Show-Success "已选择脚本文件: $scriptSource"
-                # 注意：视频源 $videoSource 仍然用于 ffprobe
+                Show-Success "Script source selected: $scriptSource"
+                # Note: $videoSource is still going to be for ffprobe
             }
-            elseif ([string]::IsNullOrWhiteSpace($mode) -or $mode -eq 'n') { # 生成无滤镜脚本
+            elseif ([string]::IsNullOrWhiteSpace($mode) -or $mode -eq 'n') { # Generate
                 $placeholderScript = Get-BlankAVSVSScript -videoSource $videoSource
                 if (-not $placeholderScript) { 
-                    Show-Error "生成无滤镜脚本失败，请重试"
+                    Show-Error "Failed to create filter-less script, please try again."
                     continue
                 }
             
-                # 根据上游类型选择正确的脚本路径
+                # Select the correct script path based on the upstream type
                 if ($selectedType.Name -in @('avs2yuv', 'avs2pipemod')) {
                     $scriptSource = $placeholderScript.AVS
                 }
@@ -223,10 +223,10 @@ function Main {
                     $scriptSource = $placeholderScript.VPY
                 }
                 
-                Show-Success "已生成无滤镜脚本: $scriptSource"
+                Show-Success "Filter-less script created: $scriptSource"
             }
             else {
-                Show-Warning "无效输入"
+                Show-Warning "Invalid input"
                 continue
             }
             break
@@ -235,16 +235,16 @@ function Main {
 
         $encodeImportSourcePath = $scriptSource
     }
-    else { # ffmpeg、SVFI：视频源
+    else { # ffmpeg、SVFI: video source
         do {
-            Show-Info "选择要分析的视频源文件"
-            $videoSource = Select-File -Title "定位视频文件，如视频（.mp4/.mov/...）、RAW（.yuv/.y4m/...）"
+            Show-Info "Select the video source file for ffprobe to analyze"
+            $videoSource = Select-File -Title "Locate video source (.mp4/.mov/...), RAW (.yuv/.y4m/...)"
             if (-not $videoSource) { 
-                Show-Error "未选择文件" 
+                Show-Error "No video source selected" 
                 continue
             }
             
-            Show-Success "已选择视频源文件: $videoSource"
+            Show-Success "Video source selected: $videoSource"
             break
         }
         while ($true)
@@ -252,18 +252,16 @@ function Main {
         $encodeImportSourcePath = $videoSource
     }
 
-    # 检测封装文件类型
+    # Detect source video container format
     $isMOV = ([IO.Path]::GetExtension($videoSource).ToLower() -eq '.mov')
-
-    # 报告封装文件类型
     if ($isMOV) {
-        Show-Info "导入视频 $videoSource 的封装格式为 MOV"
+        Show-Debug "`r`nVideo source $videoSource is in MOV format`r`n"
     }
     else {
-        Show-Info "导入视频 $videoSource 的封装格式非 MOV"
+        Show-Debug "`r`nVideo source $videoSource is not in MOV format`r`n"
     }
 
-    # 根据封装文件类型选用 ffprobe 命令、定义文件名
+    # Select ffprobe command and define the filename according to container format
     $ffprobeArgs =
         if ($isMOV) {@(
             '-i', $videoSource, '-select_streams', 'v:0', '-v', 'error', '-hide_banner', '-show_streams', '-show_entries',
@@ -285,7 +283,9 @@ function Main {
     #        '-of', 'ini'
     #    )}
     
-    # 由于 ffprobe 读取不同源所产生的列数不一，导致读取额外插入的信息随机错位，因此需要独立的 CSV（s_info）来储存源信息
+    # Because ffprobe outputs different numbers of columns from different sources,
+    # causing random misalignment (by extra source information)
+    # A separate CSV (s_info) is needed to store the source information
     $sourceCSVExportPath = Join-Path $Global:TempFolder "temp_s_info.csv"
     $ffprobeCSVExportPath =
         if ($isMOV) {
@@ -302,28 +302,28 @@ function Main {
     #         Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_debug.csv"
     #     }
 
-    # 若 CSV 已存在，要求手动确认后清理，避免覆盖
+    # If the CSV file already exists, manually confirm and delete
     Confirm-FileDelete (Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_mov.csv")
     Confirm-FileDelete (Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info.csv")
     Confirm-FileDelete $sourceCSVExportPath
 
-    # 定位 ffprobe 程序
-    Show-Info "定位 ffprobe.exe..."
+    # Locate ffprobe
+    Show-Info "Select ffprobe.exe..."
     do {
         $ffprobePath =
-            Select-File -Title "定位 ffprobe.exe" -InitialDirectory ([Environment]::GetFolderPath('ProgramFiles')) -ExeOnly
+            Select-File -Title "Open ffprobe.exe" -InitialDirectory ([Environment]::GetFolderPath('ProgramFiles')) -ExeOnly
         if (-not (Test-Path -LiteralPath $ffprobePath)) {
-            Show-Warning "找不到 ffprobe 可执行文件，请重试：$ffprobePath"
+            Show-Warning "Could not locate ffprobe executable, please retry"
         }
     }
     while (-not (Test-Path -LiteralPath $ffprobePath))
 
-    # 执行 ffprobe 并插入视频源路径
+    # Execute ffprobe with video source path provided
     try {
         $ffprobeOutputCSV = (& $ffprobePath @ffprobeArgs).Trim()
         # $ffprobeOutputCSVDebug = (& $ffprobePath @ffprobeArgsDebug).Trim()
 
-        # 构建源 CSV 行
+        # Construct source CSV row
         $sourceInfoCSV = @"
 "$encodeImportSourcePath",$upstreamCode,"$Avs2PipeModDLL","$OneLineShotArgsINI"
 "@
@@ -332,10 +332,10 @@ function Main {
         # [System.IO.File]::WriteAllLines($ffprobeCSVExportPathDebug, $ffprobeOutputCSVDebug)
 
         Write-TextFile -Path $sourceCSVExportPath -Content $sourceInfoCSV -UseBOM $true
-        Show-Success "CSV 文件已生成：$ffprobeCSVExportPath`n$sourceCSVExportPath"
+        Show-Success "CSV file created: $ffprobeCSVExportPath`n$sourceCSVExportPath"
 
-        # 验证换行符
-        Show-Debug "验证 CSV 文件格式..."
+        # Check line breaks (must be CRLF)
+        Show-Debug "Validating file format..."
         if (-not (Test-TextFileFormat -Path $ffprobeCSVExportPath)) {
             return
         }
@@ -343,19 +343,18 @@ function Main {
             return
         }
     }
-    catch { throw "ffprobe 执行失败：$_" }
+    catch { throw "ffprobe execution failed: $_" }
 
     Write-Host ""
-    Show-Success "脚本执行完成！"
-    Read-Host "按回车键退出"
+    Show-Success "Script Completed!"
+    Read-Host "Press any button to exit"
 }
 #endregion
 
-# 异常处理
 try { Main }
 catch {
-    Show-Error "脚本执行出错：$_"
-    Write-Host "错误详情：" -ForegroundColor Red
+    Show-Error "Script failed: $_"
+    Write-Host "Error details: " -ForegroundColor Red
     Write-Host $_.Exception.ToString()
-    Read-Host "按回车键退出"
+    Read-Host "Press any button to exit"
 }

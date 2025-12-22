@@ -334,7 +334,7 @@ function Main {
     
     $containerExt = ""
     do {
-        switch (Read-Host "请输入选项 （1/2/3/4）") {
+        switch (Read-Host "请输入选项（1/2/3/4）") {
             1 { $containerExt = ".mp4" }
             2 { $containerExt = ".mov" }
             3 { $containerExt = ".mkv" }

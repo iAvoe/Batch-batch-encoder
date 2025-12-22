@@ -53,7 +53,7 @@ function Get-VSPipeY4MArgument {
     )
 
     foreach ($testArgs in $tests) {
-        Write-Host (" Testing：{0} {1}" -f $VSpipePath, ($testArgs -join " "))
+        Write-Host (" Testing: {0} {1}" -f $VSpipePath, ($testArgs -join " "))
         
         # Use Start-Process to execute on a different process,
         # so it doesn't break the character code page used in current console
@@ -91,7 +91,7 @@ function Get-VSPipeY4MArgument {
 function Get-CommandFromPreset([string]$presetName, $tools, $vspipeInfo) {
         $preset = $Global:PipePresets[$presetName]
         if (-not $preset) {
-            throw "Unknown PipePreset：$presetName"
+            throw "Unknown PipePreset: $presetName"
         }
 
         $up   = $preset.Upstream
@@ -109,7 +109,7 @@ function Get-CommandFromPreset([string]$presetName, $tools, $vspipeInfo) {
 
         # Check pipe format
         if (-not $Script:DownstreamPipeParams.ContainsKey($pType)) {
-            throw "Unknown PipeType：$pType"
+            throw "Unknown PipeType: $pType"
         }
         if (-not $Script:DownstreamPipeParams[$pType].ContainsKey($down)) {
             throw "Downstream (Video Encoder) $down does not support $pType pipe"
@@ -130,7 +130,7 @@ function Main {
     Show-Border
     Write-Host ""
     
-    Show-Info "Example of common encoding commandlines："
+    Show-Info "Example of common encoding commandlines:"
     Write-Host "ffmpeg -i [source] -an -f yuv4mpegpipe -strict unofficial - | x265.exe --y4m - -o"
     Write-Host "vspipe [source.vpy] --y4m - | x265.exe --y4m - -o"
     Write-Host "avs2pipemod [source.avs] -y4mp | x265.exe --y4m - -o"
@@ -150,7 +150,7 @@ function Main {
     
     $batchFullPath = Join-Path -Path $outputPath -ChildPath "encode_single.bat"
 
-    Show-Success "Output file：$batchFullPath"
+    Show-Success "Output file defined: $batchFullPath"
     
     # Import encoding tools
     $upstreamTools = @{
@@ -260,7 +260,7 @@ function Main {
     }
 
     # Show toochains that could work
-    Show-Info "Encoding Toolchains available："
+    Show-Info "Available encoding toolchains:"
     Write-Host ("─" * 60)
 
     # Construct “ID → PresetName” map
@@ -330,7 +330,9 @@ function Main {
     }
     $remCommands = $otherCommands -join "`r`n"
 
-    # Build batch file (needs double line break at the beginning of the file) # !TODO：Alter Script 4 so it matches English batch title!
+    # Build batch file (needs double line break at the beginning of the file)
+    
+    # !TODO: Alter Script 4 so it matches English batch title!
     $batchContent = @'
 
 @echo off
@@ -384,7 +386,7 @@ cmd /k
         # Show usages
         Write-Host ""
         Write-Host ("─" * 50)
-        Show-Info "Usages："
+        Show-Info "Usages:"
         Write-Host " 1. Later scripts will generate ‘Encoding Batch’ based on this ‘Toolchain/Pipeline Batch’ to start encoding properly"
         Write-Host " 2. Regenration of ‘Toolchain/Pipeline Batch’ is not required as long as there are no changes in encoding tool programs"
         Write-Host " 3. It is recommended to double check tool existense before encoding, especially after setting aside for a long time"
@@ -408,7 +410,7 @@ cmd /k
     }
     
     Write-Host ""
-    Show-Success "Script execution completed!"
+    Show-Success "Script Completed!"
     Read-Host "Press any button to exit"
 }
 #endregion
@@ -416,7 +418,7 @@ cmd /k
 try { Main }
 catch {
     Show-Error "Script failed: $_"
-    Write-Host "Error: " -ForegroundColor Red
+    Write-Host "Error details: " -ForegroundColor Red
     Write-Host $_.Exception.ToString()
     Read-Host "Press any button to exit"
 }

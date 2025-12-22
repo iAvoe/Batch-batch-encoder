@@ -111,7 +111,7 @@ function Main {
         $sourceTypes.GetEnumerator() | Sort-Object Key | ForEach-Object {
             Write-Host "  $($_.Key): $($_.Value.Name)"
         }
-        $choice = (Read-Host " 请输入选项").ToUpper()
+        $choice = (Read-Host " 请输入选项（A/B/C/D/E）").ToUpper()
 
         if ($sourceTypes.ContainsKey($choice)) {
             $selectedType = $sourceTypes[$choice]
@@ -145,16 +145,17 @@ function Main {
             }
             while (-not $Avs2PipeModDLL)
 
-            Show-Success "已记录 avisynth.dll 路径: $Avs2PipeModDLL"
+            Show-Success "已记录 avisynth.dll 路径：$Avs2PipeModDLL"
         }
         'SVFI'         {
             $upstreamCode = 'e'
-            Show-Info "请指定 SVFI 渲染配置 INI 文件的路径，`r`n      如 X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini"
+            Show-Info "请指定 SVFI 渲染配置 INI 文件的路径"
+            Write-Host " 如 X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini"
 
             do {
-                $OneLineShotArgsINI = Select-File -Title "选择 SVFI 渲染配置文件 (.ini)" -IniOnly
+                $OneLineShotArgsINI = Select-File -Title "选择 SVFI 渲染配置文件（.ini）" -IniOnly
                 if (-not $OneLineShotArgsINI) {
-                    $placeholderScript = Read-Host "未选择 INI。按 Enter 重试，输入 'q' 强制退出"
+                    $placeholderScript = Read-Host " 未选择 INI。按 Enter 重试，输入 'q' 强制退出"
                     if ($placeholderScript -eq 'q') { exit }
                 }
             }
@@ -202,7 +203,7 @@ function Main {
                 }
                 while (-not $scriptSource)
             
-                Show-Success "已选择脚本文件: $scriptSource"
+                Show-Success "已选择脚本文件：$scriptSource"
                 # 注意：视频源 $videoSource 仍然用于 ffprobe
             }
             elseif ([string]::IsNullOrWhiteSpace($mode) -or $mode -eq 'n') { # 生成无滤镜脚本
@@ -220,7 +221,7 @@ function Main {
                     $scriptSource = $placeholderScript.VPY
                 }
                 
-                Show-Success "已生成无滤镜脚本: $scriptSource"
+                Show-Success "已生成无滤镜脚本：$scriptSource"
             }
             else {
                 Show-Warning "无效输入"
@@ -241,7 +242,7 @@ function Main {
                 continue
             }
             
-            Show-Success "已选择视频源文件: $videoSource"
+            Show-Success "已选择视频源文件：$videoSource"
             break
         }
         while ($true)
@@ -251,13 +252,11 @@ function Main {
 
     # 检测封装文件类型
     $isMOV = ([IO.Path]::GetExtension($videoSource).ToLower() -eq '.mov')
-
-    # 报告封装文件类型
     if ($isMOV) {
-        Show-Info "导入视频 $videoSource 的封装格式为 MOV"
+        Show-Debug "`r`n导入视频 $videoSource 的封装格式为 MOV`r`n"
     }
     else {
-        Show-Info "导入视频 $videoSource 的封装格式非 MOV"
+        Show-Debug "`r`n导入视频 $videoSource 的封装格式非 MOV`r`n"
     }
 
     # 根据封装文件类型选用 ffprobe 命令、定义文件名
@@ -310,7 +309,7 @@ function Main {
         $ffprobePath =
             Select-File -Title "定位 ffprobe.exe" -InitialDirectory ([Environment]::GetFolderPath('ProgramFiles')) -ExeOnly
         if (-not (Test-Path -LiteralPath $ffprobePath)) {
-            Show-Warning "找不到 ffprobe 可执行文件，请重试：$ffprobePath"
+            Show-Warning "找不到 ffprobe 可执行文件，请重试"
         }
     }
     while (-not (Test-Path -LiteralPath $ffprobePath))
