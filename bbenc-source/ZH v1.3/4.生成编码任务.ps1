@@ -97,8 +97,10 @@ function Get-EncodeOutputName {
         }
         b {
             Show-Info "填写除后缀外的文件名..."
+            Show-Warning " 两个方括号间必须用字符隔开"
+            Show-Warning " 不要输入包括货币符、换行符的特殊符号"
             do {
-                $encodeOutputFileName = Read-Host "要求：两个方括号间必须用字符隔开，且避免输入包括货币符、换行符的特殊符号"
+                $encodeOutputFileName = Read-Host "填写除后缀外的文件名"
                 $fileNameTestResult = Test-FilenameValid($encodeOutputFileName)
                 if ((-not $fileNameTestResult) -or [string]::IsNullOrWhiteSpace($encodeOutputFileName)) {
                     if ((Read-Host "文件名含特殊字符或只有空值，按 Enter 重试，输入 'q' 强制退出") -eq 'q') {

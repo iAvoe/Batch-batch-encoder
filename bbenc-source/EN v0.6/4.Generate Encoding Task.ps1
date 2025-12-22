@@ -1,23 +1,24 @@
 ﻿<#
 .SYNOPSIS
-    视频编码任务生成器
+    Video encoding task batch generator
 .DESCRIPTION
-    生成用于视频编码的批处理文件，支持多种编码工具链组合，先前步骤已经录入所有上下游程序路径
+    Generate batch script for video encoding, supporting multiple toochains, inherit paths and toolchains created by preceding script steps
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
     1.3
 #>
 
-# 加载共用代码
+# Load globals
 . "$PSScriptRoot\Common\Core.ps1"
 
-# 需要结合视频数据统计的参数，注意管道参数已经在先前脚本完成，这里不写
+# Encoding parameters to configure according to source result and user requirements
+# Note that pipe parameteres was already configured in step 2 script
 $x264Params = [PSCustomObject]@{
-    FPS = "" # 丢帧帧率用如 24000/1001 的字符串
+    FPS = "" # Best practice: use string (24000/1001) for fractional frame rate
     Resolution = ""
     TotalFrames = ""
-    RAWCSP = "" # 位深、色彩空间
+    RAWCSP = "" # Depth, colorspace...
     Keyint = ""
     RCLookahead = ""
     SEICSP = "" # ColorMatrix、Transfer
@@ -27,7 +28,7 @@ $x264Params = [PSCustomObject]@{
     OutputExtension = ".mp4"
 }
 $x265Params = [PSCustomObject]@{
-    FPS = "" # 丢帧帧率用如 24000/1001 的字符串
+    FPS = "" # same as x264
     Resolution = ""
     TotalFrames = ""
     RAWCSP = ""
@@ -44,7 +45,7 @@ $x265Params = [PSCustomObject]@{
     OutputExtension = ".hevc"
 }
 $svtav1Params = [PSCustomObject]@{
-    FPS = "" # 丢帧帧率用 --fps-num --fps-denom 而不是 --fps
+    FPS = "" # Best practice: use --fps-num --fps-denom for fractional frame rate, not --fps
     RAWCSP = "" # --color-format --input-depth
     Keyint = ""
     Resolution = ""
@@ -82,11 +83,11 @@ function Get-EncodeOutputName {
 
     switch ($pickOps) {
         a {
-            Show-Info "选择文件以拷贝文件名..."
+            Show-Info "Select file to copy file name..."
             do {
-                $selection = Select-File -Title "选择文件以拷贝文件名"
+                $selection = Select-File -Title "Select a file to copy file name"
                 if (-not $selection) {
-                    if ((Read-Host "未选中文件，按 Enter 重试，输入 'q' 强制退出") -eq 'q') {
+                    if ((Read-Host "No file selected. Press Enter to retry, input 'q' to force exit") -eq 'q') {
                         exit 1
                     }
                 }
@@ -96,12 +97,14 @@ function Get-EncodeOutputName {
             return [io.path]::GetFileNameWithoutExtension($selection)
         }
         b {
-            Show-Info "填写除后缀外的文件名..."
+            Show-Info "Input file name expect file extension..."
+            Show-Warning " Two square brackets MUST be separated by character"
+            Show-Warning " Avoid special characters including currency symbols AND newline characters"
             do {
-                $encodeOutputFileName = Read-Host "要求：两个方括号间必须用字符隔开，且避免输入包括货币符、换行符的特殊符号"
+                $encodeOutputFileName = Read-Host "Input a file name"
                 $fileNameTestResult = Test-FilenameValid($encodeOutputFileName)
                 if ((-not $fileNameTestResult) -or [string]::IsNullOrWhiteSpace($encodeOutputFileName)) {
-                    if ((Read-Host "文件名含特殊字符或只有空值，按 Enter 重试，输入 'q' 强制退出") -eq 'q') {
+                    if ((Read-Host "File name is empty or contains special characters. Press Enter to retry, input 'q' to force exit") -eq 'q') {
                         exit 1
                     }
                 }
@@ -109,15 +112,15 @@ function Get-EncodeOutputName {
             while ((-not $fileNameTestResult) -or [string]::IsNullOrWhiteSpace($encodeOutputFileName))
         }
         default {
-            Show-Warning "未选择有效选项，返回空文件名"
+            Show-Warning "No option selected, returning empty file name"
             return ""
         }
     }
-    Show-Success "导出文件名：$encodeOutputFileName"
+    Show-Success "Output file name: $encodeOutputFileName"
     return $encodeOutputFileName
 }
 
-# 解析分数字符串并进行除法计算，用例：ConvertTo-Fraction -fraction "1/2"
+# Parse the fraction string and perform division, i.e., ConvertTo-Fraction -fraction "1/2"
 function ConvertTo-Fraction {
     param([Parameter(Mandatory=$true)][string]$fraction)
     if ($fraction -match '^(\d+)/(\d+)$') {
@@ -126,10 +129,12 @@ function ConvertTo-Fraction {
     elseif ($fraction -match '^\d+(\.\d+)?$') {
         return [double]$fraction
     }
-    throw "无法解析帧率除法字符串: $fraction"
+    throw "Could not parse framerate division string: $fraction"
 }
 
-# 生成上游程序导入、下游程序导出命令（管道命令已经在先前脚本中写完，目录不存在则自动创建）
+# Generate upstream program import and downstream program export commands
+# the pipe commands have already been written in the previous script;
+# if the directory does not exist, it will be created automatically
 function Get-EncodingIOArgument {
     Param (
         [ValidateSet(
@@ -142,28 +147,29 @@ function Get-EncodingIOArgument {
             'x265','h265','hevc',
             'svt-av1','svtav1','ivf'
         )][Parameter(Mandatory=$true)]$program,
-        [string]$source, # 导入路径到文件（带或不带引号）
+        [string]$source, # Import path to file (with or without quotes)
         [bool]$isImport = $true,
-        [string]$outputFilePath, # 导出目录，不用于导入
-        [string]$outputFileName, # 导出文件名，不用于导入
+        [string]$outputFilePath, # Export directory, not used for import
+        [string]$outputFileName, # Export filename, not used for import
         [string]$outputExtension
     )
 
-    # 验证输入文件（生成导入命令）
+    # Validate file input (generate input argument)
     $quotedInput = $null
     if ($isImport) {
-        if (-not (Test-Path -LiteralPath $source)) { # 文件名含方括号，因此不用 -Path
-            throw "输入文件不存在: $source"
+        # Video filename commonly contains square brackets, -Path option is doomed
+        if (-not (Test-Path -LiteralPath $source)) {
+            throw "Input file missing: $source"
         }
         $quotedInput = Get-QuotedPath $source
     }
-    else { # 导出模式必须给出导出文件名
+    else { # Export mode requires specifying the export file name
         if ([string]::IsNullOrWhiteSpace($outputFileName)) {
-            throw "导出（下游）模式需要 outputFileName 参数"
+            throw "Export (downstream) mode requires the outputFileName parameter"
         }
     }
     
-    # 组合完整输出路径（不做扩展名自动添加）
+    # Combine the complete output path (w/out automatically adding the file extension).
     if (-not [string]::IsNullOrWhiteSpace($outputFilePath)) {
         $quotedExport = Get-QuotedPath $outputFilePath
         if (-not (Test-Path -LiteralPath $quotedExport)) {
@@ -176,10 +182,10 @@ function Get-EncodingIOArgument {
         }
         else { $outputFileName }
     
-    # 路径加引号（$quoteInput 已定义）
+    # Enclose path with quotes ($quoteInput is already defined)
     $quotedOutput = Get-QuotedPath ($combinedOutputPath + $outputExtension)
 
-    # 生成管道上游导入与下游导出参数
+    # Generate upstream import and downstream export parameters for pipelines
     if ($isImport) {
         switch ($program) {
             'ffmpeg' { 
@@ -212,14 +218,15 @@ function Get-EncodingIOArgument {
                 return "-b $($quotedOutput)"
             }
             default {
-                throw "未识别的导出程序：$program"
+                throw "Unidentified program: $program"
             }
         }
     }
-    throw "无法为程序 $program 生成 IO 参数"
+    throw "Could not generate IO parameter for: $program"
 }
 
-# 后续脚本已实现封装功能，直接使用默认值即可，否则调用此函数
+# Subsequent scripts have implemented encapsulation functionality; 
+# Use the default values, otherwise call this function.
 # function Get-EncodingOutputFormatExtension {
 #     Param (
 #         [ValidateSet(
@@ -228,7 +235,9 @@ function Get-EncodingIOArgument {
 #             'svt-av1','svtav1','ivf'
 #         )][Parameter(Mandatory=$true)]$program
 #     )
-#     # x264 支持直接封装 MP4、x265 仅导出 .hevc、SVT-AV1 仅导出 .ivf
+#     # x264 supports direct encapsulation of MP4 files;
+#     # x265 only exports .hevc files;
+#     # SVT-AV1 only exports .ivf files.
 #     switch ($program) {
 #         { $_ -in @('x264', 'h264', 'avc') } {
 #             return ".mp4"
@@ -242,7 +251,7 @@ function Get-EncodingIOArgument {
 #     }
 # }
 
-# 获取基础参数，注意输入的“ - ”必须放在最后，需要确保不和 --output 参数构建冲突
+# When retrieving basic parameters, note that the "-" in the input must be placed last to ensure it doesn't conflict with the `--output` parameter.
 function Get-x264BaseParam {
     Param (
         [Parameter(Mandatory=$true)]$pickOps,
