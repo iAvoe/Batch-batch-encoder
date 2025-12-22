@@ -1,26 +1,26 @@
 ﻿<#
 .SYNOPSIS
-    基于 ffmpeg、ffprobe 的多轨道复杂封装命令生成器
+    Multi-track multiplex command generator
 .DESCRIPTION
-    封装对过视音频、字幕字体批处理的工具，运行批处理即可完成封装操作
+    Using ffmpeg and ffprobe to multiplex/encapsulate multiple tracks to video container format
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
     1.3
 #>
 
-# 加载共用代码，工具链组合全局变量
+# Load globals
 . "$PSScriptRoot\Common\Core.ps1"
 
-# 检测帧率值是否正常
+# Validate if frame rate value is normal
 function Test-FrameRateValid {
     param([string]$fr)
     if (-not $fr) { return $false }
 
-    # 排除 0/0 或 0
+    # Exclude 0/0 or 0
     if ($fr -match '^(0(/0)?|0(\.0+)?)$') { return $false }
 
-    # 允许分数如 24000/1001、允许整数 24、允许小数 23.976
+    # Fractions such as 24000/1001 are allowed, as are integers like 24 and floats like 23.976
     if ($fr -match '^\d+/\d+$') { return $true }
     if ($fr -match '^\d+(\.\d+)?$') { return $true }
     return $false
@@ -39,7 +39,8 @@ function Get-FrameRateFromContainer {
 }
 
 
-# 调用 ffprobe 获取指定流的信息，直接返回对象，不写临时文件
+# Calling ffprobe retrieves information about a specified stream and returns an object directly without writing to a temporary file
+# Let user to specify video fps as a last resort to eliminate errors and improve experience
 function Get-StreamArgs {
     param (
         [string]$FFprobePath,
@@ -47,133 +48,130 @@ function Get-StreamArgs {
         [int]$MapIndex,
         [bool]$IsFirstVideo
     )
-    
     $ext = [IO.Path]::GetExtension($FilePath).ToLower()
     $argsResult = @()
     $hasVideo = $false
     
-    # 检查是否为视频容器格式
+    # Try to match video container formats
     $isVideoContainer = $ext -in @('.mkv', '.mp4', '.mov', '.f4v', '.flv', '.avi', '.m3u', '.mxv')
     $isAudioContainer = $ext -in @('.m4a', '.mka', '.mks')
     $isSingleFile = -not ($isVideoContainer -or $isAudioContainer)
     
-    Show-Debug "分析文件: $FilePath (扩展名: $ext)"
+    Show-Debug "Analyzing: $FilePath (Extension: $ext)"
     
-    # 处理视频容器
+    # Process multiplexed/contained video formats
     if ($isVideoContainer) {
-        Show-Info "视频容器格式，分析所有流..."
+        Show-Info "Video container format，analyzing internal tracks..."
         
-        # 视频流
+        # Video streams
         $vData = Get-StreamMetadata -FFprobePath $FFprobePath -FilePath $FilePath -StreamType "v"
         if ($vData -and $IsFirstVideo) {
             $codec = if ($vData.CodecTag -and $vData.CodecTag -ne "0") { 
                 $vData.CodecTag 
-            } else { 
+            }
+            else { 
                 $vData.CodecName 
             }
             
-            Show-Success "视频流: $codec"
-            if ($vData.FrameRate) {
+            Show-Success "Video stream: $codec"
+            if ($vData.FrameRate) { # Assume video container format always provide fps data
                 $argsResult += "-r $($vData.FrameRate) -c:v copy"
-            } else {
+            }
+            else {
                 $argsResult += "-c:v copy"
             }
             $hasVideo = $true
         }
         elseif ($vData) {
-            Show-Warning "跳过额外视频流（仅保留第一个视频）"
+            Show-Warning "Skip extra video streams (allow only the 1st video stream)."
         }
-        
-        # 音频流
-        if (Get-StreamMetadata -FFprobePath $FFprobePath -FilePath $FilePath -StreamType "a") {
-            Show-Success "发现音频流"
-            $argsResult += "-c:a copy"
-        }
-        
-        # 字幕流
-        if (Get-StreamMetadata -FFprobePath $FFprobePath -FilePath $FilePath -StreamType "s") {
-            Show-Success "发现字幕流"
-            $argsResult += "-c:s copy"
-        }
-    }
-    # 处理音频容器
-    elseif ($isAudioContainer) {
-        Show-Info "音频容器格式..."
         
         if (Get-StreamMetadata -FFprobePath $FFprobePath -FilePath $FilePath -StreamType "a") {
-            Show-Success "发现音频流"
+            Show-Success "Audio stream detected"
             $argsResult += "-c:a copy"
         }
         
         if (Get-StreamMetadata -FFprobePath $FFprobePath -FilePath $FilePath -StreamType "s") {
-            Show-Success "发现字幕流"
+            Show-Success "Subtitle stream detected"
             $argsResult += "-c:s copy"
         }
     }
-    # 处理单文件（未封装视频、音频、字幕等）
-    elseif ($isSingleFile) {
-        Show-Info "单文件格式，分析流类型..."
+    elseif ($isAudioContainer) { # Process audio container format
+        Show-Info "Detected audio container format..."
         
-        # 尝试检测视频流
+        if (Get-StreamMetadata -FFprobePath $FFprobePath -FilePath $FilePath -StreamType "a") {
+            Show-Success "Audio stream detected"
+            $argsResult += "-c:a copy"
+        }
+        
+        if (Get-StreamMetadata -FFprobePath $FFprobePath -FilePath $FilePath -StreamType "s") {
+            Show-Success "Subtitle stream detected"
+            $argsResult += "-c:s copy"
+        }
+    }
+    elseif ($isSingleFile) { # Single file (video stream, audio stream, subtitle...)
+        Show-Info "Singular file detected..."
+        
+        # Try to detect file type
         $vData = Get-StreamMetadata -FFprobePath $FFprobePath -FilePath $FilePath -StreamType "v"
         
         if ($vData -and $IsFirstVideo) {
-            Show-Success "发现视频流: $($vData.CodecName)"
+            Show-Success "Detecting singular video stream: $($vData.CodecName)"
             
-            # 获取当前文件的帧率
+            # Get fps of this stream
             $currentFrameRate = $vData.FrameRate
             $isCurrentFrameRateValid = Test-FrameRateValid -fr $currentFrameRate
             
-            # 帧率处理逻辑
+            # FPS handling
             if ($isCurrentFrameRateValid) {
-                # 情况1：单文件本身有有效帧率
-                Show-Info "使用文件自带的帧率: $currentFrameRate"
+                # 1. Video file actually provides frame rate (could be indeo video format / ivf)
+                Show-Info "Use the frame rate provided in the file: $currentFrameRate"
                 $frameRate = $currentFrameRate
             }
             else {
-                # 情况2：单文件没有有效帧率，提供选择
-                Show-Warning "未封装的视频流不具备有效帧率信息"
+                # 2. No fps data provided
+                Show-Warning "Singular video stream does not provide valid frame rate (fps) data..."
                 
-                # 提供用户选择
-                Write-Host "`n选择帧率来源：" -ForegroundColor Cyan
-                Write-Host "1：手动输入帧率" -ForegroundColor Yellow
-                Write-Host "2：从其他封装视频文件读取（推荐）" -ForegroundColor Yellow
-                Write-Host "3：使用常用预设帧率" -ForegroundColor Yellow
-                Write-Host "Q：跳过此文件" -ForegroundColor DarkGray
+                # Provide choices
+                Write-Host "`nSelect a method to provide frame rate (fps) data:" -ForegroundColor Cyan
+                Write-Host "1: Manual input" -ForegroundColor Yellow
+                Write-Host "2: Read from another video source (recommended)" -ForegroundColor Yellow
+                Write-Host "3: Pick a common frame rate from list" -ForegroundColor Yellow
+                Write-Host "q: Skip this file" -ForegroundColor DarkGray
                 
-                $choice = Read-Host "`n请选择（1-3, Q）"
+                $choice = Read-Host "`nSpecify (1-3, q)"
                 
-                switch ($choice.ToUpper()) {
-                    '1' {
-                        # 手动输入帧率
-                        $manualFrameRate = Read-Host "请输入帧率（整数/小数/分数，如 24、23.976、24000/1001）"
+                switch ($choice.ToLower()) {
+                    '1' { # Manual input
+                        $manualFrameRate = Read-Host "Specify a framerate (Integer/Decimal/Fraction, i.e., 24, 23.976, 24000/1001)"
                         if (Test-FrameRateValid -fr $manualFrameRate) {
                             $frameRate = $manualFrameRate
-                        } else {
-                            Show-Error "无效的帧率格式，将跳过此文件"
+                        }
+                        else {
+                            Show-Error "Invalid framerate, skipping current stream"
                             return $null
                         }
                     }
-                    '2' {
-                        # 从其他文件读取帧率
-                        Show-Info "请选择一个包含帧率信息的封装视频文件"
-                        $containerFile = Select-File -Title "选择封装视频文件以读取帧率"
+                    '2' { # Read from another source
+                        Show-Info "Selected a multiplexed/container format (.mp4/.mov/.flv/...)"
+                        $containerFile = Select-File -Title "Select a video source to read framerate (fps)"
                         
                         if ($containerFile -and (Test-Path -LiteralPath $containerFile)) {
                             $frameRate = Get-FrameRateFromContainer -FFprobePath $FFprobePath -FilePath $containerFile
                             if (-not $frameRate) {
-                                Show-Error "无法从所选文件读取有效帧率"
+                                Show-Error "Could not find valid video framerate from file, skipping current stream"
                                 return $null
                             }
-                            Show-Info "从参考文件读取帧率: $frameRate"
-                        } else {
-                            Show-Error "未选择有效文件，将跳过此文件"
+                            Show-Info "Framerate found from file: $frameRate"
+                        }
+                        else {
+                            Show-Error "Invalid file selected, skipping current stream"
                             return $null
                         }
                     }
-                    '3' {
-                        # 使用预设帧率
-                        Write-Host "`n常用帧率预设：" -ForegroundColor Cyan
+                    '3' { # Pick a common frame rate
+                        Write-Warning "Framerate (fps) must be exactly same as source video stream, expect playback issues otherwise"
+                        Write-Host "`nCommon framerate (fps)" -ForegroundColor Cyan
                         Write-Host "1. 23.976 (24000/1001)" -ForegroundColor Yellow
                         Write-Host "2. 24" -ForegroundColor Yellow
                         Write-Host "3. 25" -ForegroundColor Yellow
@@ -183,9 +181,12 @@ function Get-StreamArgs {
                         Write-Host "7. 50" -ForegroundColor Yellow
                         Write-Host "8. 59.94 (60000/1001)" -ForegroundColor Yellow
                         Write-Host "9. 60" -ForegroundColor Yellow
+                        Write-Host "a. 120" -ForegroundColor Yellow
+                        Write-Host "b. 144" -ForegroundColor Yellow
+                        Write-Host ""
                         
-                        $presetChoice = Read-Host "`n选择预设帧率 (1-9)"
-                        $frameRate = switch ($presetChoice) {
+                        $presetChoice = Read-Host "Select a framerate/fps (1-9, a-b)"
+                        $frameRate = switch ($presetChoice.ToLower()) {
                             '1' { '24000/1001' }
                             '2' { '24' }
                             '3' { '25' }
@@ -195,64 +196,63 @@ function Get-StreamArgs {
                             '7' { '50' }
                             '8' { '60000/1001' }
                             '9' { '60' }
+                            'a' { '120' }
+                            'b' { '144' }
                             default { 
-                                Show-Error "无效选择，将跳过此文件"
+                                Show-Error "Invalid choice, skipping current stream"
                                 return $null
                             }
                         }
                     }
-                    'Q' {
-                        Show-Info "用户取消，跳过此文件"
+                    'q' {
+                        Show-Info "Cancelled, skipping current stream"
                         return $null
                     }
                     default {
-                        Show-Error "无效选择，将跳过此文件"
+                        Show-Error "Invalid choice, skipping current stream"
                         return $null
                     }
                 }
             }
             
-            # 添加帧率参数
+            # Add ffmpeg framerate parameter
             if ($frameRate) {
                 $argsResult += "-r $frameRate -c:v copy"
                 $hasVideo = $true
-            } else {
-                Show-Warning "未设置帧率，可能导致播放问题"
+            }
+            else {
+                Show-Warning "No framerate selected, please expect playback issues"
                 $argsResult += "-c:v copy"
                 $hasVideo = $true
             }
         }
-        # 尝试音频流
-        elseif (-not $vData) {
+        elseif (-not $vData) { # Try to match audio stream
             $aData = Get-StreamMetadata -FFprobePath $FFprobePath -FilePath $FilePath -StreamType "a"
             if ($aData) {
-                Show-Success "发现音频流: $($aData.CodecName)"
+                Show-Success "Audio stream detected: $($aData.CodecName)"
                 $argsResult += "-c:a copy"
             }
         }
         
-        # 处理字幕文件
         if ($ext -in @('.srt', '.ass', '.ssa')) {
-            Show-Success "字幕文件: $ext"
+            Show-Success "Subtitle stream detected: $ext"
             $argsResult += "-c:s copy"
         }
-        # 处理字体文件
         elseif ($ext -in @('.ttf', '.ttc', '.otf')) {
-            Show-Success "字体文件: $ext"
+            Show-Success "Font file detected: $ext"
             $argsResult += "-c:t copy"
         }
     }
     else {
-        Show-Warning "未识别的源，无法处理"
+        Show-Warning "Unidentified source, cannot be processed"
         return $null
     }
     
     if ($argsResult.Count -eq 0) {
-        Show-Warning "文件未生成有效参数: $FilePath"
+        Show-Warning "Input file did not generate valid parameters: $FilePath"
         return $null
     }
     
-    # 返回结果
     return [PSCustomObject]@{
         ArgumentsString = $argsResult -join " "
         ContainsVideo   = $hasVideo
@@ -260,33 +260,33 @@ function Get-StreamArgs {
 }
 
 function Main {
-    # 标题与说明
     Show-Border
-    Show-Info "基于 ffmpeg 的多轨道封装命令生成器"
+    Show-Info "Multi-track multiplex command generator"
     Show-Border
     
-    # 初始化路径
-    Show-Info "导入工具和选择路径"
-    Show-Info "选择 ffprobe.exe"
-    $fprbPath = Select-File -Title "选择 ffprobe.exe" -ExeOnly
-    Show-Info " 导入 ffmpeg.exe..."
-    $ffmpegPath = Select-File -Title "请选择 ffmpeg.exe" -ExeOnly -InitialDirectory ([IO.Path]::GetDirectoryName($fprbPath))
-    Show-Info "选择导出封装批处理路径..."
-    $exptPath = Select-Folder -Description "选择导出封装批处理的文件夹"
-    Show-Info "选择封装结果路径..."a
-    $muxPath  = Select-Folder -Description "选择导出封装结果的文件夹"
+    # 1. Initialize paths and tools
+    Show-Info "Import tools and select export paths"
+    Show-Info "Import ffprobe.exe..."
+    $fprbPath = Select-File -Title "Select ffprobe.exe" -ExeOnly
+    Show-Info "Import ffmpeg.exe..."
+    $ffmpegPath = Select-File -Title "Select ffmpeg.exe" -ExeOnly -InitialDirectory ([IO.Path]::GetDirectoryName($fprbPath))
+    Show-Info "Select export path for multiplexing batch..."
+    $exptPath = Select-Folder -Description "Select folder to export the multiplexing batch file"
+    Show-Info "Select export path for mutiplex result..."
+    $muxPath  = Select-Folder -Description "Select folder to export the multiplexing result"
 
-    Show-Info "导入素材文件（循环）"
-    Write-Host "提示：仅第一个视频文件会被用作主视频流" -ForegroundColor Yellow
-    Write-Host "      后续文件只添加音频、字幕等轨道" -ForegroundColor Yellow
+    # 2. Import streams
+    Show-Info "Import source stream (loop)"
+    Write-Host "Note: Only the first video stream will be used" -ForegroundColor Yellow
+    Write-Host "      all later imports will only add audio, subtitle tracks" -ForegroundColor Yellow
     
-    $inputsAgg = ""   # 所有的 -i "path"
-    $mapsAgg   = ""   # 所有的 -map xArgs
+    $inputsAgg = ""   # All -i "path"S
+    $mapsAgg   = ""   # All -map xArgs
     $mapIndex  = 0
     $hasVideo  = $false
 
     while ($true) {
-        $strmPath = Select-File -Title "选择源文件（第 $($mapIndex+1) 个）"
+        $strmPath = Select-File -Title "Select source stream ($($mapIndex+1)st/nd/th)"
         
         $result = Get-StreamArgs -FFprobePath $fprbPath -FilePath $strmPath -MapIndex $mapIndex -IsFirstVideo (-not $hasVideo)
         
@@ -296,92 +296,100 @@ function Main {
             
             if ($result.ContainsVideo) {
                 $hasVideo = $true
-                Show-Success "已添加主视频流"
+                Show-Success "Master/Primary video stream added"
             }
             
             $mapIndex++
         }
         
         Write-Host ""
-        $continue = Read-Host "继续添加文件？输入 'y' 确认，按 Enter 完成"
+        $continue = Read-Host "Add more streams? Input 'y' to add, press Enter to complete import"
         if ($continue -ne 'Y' -and $continue -ne 'y') {
             break
         }
     }
 
-    # 3. 输出重置
-
-    Show-Info "步骤 4/4: 配置输出"
-
-    # 3-1. 确定文件名
+    # 3. Export batch
+    # 3-1. Specify file name for multiplex result
     $defaultName = [IO.Path]::GetFileNameWithoutExtension($strmPath) + "_mux"
-    $outName = Read-Host "请输入输出文件名 (留空默认：$defaultName)"
+    $outName = Read-Host "Please specify the file name for multiplex result`r`n (Input Enter on empty for default: $defaultName)"
     if ([string]::IsNullOrWhiteSpace($outName)) { $outName = $defaultName }
     
-    # 3-2. 简单校验文件名
+    # 3-2. Validate file name
     if (-not (Test-FilenameValid $outName)) {
-        Show-Warning "文件名包含非法字符，已自动修正"
+        Show-Warning "Invalid characters found, replacing..."
         $invalid = [IO.Path]::GetInvalidFileNameChars()
         foreach ($c in $invalid) { $outName = $outName.Replace($c, '_') }
     }
 
-    # 3-3. 选择封装容器 & ffmpeg 路径
-    Write-Host "`r`n选择封装容器:"
-    Write-Host " 1：MP4（适合通用）"
-    Write-Host " 2：MOV（适合剪辑）"
-    Write-Host " 3：MKV（兼容字幕、字体）"
-    Write-Host " 4：MXF（专业用途）"
+    # 3-3. Select 
+    Write-Host "`r`nSelect a video container format:"
+    Write-Host " 1：MP4 (General purpose)"
+    Write-Host " 2：MOV (Editing software preferred)"
+    Write-Host " 3：MKV (Compatible with most subtitles, support fonts)"
+    Write-Host " 4：MXF (Professional use case)"
+    Write-Warning " ffmpeg is deprecating the MP4 timecode (pts) generation feature, at which point the MP4 format option will stop working"
     
     $containerExt = ""
     do {
-        switch (Read-Host "请输入选项 （1/2/3/4）") {
+        switch (Read-Host "Pick an option (1/2/3/4)") {
             1 { $containerExt = ".mp4" }
             2 { $containerExt = ".mov" }
             3 { $containerExt = ".mkv" }
             4 { $containerExt = ".mxf" }
-            default { Write-Warning "无效选项" }
+            default { Write-Warning "Invalid option selected" }
         }
     }
     while ($containerExt -eq "")
 
-    # 3-4. 生成命令与后期检查
+    # 3-4. Commandline generation and final checks
     
-    # 组合最终命令
-    # 结构: ffmpeg.exe inputs maps output
+    # Construct final commandline
+    # Structore: ffmpeg.exe inputs maps output
     $finalOutput = Join-Path $muxPath ($outName + $containerExt)
     $cmdLine = "& $(Get-QuotedPath $ffmpegPath) $inputsAgg $mapsAgg $(Get-QuotedPath $finalOutput)"
 
-    # 兼容性检查与自动修复
-    if ($containerExt -in ".mp4", ".mov", ".mxf") {
-        if ($cmdLine -match "-c:t copy") {
-            Show-Warning "检测到字体流 (-c:t copy)，但 MP4/MOV/MXF 不支持。"
-            $fix = Read-Host "输入 'd' 删除字体流，输入 'm' 强制改为 MKV，其他键忽略"
-            if ($fix -eq 'd') { $cmdLine = $cmdLine.Replace("-c:t copy", "") }
-            elseif ($fix -eq 'm') { 
-                $containerExt = ".mkv"
-                $cmdLine = $cmdLine.Replace(".mp4", ".mkv").Replace(".mov", ".mkv").Replace(".mxf", ".mkv")
-                Show-Success "已切换为 MKV"
-            }
+    # Compatibility checks and fixes
+    if (($containerExt -in ".mp4", ".mov", ".mxf") -and $cmdLine -match "-c:t copy") {
+        Show-Warning "Font detected (-c:t copy), they are unsupported by MP4/MOV/MXF format"
+        Write-Host "`r`nSelect an option to proceed:"
+        Write-Host " d: Delete import statement"
+        Write-Host " m: Alter container format to MKV"
+        Write-Host " Enter: Ignore"
+
+        $fix = Read-Host "Please select on option..."
+        if ($fix -eq 'd') {
+            $cmdLine = $cmdLine.Replace("-c:t copy", "")
+        }
+        elseif ($fix -eq 'm') { 
+            $containerExt = ".mkv"
+            $cmdLine = $cmdLine.Replace(".mp4", ".mkv").Replace(".mov", ".mkv").Replace(".mxf", ".mkv")
+            Show-Success "Switched format to MKV"
         }
     }
 
-    if ($containerExt -in ".mp4", ".mov") {
-        if ($cmdLine -match "-c:s copy") {
-            Show-Warning "检测到字幕流 (-c:s copy)，MP4/MOV 对多轨/ASS支持不佳。"
-            $fix = Read-Host "输入 'd' 删除，'t' 转为 mov_text (仅第一轨)，其他键忽略"
-            if ($fix -eq 'd') { $cmdLine = $cmdLine.Replace("-c:s copy", "") }
-            elseif ($fix -eq 't') { $cmdLine = $cmdLine.Replace("-c:s copy", "-c:s:0 mov_text") }
+    if (($containerExt -in ".mp4", ".mov") -and $cmdLine -match "-c:s copy") {
+        Show-Warning "Subtitle detected (-c:s copy), MP4/MOV, multiplexing is likely going to fail"
+        Write-Host "`r`nSelect an option to proceed:"
+        Write-Host " d: Delete import statement"
+        Write-Host " m: Alter container format to MKV"
+        Write-Host " Enter: Ignore"
+
+        $fix = Read-Host "Please select on option..."
+        if ($fix -eq 'd') {
+            $cmdLine = $cmdLine.Replace("-c:s copy", "")
         }
+        elseif ($fix -eq 't') {
+            $cmdLine = $cmdLine.Replace("-c:s copy", "-c:s:0 mov_text")
+        }
+        
     }
-
-    # TODO：末尾添加一行 cmd /k 从而保持交互窗口
-
     
-    # 生成文件名
+    # Generate file name
     $batFilename = "ffmpeg_mux.bat"
     $batPath = Join-Path $exptPath $batFilename
 
-    # 写入 Bat 文件内容（去除 PowerShell 的 & 调用符，转为 CMD 格式）
+    # Write batch (remove PowerShell's & call, convert to CMD format)
     $cmdContent = $cmdLine.TrimStart('& ') 
     $batContent = @"
 
@@ -390,47 +398,46 @@ chcp 65001 >nul
 setlocal
 
 REM ========================================
-REM ffmpeg 封装工具
-REM 生成时间: {0}
+REM ffmpeg Multiplexing tool
+REM Generated on: {0}
 REM ========================================
 
 echo.
-echo 开始封装任务...
+echo Starting multiplexing task...
 echo.
 
 {1}
 
 echo.
 echo ========================================
-echo  批处理执行完毕！
+echo  Batch execution completed！
 echo ========================================
 echo.
 
 endlocal
-echo 按任意键进入命令提示符，输入 exit 退出...
+echo Press any button to enter CMD, input exit to exit...
 pause >nul
 cmd /k
 "@ -f (Get-Date -Format 'yyyy-MM-dd HH:mm'), $cmdContent
 
-    # 确保 ffmpeg 路径带引号（虽然 $ffmpegPath 变量里可能没带，但上面组合时加了）
-    # 简单优化：如果 inputsAgg 前面有空格则保留
+    # Ensure the ffmpeg path is enclosed in quotes
+    # (although it might not be in the $ffmpegPath variable, it was added when combining them above).
     
     Show-Border
     Write-TextFile -Path $batPath -Content $batContent -UseBOM $true
     
-    Show-Success "任务完成！"
-    Show-Info "命令已保存至：$batPath"
-    Show-Info "请手动打开该文件，检查并删除末尾的 .txt 后缀运行。"
-    Write-Host "提示：如果音画不同步，请在 -map 和 -c 之间添加 -itoffset <秒> 参数" -ForegroundColor DarkGray
+    Show-Success "Script completed!"
+    Show-Info "Batch saved to: $batPath"
+    Show-Info "Open the batch file to start multiplexing process"
+    Write-Host "Note: If the audio and video are out of sync, add -itoffset <seconds> parameter between -map and -c" -ForegroundColor DarkGray
     
     Pause
 }
 
-# 异常处理
 try { Main }
 catch {
-    Show-Error "脚本执行出错：$_"
-    Write-Host "错误详情：" -ForegroundColor Red
+    Show-Error "Script failed: $_"
+    Write-Host "Error details: " -ForegroundColor Red
     Write-Host $_.Exception.ToString()
-    Read-Host "按回车键退出"
+    Read-Host "Press any button to exit"
 }

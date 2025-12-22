@@ -331,14 +331,14 @@ function Main {
     
     do {
         Write-Host @"
- 请选择 UAC 操作选项：
+ 选择 UAC 操作选项：
  A: 禁用 UAC（每次运行脚本不再弹出警告）
  B: 不进行更改
  C: 恢复 UAC（公用电脑建议）
  Q: 退出脚本
 "@ -ForegroundColor Yellow
         
-        $choice = Read-Host " 请选择 (A/B/C/Q)"
+        $choice = Read-Host " 选择 (A/B/C/Q)"
         
         switch ($choice.ToUpper()) {
             'A' {

@@ -2,8 +2,6 @@
 
 This tool analyzes video to perform actual x264, x265, SVT-AV1 parameter customizations. Assisted with filter-less VS/AVS script generation, semi-auto multiplex/encapsulation, and offers GUI and color-coded CLI for extra user guidance. This tool automates tedious format alignment, simplifies operations, and starts your encoding ASAP.
 
-[TODO] English Translation progress: 4/5 of main scripts
-
 ## Environment
 
 **Supported Upstream Programs**:
@@ -52,7 +50,6 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 6. Run step 4. The generated batch file begins encoding.
     1. If multiple formats are required, simply remove the comments from the alternative parameters.
 7. Run step 5 to encapsulate the encoding results.
-
 
 ![Script-Step-2-example (To be added)](zh-step2-example-en.png)
 <p align="center">Example fur running step 2（CLI window only, this works even better in VSCode）</p>
