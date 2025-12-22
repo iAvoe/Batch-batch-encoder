@@ -413,7 +413,7 @@ function Get-x265SVTAV1Profile {
     # 移除可能的 "-pix_fmt " 前缀（尽管实际情况不会遇到）
     $pixfmt = $CSVpixfmt -replace '^-pix_fmt\s+', ''
 
-    # 解析色度采样格式和位深度
+    # 解析色度采样格式和位深
     $chromaFormat = $null
     $depth = 8  # 默认 8bit
     
@@ -574,7 +574,7 @@ function Get-Keyint {
             $userSecond =
                 Read-Host " 分辨率高于 2560x1440 则偏左一格，`r`n 画面内容简单则偏右一格：[低功耗/多轨剪辑：6-7 秒| 一般：8-10 秒| 高：11-13+ 秒]"
             if ($userSecond -notmatch "^\d+$") {
-                if ((Read-Host " 未输入正整数，按 Enter 重试，输入 'q' 退出") -eq 'q') {
+                if ((Read-Host " 未输入正整数，按 Enter 重试，输入 'q' 强制退出") -eq 'q') {
                     exit 1
                 }
             }
@@ -622,7 +622,7 @@ function Get-RateControlLookahead { # 1.8*fps
     )
     try {
         $frames = [math]::Round(((ConvertTo-Fraction $CSVfps) * $second))
-        # 关键帧间隔必须大于 --bframes
+        # 必须大于 --bframes
         $frames = [math]::max($frames, $bframes+1)
         return "--rc-lookahead $frames"
     }

@@ -251,7 +251,8 @@ function Get-EncodingIOArgument {
 #     }
 # }
 
-# When retrieving basic parameters, note that the "-" in the input must be placed last to ensure it doesn't conflict with the `--output` parameter.
+# Retrieve basic x264 parameters
+# Note: the input "-" must be placed last to be correct
 function Get-x264BaseParam {
     Param (
         [Parameter(Mandatory=$true)]$pickOps,
@@ -261,25 +262,25 @@ function Get-x264BaseParam {
     $enableFGO = $false
     if ($askUserFGO) {
         Write-Host ""
-        Write-Host " 少数修改版（Mod）x264 支持基于高频信息量的率失真优化（Film Grain Optimization）" -ForegroundColor Cyan
-        Write-Host " 用 x264.exe --fullhelp | findstr fgo 检测 --fgo 参数是否被支持" -ForegroundColor Yellow
-        if ((Read-Host " 输入 'y' 以启用 --fgo（提高画质），或 Enter 以禁用（不支持或无法确定则禁）") -match '^[Yy]$') {
+        Write-Host " A few modified/unofficial x264 support rate-distortion optimization based on high-frequency information content (Film Grain Optimization)." -ForegroundColor Cyan
+        Write-Host " Test with 'x264.exe --fullhelp | findstr fgo' to verify if its supported (shows up)" -ForegroundColor Yellow
+        if ((Read-Host " Input 'y' to add '--fgo' for better image, or Enter to disable (disable if unsure / can't confim)") -match '^[Yy]$') {
             $enableFGO = $true
-            Show-Info "启用 x264 参数 --fgo"
+            Show-Info "Enabled x264 parameter --fgo"
         }
-        else { Show-Info "不用 x264 参数 --fgo" }
+        else { Show-Info "Disabled x264 parameter --fgo" }
     }
     else {
-        Write-Host " 已跳过 --fgo 请柬..."
+        Write-Host " Skipped '--fgo' prompt..."
     }
     $fgo10 = if ($enableFGO) {" --fgo 10"} else {""}
     $fgo15 = if ($enableFGO) {" --fgo 15"} else {""}
 
     $default = ("--bframes 14 --b-adapt 2 --me umh --subme 9 --merange 48 --no-fast-pskip --direct auto --weightb --min-keyint 5 --ref 3 --crf 18 --chroma-qp-offset -2 --aq-mode 3 --aq-strength 0.7 --trellis 2 --deblock 0:0 --psy-rd 0.77:0.22" + $fgo10)
     switch ($pickOps) {
-        # 通用 General Purpose，bframes 14
+        # General Purpose，bframes 14
         a {return $default}
-        # 素材 Stock Footage，bframes 12
+        # Stock Footage for Editing，bframes 12
         b {return ("--partitions all --bframes 12 --b-adapt 2 --me esa --merange 48 --no-fast-pskip --direct auto --weightb --min-keyint 1 --ref 3 --crf 16 --tune grain --trellis 2" + $fgo15)}
         helpzh {
             Write-Host ""
@@ -295,21 +296,21 @@ function Get-x264BaseParam {
     }
 }
 
-# 获取基础参数：ffmpeg.exe -y -i ".\in.mp4" -an -f yuv4mpegpipe -strict -1 - | x265.exe [Get-...] [Get-x265BaseParam] --y4m --input - --output ".\out.hevc"
+# Retrieve basic x265 parameters
 function Get-x265BaseParam {
     Param ([Parameter(Mandatory=$true)]$pickOps)
-    # TODO：添加 DJATOM? Mod 的深度自定义 AQ
+    # TODO：Add DJATOM? Mod's fully customizable AQ
     $default = "--high-tier --preset slow --me umh --subme 5 --weightb --aq-mode 4 --bframes 5 --ref 3"
     switch ($pickOps) {
-        # 通用 General Purpose，bframes 5
+        # General Purpose，bframes 5
         a {return $default}
-        # 录像 Movie，bframes 8
+        # Movie，bframes 8
         b {return "--high-tier --ctu 64 --tu-intra-depth 4 --tu-inter-depth 4 --limit-tu 1 --rect --tskip --tskip-fast --me star --weightb --ref 4 --max-merge 5 --no-open-gop --min-keyint 3 --fades --bframes 8 --b-adapt 2 --b-intra --crf 21.8 --crqpoffs -3 --ipratio 1.2 --pbratio 1.5 --rdoq-level 2 --aq-mode 4 --aq-strength 1.1 --qg-size 8 --rd 5 --limit-refs 0 --rskip 0 --deblock 0:-1 --limit-sao --sao-non-deblock --selective-sao 3"} 
-        # 素材 Stock Footage，bframes 7
+        # Stock Footage，bframes 7
         c {return "--high-tier --ctu 32 --tskip --me star --max-merge 5 --early-skip --b-intra --no-open-gop --min-keyint 1 --ref 3 --fades --bframes 7 --b-adapt 2 --crf 17 --crqpoffs -3 --cbqpoffs -2 --rd 3 --limit-modes --limit-refs 1 --rskip 1 --splitrd-skip --deblock -1:-1 --tune grain"}
-        # 动漫 Anime，bframes 16
+        # Anime，bframes 16
         d {return "--high-tier --tu-intra-depth 4 --tu-inter-depth 4 --max-tu-size 16 --tskip --tskip-fast --me umh --weightb --max-merge 5 --early-skip --ref 3 --no-open-gop --min-keyint 5 --fades --bframes 16 --b-adapt 2 --bframe-bias 20 --constrained-intra --b-intra --crf 22 --crqpoffs -4 --cbqpoffs -2 --ipratio 1.6 --pbratio 1.3 --cu-lossless --psy-rdoq 2.3 --rdoq-level 2 --hevc-aq --aq-strength 0.9 --qg-size 8 --rd 3 --limit-modes --limit-refs 1 --rskip 1 --rect --amp --psy-rd 1.5 --splitrd-skip --rdpenalty 2 --deblock -1:0 --limit-sao --sao-non-deblock"}
-        # 穷举法 Exhausive
+        # Exhausive
         e {return "--high-tier --tu-intra-depth 4 --tu-inter-depth 4 --max-tu-size 4 --limit-tu 1 --rect --amp --tskip --me star --weightb --max-merge 5 --ref 3 --no-open-gop --min-keyint 1 --fades --bframes 16 --b-adapt 2 --b-intra --crf 18.1 --crqpoffs -5 --cbqpoffs -2 --ipratio 1.67 --pbratio 1.33 --cu-lossless --psy-rdoq 2.5 --rdoq-level 2 --hevc-aq --aq-strength 1.4 --qg-size 8 --rd 5 --limit-refs 0 --rskip 2 --rskip-edge-threshold 3 --no-cutree --psy-rd 1.5 --rdpenalty 2 --deblock -2:-2 --limit-sao --sao-non-deblock --selective-sao 1"}
         helpzh {
             Write-Host ""
@@ -325,7 +326,7 @@ function Get-x265BaseParam {
     }
 }
 
-# 获取基础参数：ffmpeg.exe -y -i ".\in.mp4" -an -f yuv4mpegpipe -strict -1 - | SvtAv1EncApp.exe -i - [Get-svtav1BaseParam] -b ".\out.ivf"
+# Retrieve basic SVT-AV1 parameters
 function Get-svtav1BaseParam {
     Param (
         [Parameter(Mandatory=$true)]$pickOps,
@@ -335,16 +336,16 @@ function Get-svtav1BaseParam {
     $enableDLF2 = $false
     Write-Host ""
     if ($askUserDLF -and $pickOps -ne 'b') {
-        Write-Host " 少数修改版 SVT-AV1 编码器（如 SVT-AV1-Essential）支持高精度去块滤镜 --enable-dlf 2"  -ForegroundColor Cyan
-        Write-Host " 用 SvtAv1EncApp.exe --help | findstr enable-dlf 即可检测`'2`'是否受支持" -ForegroundColor Yellow
-        if ((Read-Host " 输入 'y' 以启用 --enable-dlf 2（提高画质），或 Enter 使用常规去块滤镜（不支持或无法确定则禁）") -match '^[Yy]$') {
+        Write-Host " A few modified/unofficial SVT-AV1 encoder (i.e., SVT-AV1-Essential) supports precise deblocking filter --enable-dlf 2"  -ForegroundColor Cyan
+        Write-Host " Test with 'SvtAv1EncApp.exe --help | findstr enable-dlf' to verify if its supported (shows up)" -ForegroundColor Yellow
+        if ((Read-Host " Input 'y' to add '--enable-dlf 2' for better image, or Enter to disable (disable if unsure / can't confim)") -match '^[Yy]$') {
             $enableDLF2 = $true
-            Show-Info "启用了 SVT-AV1 参数 --enable-dlf 2"
+            Show-Info "Enabled SVT-AV1 parameter --enable-dlf 2"
         }
-        else { Show-Info "启用 SVT-AV1 参数 --enable-dlf 1" }
+        else { Show-Info "Enabled SVT-AV1 parameter --enable-dlf 1" }
     }
     else {
-        Write-Host " 已跳过 --enable-dlf 2 请柬..."
+        Write-Host " Skipped --enable-dlf 2 prompt..."
     }
     $deblock = if ($enableDLF2) {"--enable-dlf 2"} else {"--enable-dlf 1"}
 
@@ -370,69 +371,71 @@ function Get-svtav1BaseParam {
     }
 }
 
-# 交互式获取编码器基础预设参数
+# Get base encoding parameter by user requirement
 function Invoke-BaseParamSelection {
     Param (
-        [Parameter(Mandatory=$true)][string]$CodecName, # 仅用于显示
-        [Parameter(Mandatory=$true)][scriptblock]$GetParamFunc, # 对应的获取函数
+        [Parameter(Mandatory=$true)][string]$CodecName, # Only for display
+        [Parameter(Mandatory=$true)][scriptblock]$GetParamFunc, # Correcponding get function
         [hashtable]$ExtraParams = @{}
     )
 
     $selectedParam = ""
     do {
-        & $GetParamFunc -pickOps "helpzh"
+        & $GetParamFunc -pickOps "helpen"
         
-        $selection = (Read-Host " 指定一份 $CodecName 自定义预设，输入 'q' 忽略（沿用编码器内置默认）").ToLower()
+        $selection = (Read-Host " Specify a custom present for $CodecName, Input 'q' to skip (use encoder defaults)").ToLower()
 
-        if ($selection -eq 'q') { # $selectedParam = "" # 已经是默认值，不用再赋值
+        if ($selection -eq 'q') { # $selectedParam = "" # No need to specify again
             break;
         }
         elseif ($selection -notmatch "^[a-z]$") {
-            if ((Read-Host " 无法识别选项，按 Enter 重试，输入 'q' 强制退出") -eq 'q') {
+            if ((Read-Host " Could not identify option. Press Enter to retry, input 'q' to force exit") -eq 'q') {
                 exit 1
             }
             continue
         }
 
-        # 根据用户输入获取基础参数
+        # Get base parameters by use selection
         $selectedParam = & $GetParamFunc -pickOps $selection @ExtraParams
     }
     while (-not $selectedParam)
 
     if ($selectedParam) {
-        Show-Success "已定义 $CodecName 基础参数：$selectedParam"
+        Show-Success "Defined base parameter for $($CodecName): $($selectedParam)"
     }
-    else { Show-Info "$CodecName 将使用编码器默认参数" }
+    else { Show-Info "$CodecName will use encoder default parameters" }
 
     return $selectedParam
 }
 
-# 使用 Y4M 管道时能够自动获取 profile 参数，RAW 管道则直接指定 CSP、分辨率等参数即可，除非要实现硬件兼容才指定 Profile
+# When using a Y4M pipeline, 'profiles' can be obtained automatically
+# For a RAW pipeline, parameters such as CSP and resolution needs to be specified directly
+# The profile should only be specified when hardware compatibility is required
 function Get-x265SVTAV1Profile {
-    # 注：由于 HEVC 本就支持有限的 CSP，因此其它 CSP 值皆为 else
-    # 注：NV12：8bit 2 平面 YUV420；NV16：8bit 2 平面 YUV422
-    # 警告：暂不支持隔行扫描视频
+    # Note: Since HEVC inherently supports a limited number of CSP values, all other CSP values ​​are else.
+    # Note: NV12: 8-bit 2-plane YUV420; NV16: 8-bit 2-plane YUV422
+    # Warning: Interlaced video is not currently supported.
     Param (
         [Parameter(Mandatory=$true)]$CSVpixfmt, # i.e., yuv444p12le, yuv422p, nv12
         [bool]$isIntraOnly=$false,
         [bool]$isSVTAV1=$false
     )
-    # 移除可能的 "-pix_fmt " 前缀（尽管实际情况不会遇到）
+    # Remove any possible "-pix_fmt" prefixes (although unlikely to encounter)
     $pixfmt = $CSVpixfmt -replace '^-pix_fmt\s+', ''
 
-    # 解析色度采样格式和位深度
+    # Parse chroma sampling format and bit depth
     $chromaFormat = $null
-    $depth = 8  # 默认 8bit
+    $depth = 8  # Defualt to 8bit
     
-    # 解析位深
+    # Parse bit depth
     if ($pixfmt -match '(\d+)(le|be)$') {
         $depth = [int]$matches[1]
     }
     # elseif ($pixfmt -eq 'nv12' -or $pixfmt -eq 'nv16') {
-    #     $depth = 8 # 同默认，判断直接注释
+    #     $depth = 8 # Commented out as same as default
     # }
     
-    # 解析 HEVC 色度采样
+    # Parse HEVC chroma subsampling
     if ($pixfmt -match '^yuv420' -or $pixfmt -eq 'nv12') {
         $chromaFormat = 'i420'
     }
@@ -445,15 +448,15 @@ function Get-x265SVTAV1Profile {
     elseif ($pixfmt -match '^(gray|yuv400)') {
         $chromaFormat = 'gray'
     }
-    else { # 默认 4:2:0
+    else { # Default to 4:2:0
         $chromaFormat = 'i420'
-        Show-Warning "未知像素格式：$pixfmt，将使用默认值（4:2:0 8bit）"
+        Show-Warning "Unknown pixel format: $pixfmt, using the default value instead (4:2:0 8bit)."
     }
 
-    # 解析 SVT-AV1 色度采样
-    # - Main：        4:0:0（gray）-4:2:0，全采样最高 10bit
-    # - High：        额外支持 4:4:4 采样
-    # - Professional：额外支持 4:2:2 采样，全采样最高 12bit
+    # Parse SVT-AV1 chroma sampling
+    # - Main: 4:0:0 (gray) - 4:2:0, maximum 10-bit full sampling
+    # - High: Additional support for 4:4:4 sampling
+    # - Professional: Additional support for 4:2:2 sampling, maximum 12-bit full sampling
     $svtav1Profile = 0 # 默认 main
     switch ($chromaFormat) {
         'i444' {
@@ -463,7 +466,7 @@ function Get-x265SVTAV1Profile {
         'i422' { $svtav1Profile = 2 } # Professional only
         'gray' {
             if ($depth -eq 12) { $svtav1Profile = 2 }
-            else { $svtav1Profile = 0 } # Main（保守）
+            else { $svtav1Profile = 0 } # Main (conservative)
         }
         default { # i420
             if ($depth -eq 12) { $svtav1Profile = 2 }
@@ -471,19 +474,19 @@ function Get-x265SVTAV1Profile {
         }
     }
 
-    # 检查位深
+    # Parse bit depth
     if ($depth -notin @(8, 10, 12)) {
-        Show-Warning "视频编码可能不支持 $depth bit 位深" # $depth = 8
+        Show-Warning "Video encoder is not likely to support $depth bit." # $depth = 8
     }
 
-    # 检查 x265 实际支持的 profile 范围：
+    # Check the range of profiles actually supported by x265:
     # 8bit：main, main-intra，main444-8, main444-intra
     # 10bit：main10, main10-intra，main422-10, main422-10-intra，main444-10, main444-10-intra
     # 12 bit：main12, main12-intra，main422-12, main422-12-intra，main444-12, main444-12-intra
     $profileBase = ""
     $inputCsp = ""
 
-    # 根据色度格式和位深度返回对应的 profile
+    # Return the corresponding profile based on the chroma format and bit depth.
     if ($isSVTAV1) {
         return ("--profile " + $svtav1Profile)
     }
@@ -491,14 +494,14 @@ function Get-x265SVTAV1Profile {
     switch ($chromaFormat) {
         'i422' {
             if ($depth -eq 8) {
-                Write-Warning "x265 不支持 main422-8，降级为 main (4:2:0)"
+                Write-Warning "x265 does not support main422-8, downgrading to main (4:2:0)."
                 $profileBase = "main"
             }
             else {
                 $profileBase = "main422-$depth"
             }
         }
-        'i444' { # 特殊：8-bit 4:4:4 的 intra profile 是 main444-intra，不是 main444-8-intra
+        'i444' { # Special case: 8-bit 4:4:4 intra profile is main444-intra, not main444-8-intra
             if ($depth -eq 8) {
                 $profileBase = "main444-8"
             }
@@ -506,7 +509,7 @@ function Get-x265SVTAV1Profile {
                 $profileBase = "main444-$depth"
             }
         }
-        'gray' { # 灰度图像可以用 main/main10/main12
+        'gray' { # Grayscale also uses main/main10/main12
             $inputCsp = "--input-csp i400"
             switch ($depth) {
                 8  { $profileBase = "main" }
@@ -515,7 +518,7 @@ function Get-x265SVTAV1Profile {
                 default { $profileBase = "main" }
             }
         }
-        default { # i420 和其他
+        default { # i420 and others
             switch ($depth) {
                 8  { $profileBase = "main" }
                 10 { $profileBase = "main10" }
@@ -525,7 +528,7 @@ function Get-x265SVTAV1Profile {
         }
     }
 
-   # 如果使用 intra-only 编码，则添加 -intra 后缀
+   # Add -intra suffix for intra-only encoding
     if ($isIntraOnly) {
         if ($profileBase -eq "main444-8") {
             $profileBase = "main444-intra"
@@ -540,7 +543,7 @@ function Get-x265SVTAV1Profile {
     return $result
 }
 
-# 获取关键帧间隔，默认 10*fps，直接适用于 x264
+# Get keyframe interval. Default to 10*fps, which is directly applicable to x264
 function Get-Keyint { 
     Param (
         [Parameter(Mandatory=$true)]$CSVfps,
@@ -552,36 +555,43 @@ function Get-Keyint {
         [switch]$isSVTAV1
     )
     if (($isx264 -and $isx265) -or ($isx264 -and $isSVTAV1) -or ($isx265 -and $isSVTAV1)) {
-        throw "参数异常，一次只能给一个编码器配置参数"
+        throw "Parameter error; only one encoder can be configured at a time."
     }
 
-    # 注意：值可以是“24000/1001”的字符串，需要处理（得到 23.976d）
+    # Note: The value can be a string like "24000/1001",
+    # which needs to be parsed (resulting in 23.976d).
     [double]$fps = ConvertTo-Fraction $CSVfps
 
-    $userSecond = $null # 用户指定秒
+    $userSecond = $null # User specified seconds
     if ($askUser) {
         if ($isx264) {
             Write-Host ""
-            Show-Info "请指定 x264 的关键帧最大间隔秒（正整数，非帧数）"
+            Show-Info "Please specify the maximum keyframe interval for x264 in seconds (positive integer, not frame number)"
         }
         elseif ($isx265) {
             Write-Host ""
-            Show-Info "请指定 x265 的关键帧最大间隔秒数（正整数，非帧数）"
+            Show-Info "Please specify the maximum keyframe interval for x265 in seconds (positive integer, not frame number)"
         }
         elseif ($isSVTAV1) {
             Write-Host ""
-            Show-Info "请指定 SVT-AV1 的关键帧最大间隔秒数（正整数，非帧数）"
+            Show-Info "Please specify the maximum keyframe interval for SVT-AV1 in seconds (positive integer, not frame number)"
         }
         else {
-            throw "未指定要配置最大关键帧间隔参数的编码器，无法执行"
+            throw "The encoder for which the maximum keyframe interval parameter is not specified cannot be executed"
         }
         
         $userSecond = $null
-        do { # 默认多轨剪辑的关键帧间隔相当于 N 个视频轨的关键帧间隔之和，但实际解码占用涨跌非线性，所以设为两倍
+        do {
+            # The default keyframe interval for multitrack editing is equivalent to the sum of the keyframe intervals of N video tracks,
+            # but the actual decoding process uses non-linear scaling,
+            # so it is set to twice the default interval.
+            Show-Info "Select a keyframe interval maximum"
+            Write-Host " For resolutions higher than 2560x1440, pick from 1 section to left"
+            Write-Host " For simple & flat video content, pick from 1 section to right"
             $userSecond =
-                Read-Host " 分辨率高于 2560x1440 则偏左一格，`r`n 画面内容简单则偏右一格：[低功耗/多轨剪辑：6-7 秒| 一般：8-10 秒| 高：11-13+ 秒]"
+                Read-Host " [Low Power/Multitrack Editing: 6-7 seconds | Normal: 8-10 seconds | High: 11-13+ seconds]"
             if ($userSecond -notmatch "^\d+$") {
-                if ((Read-Host " 未输入正整数，按 Enter 重试，输入 'q' 退出") -eq 'q') {
+                if ((Read-Host " Not receiving positive integer. Press Enter to retry, input 'q' to force exit") -eq 'q') {
                     exit 1
                 }
             }
@@ -593,14 +603,16 @@ function Get-Keyint {
     try {
         $keyint = [math]::Round(($fps * $second))
 
-        # 关键帧间隔必须大于连续 B 帧，但这与 SVT-AV1 无关
+        # The keyframe interval must be greater than a consecutive B-frame,
+        # but this is irrelevant to SVT-AV1
         if ($isSVTAV1) {
-            Show-Success "已配置 SVT-AV1 最大关键帧间隔：${second} 秒"
+            Show-Success "SVT-AV1 maximum keyframe interval configured: ${second} seconds"
             return "--keyint ${second}s"
         }
 
+        # The if -lt creates a hack that uses $bframes as the upper limit, and its really dumb
         $keyint = 
-            if ($bframes -lt $keyint) { # 蠢到没边但实现了把 $bframes 当做上限的 hack
+            if ($bframes -lt $keyint) {
                 [math]::max($keyint, $bframes)
             }
             elseif ($bframes -ge $keyint) {
@@ -608,15 +620,15 @@ function Get-Keyint {
             }
 
         if ($isx264) {
-            Show-Success "已配置 x264 最大关键帧间隔：${keyint} 帧"
+            Show-Success "Maximum keyframe interval for x264: ${keyint} frames"
         }
         elseif ($isx265) {
-            Show-Success "已配置 x265 最大关键帧间隔：${keyint} 帧"
+            Show-Success "Maximum keyframe interval for x265: ${keyint} frames"
         }
         return "--keyint " + $keyint
     }
     catch {
-        Show-Warning "无法读取视频帧率信息，关键帧间隔（Keyint）将使用编码器默认"
+        Show-Warning "Unable to read video frame rate information, using the encoder default keyframe interval"
         return ""
     }
 }
@@ -629,12 +641,12 @@ function Get-RateControlLookahead { # 1.8*fps
     )
     try {
         $frames = [math]::Round(((ConvertTo-Fraction $CSVfps) * $second))
-        # 关键帧间隔必须大于 --bframes
+        # must be greater than --bframes
         $frames = [math]::max($frames, $bframes+1)
         return "--rc-lookahead $frames"
     }
     catch {
-        Show-Warning "无法读取视频帧率信息，率控制前瞻距离（RC Lookahead）将使用编码器默认"
+        Show-Warning "Unable to read video frame rate information, rate control lookahead (RC Lookahead) will use the encoder default."
         return ""
     }
 }
@@ -651,7 +663,7 @@ function Get-x265MERange {
         $res = $width * $height
     }
     catch {
-        throw "无法解析视频分辨率: 宽度=$CSVw, 高度=$CSVh"
+        throw "Unable to resolve video resolution: width=$CSVw, height=$CSVh"
     }
     if ($res -ge 8294400) { return "--merange 56" } # >=3840x2160
     elseif ($res -ge 3686400) { return "--merange 52" } # >=2560*1440
@@ -672,7 +684,7 @@ function Get-x265Subme { # 24fps=3, 48fps=4, 60fps=5, ++=6
     return ("--subme " + $subme)
 }
 
-# 核心数大于 36 时开启并行动态搜索
+# Enable parallel motion estimation when the # of cores is greater than 36
 function Get-x265PME {
     if ([int](wmic cpu get NumberOfCores)[2] -gt 36) {
         return "--pme"
@@ -680,34 +692,35 @@ function Get-x265PME {
     return ""
 }
 
-# 指定运行于特定 NUMA 节点，索引从 0 开始数；输出例：--pools -,+（双路下使用二号节点）
+# Specifies which NUMA node to run on (starting from 0)
+# Example output: --pools -,+ (uses node 2 in a dual-pool setup)
 function Get-x265ThreadPool {
-    Param ([int]$atNthNUMA=0) # 直接输入，一般情况下用不到
+    Param ([int]$atNthNUMA=0) # Direct input, usually not needed
 
     $nodes = Get-CimInstance Win32_Processor # | Select-Object Availability
     [int]$procNodes = ($nodes | Measure-Object).Count
     
-    # 统计可用处理器
+    # Count usable processors
     if ($procNodes -lt 1) { $procNodes = 1 }
 
-    # 验证参数
+    # Validate parameters
     if ($atNthNUMA -lt 0 -or $atNthNUMA -gt ($procNodes - 1)) {
-        throw "NUMA 节点索引不能大于可用节点索引，且不能为负"
+        throw "NUMA node index cannot be greater than the available node index, nor being negative"
     }
 
     Write-Output ""
     if ($procNodes -gt 1) {
         if ($atNthNUMA -eq 0) {
             do {
-                $inputValue = Read-Host "检测到 $procNodes 处 NUMA 节点，请指定使用一处节点（范围：0-$($procNodes-1)）"
+                $inputValue = Read-Host "A NUMA node was detected at $procNodes. Please specify a node to use (range: 0-$($procNodes-1))."
                 if ([string]::IsNullOrWhiteSpace($inputValue)) {
-                    if ((Read-Host "未输入值，按 Enter 重试，输入 'q' 强制退出") -eq 'q') { exit }
+                    if ((Read-Host "No value entered. Press Enter to retry, type 'q' to force exit") -eq 'q') { exit }
                 }
                 elseif ($inputValue -notmatch '^\d+$') {
-                    if ((Read-Host "$inputValue 输入了非整数，按 Enter 重试，输入 'q' 强制退出") -eq 'q') { exit }
+                    if ((Read-Host "Non-integer entered. Press Enter to try again, type 'q' to force exit") -eq 'q') { exit }
                 }
                 elseif (($inputValue -lt 0) -or ($inputValue -gt ($procNodes - 1))) {
-                    if ((Read-Host "NUMA 节点不存在，按 Enter 重试，输入 'q' 强制退出") -eq 'q') { exit }
+                    if ((Read-Host "Inexistent NUMA node. Press Enter to try again, type 'q' to force exit") -eq 'q') { exit }
                 }
             }
             while ($inputValue -notmatch '^\d+$' -or ($inputValue -lt 0) -or ($inputValue -gt ($procNodes - 1)))
@@ -722,12 +735,14 @@ function Get-x265ThreadPool {
         return $poolParam.TrimEnd(',')
     }
     else {
-        Show-Info "检测到安装了 1 颗处理器，忽略 x265 参数 --pools"
+        Show-Info "One processor was detected. Ignoring x265 parameter --pools."
         return ""
     }
 }
 
-# 尝试获取视频总帧数并生成 x264，x265，SVT-AV1 参数，找不到则无法显示编码进度与 ETA
+# Attempt to obtain the total number of video frames and generate x264, x265, and SVT-AV1 parameters
+# if these cannot be found, and RAW pipe is specified,
+# the encoding progress, ETA won't be displayed.
 function Get-FrameCount {
     Param (
         [Parameter(Mandatory=$true)]$CSVSource, # MPEG Tag
@@ -758,7 +773,7 @@ function Get-InputResolution {
     return "--input-res ${CSVw}x${CSVh}"
 }
 
-# 添加对 SVT-AV1 的丢帧帧率支持，丢帧帧率直接保留字符串
+# Added support for fractional frame rates in SVT-AV1 (directly preserved fraction strings)
 function Get-FPSParam {
     Param (
         [Parameter(Mandatory=$true)]$CSVfps,
