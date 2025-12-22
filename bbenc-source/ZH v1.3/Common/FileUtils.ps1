@@ -114,8 +114,8 @@ function Write-TextFile { # 需在 Core.ps1 写入全局变量后运行
     
     # 写入文件
     [System.IO.File]::WriteAllText($Path, $normalizedContent, $encoding)
-    Show-Debug "编码: $($encoding.EncodingName), 换行符: CRLF"
-    Show-Success "文件已写入: $Path"
+    Show-Debug "编码：$($encoding.EncodingName), 换行符：CRLF"
+    Show-Success "文件已写入：$Path"
 }
 
 # 验证批处理文件格式
@@ -123,7 +123,7 @@ function Test-TextFileFormat {
     param([Parameter(Mandatory=$true)][string]$Path)
     
     if (-not (Test-Path -LiteralPath $Path)) {
-        Show-Error "文件不存在: $Path"
+        Show-Error "文件不存在：$Path"
         return $false
     }
     
@@ -131,12 +131,10 @@ function Test-TextFileFormat {
         # 读取文件内容
         $content = [System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::UTF8)
         
-        # 读取 Unix 换行符
         $hasUnixLF = $content -match "(?<!`r)`n"
         if ($hasUnixLF) {
             Write-Host "检测到 Unix(LF) 换行符"
         }
-        # 读取 Mac 换行符
         $hasMacCR = $content -match "`r(?!`n)"
         if ($hasMacCR) {
             Write-Host "检测到 Mac(CR) 换行符"
@@ -148,16 +146,11 @@ function Test-TextFileFormat {
             Show-Warning "换行符 CR($crCount) 和 LF($lfCount) 数量不相等，执行时可能会乱码"
         }
         
-        # 检查是否以换行符结尾 TODO：误判问题
-        # if ($content -notmatch "`r`n$") {
-        #     Show-Warning "文件没有以 CRLF 换行符结尾"
-        # }
-        
         # 返回验证结果
         $isValid = (-not $hasUnixLF) -and (-not $hasMacCR) -and ($crCount -eq $lfCount)
         
         if ($isValid) {
-            Show-Success "文件格式正确 (CRLF: $crCount)" -ForegroundColor Green
+            Show-Success "文件格式正确 (CRLF：$crCount)" -ForegroundColor Green
         }
         else {
             Show-Warning "文件格式有问题" -ForegroundColor Red
@@ -165,7 +158,7 @@ function Test-TextFileFormat {
         return $isValid
     }
     catch {
-        Show-Error "验证失败: $_" -ForegroundColor Red
+        Show-Error "验证失败：$_" -ForegroundColor Red
         return $false
     }
 }

@@ -167,9 +167,8 @@ function Main {
     }
 
     Show-Info "Start importing upstream tools..."
-    Write-Host " Hint: Select-File supports opening file selection -InitialDirectory parameter“
-    Write-Host " customize the import statements in this script to improve dexterity" -ForegroundColor DarkGray
-    Write-Host " If it doesn't work as intended, you may also create shortcut paths"
+    Write-Host " Hint: You may use add -InitialDirectory parameter to customize the import statements" -ForegroundColor DarkGray
+    Write-Host " or create shortcut paths" -ForegroundColor DarkGray
     
     # Store vspipe version, API version
     $vspipeInfo = $null

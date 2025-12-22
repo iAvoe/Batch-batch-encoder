@@ -215,7 +215,7 @@ function Show-HardwareInformation {
         $info = @(
             "名称: $($bios.Name)",
             "版本: $($bios.SMBIOSBIOSVersion)",
-            "发布日期: $([Management.ManagementDateTimeConverter]::ToDateTime($bios.ReleaseDate).ToString('yyyy-MM-dd'))"
+            "发布日期: $(($bios.ReleaseDate).ToString('yyyy-MM-dd'))"
         )
         
         $info | ForEach-Object { Write-Host "  $_" }
@@ -288,10 +288,7 @@ function Show-HardwareInformation {
 #region 主逻辑
 function Main {
     # 1. 检查 PowerShell 版本
-    Show-Border
     Show-Info "PowerShell 版本检查"
-    Show-Border
-    
     if ($PSVersionTable.PSVersion -lt [Version]"5.1") {
         Show-Warning "PowerShell 版本低于 5.1 ($($PSVersionTable.PSVersion)), 某些功能可能无法正常工作"
     }
@@ -302,10 +299,7 @@ function Main {
     # 2. 仅在需要管理员权限时请求提升
     
     # 3. 检查文件系统权限
-    Show-Border
     Show-Info "文件系统权限检查"
-    Show-Border
-    
     Show-Info "检查 C:\ 根目录权限（仅供故障排查）..."
     $cDriveReport = Test-FileSystemPermission -Path "C:\"
     Write-Host $cDriveReport
@@ -315,9 +309,7 @@ function Main {
     Write-Host $profileReport
     
     # 4. UAC 管理
-    Show-Border
-    Show-Info "用户账户控制 (UAC) 管理"
-    Show-Border
+    Show-Info "用户账户控制（UAC）管理"
     
     $currentUAC = Get-UACRegistryValues
     if ($currentUAC) {
@@ -420,10 +412,7 @@ function Main {
     } while ($choice.ToUpper() -notin @('A', 'B', 'C', 'Q'))
     
     # 5. 显示系统硬件信息
-    Show-Border
     Show-Info "系统硬件信息" -ForegroundColor
-    Show-Border
-    
     Show-HardwareInformation
     
     # 6. 完成提示
@@ -441,9 +430,7 @@ function Main {
 #endregion
 
 # 执行主函数
-try {
-    Main
-}
+try { Main }
 catch {
     Show-Error "脚本执行出错: $_"
     Write-Host "按任意键退出..." -ForegroundColor Yellow

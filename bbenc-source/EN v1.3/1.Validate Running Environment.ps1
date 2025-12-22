@@ -216,11 +216,10 @@ function Show-HardwareInformation {
     
     try {
         $bios = Get-CimInstance -ClassName Win32_BIOS -ErrorAction Stop
-        
         $info = @(
             "Name:    $($bios.Name)",
             "Version: $($bios.SMBIOSBIOSVersion)",
-            "Release: $([Management.ManagementDateTimeConverter]::ToDateTime($bios.ReleaseDate).ToString('yyyy-MM-dd'))"
+            "Release: $(($bios.ReleaseDate).ToString('yyyy-MM-dd'))"
         )
         
         $info | ForEach-Object { Write-Host "  $_" }
@@ -292,10 +291,7 @@ function Show-HardwareInformation {
 
 #region Main
 function Main {
-    Show-Border
     Show-Info "PowerShell Version"
-    Show-Border
-    
     if ($PSVersionTable.PSVersion -lt [Version]"5.1") {
         Show-Warning "PowerShell version is below 5.1 ($($PSVersionTable.PSVersion)), this may be incompatible"
     }
@@ -305,10 +301,7 @@ function Main {
     
     # Request administrator priviledge only when needed
     
-    Show-Border
     Show-Info "File System Permission Check"
-    Show-Border
-    
     Show-Info "Validating access to C:\ directory root (Debug only)..."
     $cDriveReport = Test-FileSystemPermission -Path "C:\"
     Write-Host $cDriveReport
@@ -318,9 +311,7 @@ function Main {
     Write-Host $profileReport
     
     # 4. UAC 管理
-    Show-Border
     Show-Info "User Access Control (UAC) Configuration"
-    Show-Border
     
     $currentUAC = Get-UACRegistryValues
     if ($currentUAC) {
@@ -418,9 +409,7 @@ function Main {
     while ($choice.ToUpper() -notin @('A', 'B', 'C', 'Q'))
     
     # Show Hardware details
-    Show-Border
     Show-Info "System hardware information" -ForegroundColor
-    Show-Border
     
     Show-HardwareInformation
     
@@ -438,9 +427,7 @@ function Main {
 }
 #endregion
 
-try {
-    Main
-}
+try { Main }
 catch {
     Show-Error "Script execution failed: $_"
     Write-Host "Press any button to exit..." -ForegroundColor Yellow
