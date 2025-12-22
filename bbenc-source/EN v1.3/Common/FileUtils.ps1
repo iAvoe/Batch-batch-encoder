@@ -68,6 +68,8 @@ function Select-File(
     elseif ($BatOnly) { $dialog.Filter = 'bat Files (*.bat)|*.bat' }
     else { $dialog.Filter = 'All files (*.*)|*.*' }
 
+    Write-Host " Selection window may open in the background; Avoid pressing Enter here."
+    
     do {
         if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
             return $dialog.FileName
@@ -162,5 +164,105 @@ function Test-TextFileFormat {
     catch {
         Show-Error "File validation failed: $_" -ForegroundColor Red
         return $false
+    }
+}
+
+# Get metadata by ffprobe
+function Get-StreamMetadata {
+    param(
+        [Parameter(Mandatory = $true)][string]$FFprobePath,
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [Parameter(Mandatory = $true)][string]$StreamType
+    )
+    
+    # Verify if stream file/ffprobe exists
+    if (-not (Test-Path -LiteralPath $FilePath)) {
+        Show-Error "Missing file: $FilePath"
+        return $null
+    }
+    if (-not (Test-Path -LiteralPath $FFprobePath)) {
+        Show-Error "Missing ffprobe executable: $FFprobePath"
+        return $null
+    }
+    
+    try { # Build ffprobe parameters
+        $streamSelector = switch ($StreamType.ToLower()) {
+            "v" { "v" }  # video stream
+            "a" { "a" }  # audio stream
+            "s" { "s" }  # subtitle
+            "t" { "t" }  # font
+            default { $StreamType }
+        }
+        
+        $arguments = @(
+            "-v", "quiet",
+            "-print_format", "json",
+            "-show_streams",
+            "-select_streams", $streamSelector,
+            "`"$FilePath`""
+        )
+        
+        Show-Debug "Executing ffprobe: $FFprobePath $arguments"
+        
+        # Run ffprobe and fetch output
+        $result = & $FFprobePath @arguments 2>&1
+        
+        # Detect error
+        if ($LASTEXITCODE -ne 0) {
+            Show-Warning "ffprobe failed (exit code: $LASTEXITCODE): $result"
+            return $null
+        }
+        
+        # Read JSON output
+        $jsonOutput = $result | Out-String
+        $metadata = $jsonOutput | ConvertFrom-Json
+        
+        # No match case (i.e., looking for audio (-StreamType "a"), but source doesn't have it)
+        if (-not $metadata.streams -or $metadata.streams.Count -eq 0) {
+            Show-Debug "No stream found in specified type: $($StreamType) ($($FilePath))"
+            return $null
+        }
+        
+        # Return the first videl stream's metadata
+        $stream = $metadata.streams[0]
+        
+        # Build returns
+        $streamInfo = [PSCustomObject]@{
+            Index      = if ($stream.index) { [int]$stream.index } else { 0 }
+            CodecName  = if ($stream.codec_name) { $stream.codec_name } else { $null }
+            CodecTag   = if ($stream.codec_tag_string) { $stream.codec_tag_string } else { $null }
+            CodecType  = if ($stream.codec_type) { $stream.codec_type } else { $null }
+            FrameRate  = if ($stream.r_frame_rate) { 
+                # Fractional frame rate to string (i.e., 23.976 → 24000/1001)
+                $frameRateStr = $stream.r_frame_rate.ToString()
+                # Simplify integer frame rate (24/1 → 24)
+                if ($frameRateStr -match '^(\d+)/1$') {
+                    $matches[1]
+                }
+                else { $frameRateStr }
+            }
+            else { $null }
+            Width      = if ($stream.width) { [int]$stream.width } else { $null }
+            Height     = if ($stream.height) { [int]$stream.height } else { $null }
+            Duration   = if ($stream.duration) { [double]$stream.duration } else { $null }
+            BitRate    = if ($stream.bit_rate) { [int]$stream.bit_rate } else { $null }
+            SampleRate = if ($stream.sample_rate) { [int]$stream.sample_rate } else { $null }
+            Channels   = if ($stream.channels) { [int]$stream.channels } else { $null }
+            Language   = if ($stream.tags -and $stream.tags.language) { $stream.tags.language } else { $null }
+            RawData    = $stream  # Keep original copy
+        }
+        
+        Show-Debug "Stream data detected: $($streamInfo.CodecType) - $($streamInfo.CodecName)"
+        if ($streamInfo.FrameRate) {
+            Show-Debug "FPS: $($streamInfo.FrameRate)"
+        }
+        
+        return $streamInfo
+        
+    }
+    catch {
+        Show-Error "Failed to parse ffprobe output: $_"
+        Show-Debug "Error details: $($_.ScriptStackTrace)"
+        return $null
     }
 }

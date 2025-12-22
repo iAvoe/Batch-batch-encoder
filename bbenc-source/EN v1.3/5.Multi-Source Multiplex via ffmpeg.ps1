@@ -61,7 +61,7 @@ function Get-StreamArgs {
     
     # Process multiplexed/contained video formats
     if ($isVideoContainer) {
-        Show-Info "Video container format，analyzing internal tracks..."
+        Show-Info "Video container format, analyzing internal tracks..."
         
         # Video streams
         $vData = Get-StreamMetadata -FFprobePath $FFprobePath -FilePath $FilePath -StreamType "v"
@@ -266,19 +266,19 @@ function Main {
     
     # 1. Initialize paths and tools
     Show-Info "Import tools and select export paths"
-    Show-Info "Import ffprobe.exe..."
+    Show-Info "(1/4) Import ffprobe.exe..."
     $fprbPath = Select-File -Title "Select ffprobe.exe" -ExeOnly
-    Show-Info "Import ffmpeg.exe..."
+    Show-Info "(2/4) Import ffmpeg.exe..."
     $ffmpegPath = Select-File -Title "Select ffmpeg.exe" -ExeOnly -InitialDirectory ([IO.Path]::GetDirectoryName($fprbPath))
-    Show-Info "Select export path for multiplexing batch..."
+    Show-Info "(3/4) Select export path for mux/multiplexing/encapsulating/containing batch..."
     $exptPath = Select-Folder -Description "Select folder to export the multiplexing batch file"
-    Show-Info "Select export path for mutiplex result..."
+    Show-Info "(4/4) Select export path for mux/mutiplex/encapsulation/cantained file result..."
     $muxPath  = Select-Folder -Description "Select folder to export the multiplexing result"
 
     # 2. Import streams
     Show-Info "Import source stream (loop)"
-    Write-Host "Note: Only the first video stream will be used" -ForegroundColor Yellow
-    Write-Host "      all later imports will only add audio, subtitle tracks" -ForegroundColor Yellow
+    Write-Host " Note: Only the first video stream will be used" -ForegroundColor Yellow
+    Write-Host "       all later imports will only add audio, subtitle tracks" -ForegroundColor Yellow
     
     $inputsAgg = ""   # All -i "path"S
     $mapsAgg   = ""   # All -map xArgs

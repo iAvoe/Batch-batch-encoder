@@ -266,13 +266,13 @@ function Main {
     
     # 1. 初始化路径与工具
     Show-Info "导入工具和选择路径"
-    Show-Info "导入 ffprobe.exe..."
+    Show-Info "（1/4）导入 ffprobe.exe..."
     $fprbPath = Select-File -Title "选择 ffprobe.exe" -ExeOnly
-    Show-Info "导入 ffmpeg.exe..."
+    Show-Info "（2/4）导入 ffmpeg.exe..."
     $ffmpegPath = Select-File -Title "选择 ffmpeg.exe" -ExeOnly -InitialDirectory ([IO.Path]::GetDirectoryName($fprbPath))
-    Show-Info "选择导出封装批处理路径..."
+    Show-Info "（3/4）选择导出封装批处理路径..."
     $exptPath = Select-Folder -Description "选择导出封装批处理的文件夹"
-    Show-Info "选择封装结果路径..."a
+    Show-Info "（4/4）选择封装结果路径..."a
     $muxPath  = Select-Folder -Description "选择导出封装结果的文件夹"
 
     # 2. 导入素材
@@ -382,7 +382,6 @@ function Main {
         elseif ($fix -eq 't') {
             $cmdLine = $cmdLine.Replace("-c:s copy", "-c:s:0 mov_text")
         }
-        
     }
     
     # 生成文件名

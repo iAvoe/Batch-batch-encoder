@@ -67,6 +67,8 @@ function Select-File(
     elseif ($BatOnly) { $dialog.Filter = 'bat Files (*.bat)|*.bat' }
     else { $dialog.Filter = 'All files (*.*)|*.*' }
 
+    Write-Host " 选窗可能会在本窗口后面打开，这里不要按回车"
+
     do {
         if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
             return $dialog.FileName
@@ -160,5 +162,105 @@ function Test-TextFileFormat {
     catch {
         Show-Error "验证失败：$_" -ForegroundColor Red
         return $false
+    }
+}
+
+# 用 ffprobe 获取媒体流元数据
+function Get-StreamMetadata {
+    param(
+        [Parameter(Mandatory = $true)][string]$FFprobePath,
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [Parameter(Mandatory = $true)][string]$StreamType
+    )
+    
+    # 验证流文件/ffprobe存在
+    if (-not (Test-Path -LiteralPath $FilePath)) {
+        Show-Error "文件不存在：$FilePath"
+        return $null
+    }
+    if (-not (Test-Path -LiteralPath $FFprobePath)) {
+        Show-Error "ffprobe 不存在：$FFprobePath"
+        return $null
+    }
+    
+    try { # 构建 ffprobe 命令参数
+        $streamSelector = switch ($StreamType.ToLower()) {
+            "v" { "v" }  # 视频
+            "a" { "a" }  # 音频
+            "s" { "s" }  # 字幕
+            "t" { "t" }  # 字体
+            default { $StreamType }
+        }
+        
+        $arguments = @(
+            "-v", "quiet",
+            "-print_format", "json",
+            "-show_streams",
+            "-select_streams", $streamSelector,
+            "`"$FilePath`""
+        )
+        
+        Show-Debug "执行 ffprobe：$FFprobePath $arguments"
+        
+        # 执行 ffprobe 并捕获输出
+        $result = & $FFprobePath @arguments 2>&1
+        
+        # 检查是否有错误
+        if ($LASTEXITCODE -ne 0) {
+            Show-Warning "ffprobe 执行失败（退出代码: $LASTEXITCODE）：$result"
+            return $null
+        }
+        
+        # 解析 JSON 输出
+        $jsonOutput = $result | Out-String
+        $metadata = $jsonOutput | ConvertFrom-Json
+        
+        # 如果没有找到指定类型的流
+        if (-not $metadata.streams -or $metadata.streams.Count -eq 0) {
+            Show-Debug "未找到指定为 $StreamType 类型的流：$FilePath"
+            return $null
+        }
+        
+        # 返回第一个匹配的流信息（根据上下文，通常只需要第一个）
+        $stream = $metadata.streams[0]
+        
+        # 构建返回对象
+        $streamInfo = [PSCustomObject]@{
+            Index      = if ($stream.index) { [int]$stream.index } else { 0 }
+            CodecName  = if ($stream.codec_name) { $stream.codec_name } else { $null }
+            CodecTag   = if ($stream.codec_tag_string) { $stream.codec_tag_string } else { $null }
+            CodecType  = if ($stream.codec_type) { $stream.codec_type } else { $null }
+            FrameRate  = if ($stream.r_frame_rate) { 
+                # 将分数格式化为字符串（如 24000/1001）
+                $frameRateStr = $stream.r_frame_rate.ToString()
+                # 如果是整数（如 24/1），简化为整数
+                if ($frameRateStr -match '^(\d+)/1$') {
+                    $matches[1]
+                }
+                else { $frameRateStr }
+            }
+            else { $null }
+            Width      = if ($stream.width) { [int]$stream.width } else { $null }
+            Height     = if ($stream.height) { [int]$stream.height } else { $null }
+            Duration   = if ($stream.duration) { [double]$stream.duration } else { $null }
+            BitRate    = if ($stream.bit_rate) { [int]$stream.bit_rate } else { $null }
+            SampleRate = if ($stream.sample_rate) { [int]$stream.sample_rate } else { $null }
+            Channels   = if ($stream.channels) { [int]$stream.channels } else { $null }
+            Language   = if ($stream.tags -and $stream.tags.language) { $stream.tags.language } else { $null }
+            RawData    = $stream  # 保留原始数据以备用
+        }
+        
+        Show-Debug "获取到流信息：$($streamInfo.CodecType) - $($streamInfo.CodecName)"
+        if ($streamInfo.FrameRate) {
+            Show-Debug "帧率：$($streamInfo.FrameRate)"
+        }
+        
+        return $streamInfo
+        
+    }
+    catch {
+        Show-Error "解析 ffprobe 输出时出错：$_"
+        Show-Debug "错误详情：$($_.ScriptStackTrace)"
+        return $null
     }
 }
