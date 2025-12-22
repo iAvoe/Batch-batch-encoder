@@ -1,8 +1,8 @@
 # PowerShell Batch Processing Tool with Custom Parameters
 
-By utilizing ffprobe to analyze basic video information and automatically construct and actually customizing encoding commandline parameters for multiple encoders, this tool eliminates tedious works, simplifies compression operations, and denies the loss of efficiency impacted by the encoding configuration process.
+This tool analyzes video to perform actual x264, x265, SVT-AV1 parameter customizations. Assisted with filter-less VS/AVS script generation, semi-auto multiplex/encapsulation, and offers GUI and color-coded CLI for extra user guidance. This tool automates tedious format alignment, simplifies operations, and starts your encoding ASAP.
 
-Note: Translation progress: 2/5 main scripts
+[TODO] English Translation progress: 2/5 main scripts
 
 ## Environment
 
