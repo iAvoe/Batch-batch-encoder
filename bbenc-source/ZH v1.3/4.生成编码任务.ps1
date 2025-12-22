@@ -128,7 +128,7 @@ function ConvertTo-Fraction {
     elseif ($fraction -match '^\d+(\.\d+)?$') {
         return [double]$fraction
     }
-    throw "无法解析帧率除法字符串: $fraction"
+    throw "无法解析帧率除法字符串：$fraction"
 }
 
 # 生成上游程序导入、下游程序导出命令（管道命令已经在先前脚本中写完，目录不存在则自动创建）
@@ -155,7 +155,7 @@ function Get-EncodingIOArgument {
     $quotedInput = $null
     if ($isImport) {
         if (-not (Test-Path -LiteralPath $source)) { # 文件名含方括号，因此不用 -Path
-            throw "输入文件不存在: $source"
+            throw "输入文件不存在：$source"
         }
         $quotedInput = Get-QuotedPath $source
     }
@@ -644,7 +644,7 @@ function Get-x265MERange {
         $res = $width * $height
     }
     catch {
-        throw "无法解析视频分辨率: 宽度=$CSVw, 高度=$CSVh"
+        throw "无法解析视频分辨率：宽度=$CSVw, 高度=$CSVh"
     }
     if ($res -ge 8294400) { return "--merange 56" } # >=3840x2160
     elseif ($res -ge 3686400) { return "--merange 52" } # >=2560*1440
@@ -767,8 +767,7 @@ function Get-FPSParam {
             # 如果是分数格式（如 24000/1001）
             return "--fps-num $($matches[1]) --fps-denom $($matches[2])"
         }
-        else {
-            # 直接输入了小数：转换为分数
+        else { # 直接输入了小数：转换为分数
             switch ($fpsValue) {
                 "23.976" { return "--fps-num 24000 --fps-denom 1001" }
                 "29.97"  { return "--fps-num 30000 --fps-denom 1001" }
@@ -785,16 +784,17 @@ function Get-FPSParam {
     # x264、x265、ffmpeg 都可以直接使用分数字符串或小数
     switch ($Target) {
         "ffmpeg" { return "-r $fpsValue" }
-        default  { return "--fps $fpsValue" } # x264 整数+分数、x265 整数+分数、SVT-AV1 整数
+        default  { return "--fps $fpsValue" }
     }
 }
 
+# 获取矩阵格式、传输特质、三原色
 function Get-ColorSpaceSEI {
     Param (
         [Parameter(Mandatory=$true)]$CSVColorMatrix,
         [Parameter(Mandatory=$true)]$CSVTransfer,
         [Parameter(Mandatory=$true)]$CSVPrimaries,
-        [ValidateSet("avc","x264","hevc","x265","av1","svtav1","SVT-AV1")][string]$Codec
+        [ValidateSet("avc","x264","hevc","x265","av1","svtav1")][string]$Codec
     )
     $Codec = $Codec.ToLower()
     $result = @()
@@ -802,7 +802,7 @@ function Get-ColorSpaceSEI {
     # 处理 ColorMatrix
     if (($Codec -eq 'avc' -or $Codec -eq 'x264')) {
         if (($CSVColorMatrix -eq "unknown") -or ($CSVColorMatrix -eq "bt2020nc")) {
-            $result += "--colormatrix undef" # 未知情况不写作 unknown
+            $result += "--colormatrix undef" # x264 不写 unknown
         }
         else { # fcc，bt470bg，smpte170m，smpte240m，GBR，YCgCo，bt2020c，smpte2085，chroma-derived-nc，chroma-derived-c，ICtCp
             $result += "--colormatrix $CSVColorMatrix"
@@ -834,7 +834,7 @@ function Get-ColorSpaceSEI {
             "chroma-cl"  { 13 }
             ictcp        { 14 }
             default { 
-                Show-Warning "无法匹配矩阵格式：$CSVColorMatrix，使用默认（bt709）"
+                Show-Warning "未知矩阵格式：$CSVColorMatrix，使用默认（bt709）"
                 1
             }
         }
@@ -847,7 +847,7 @@ function Get-ColorSpaceSEI {
             # bt470m，bt470bg，smpte170m，smpte240m，linear，log100，log316，iec61966-2-4，bt1361e，iec61966-2-1，bt2020-10，bt2020-12，smpte2084，smpte428，arib-std-b67
             $result += "--transfer undef"
         }
-        else { # 同 x264
+        else {
             $result += "--transfer $CSVTransfer"
         }
     }
@@ -873,12 +873,13 @@ function Get-ColorSpaceSEI {
             smpte428        { 17 }
             hlg             { 18 }
             default { 
-                Show-Warning "无法匹配传输特质：$CSVTransfer，使用默认（bt709）"
+                Show-Warning "未知传输特质：$CSVTransfer，使用默认（bt709）"
                 1
             }
         }
         $result += "--transfer-characteristics $t"
     }
+
     # 处理 Color Primaries
     if (($Codec -eq 'avc') -or ($Codec -eq 'x264')) {
 
@@ -917,7 +918,7 @@ function Get-ColorSpaceSEI {
             smpte432   { 12 }
             ebu3213    { 22 }
             default {
-                Show-Warning "无法匹配三原色：$CSVPrimaries，使用默认（bt709）"
+                Show-Warning "未知三原色：$CSVPrimaries，使用默认（bt709）"
                 1
             }
         }
@@ -956,12 +957,10 @@ function Get-RAWCSPBitDepth {
     $chromaFormat = $null
     $depth = 8
 
-    # 解析位深
+    # 解析并检查位深
     if ($pixfmt -match '(\d+)(le|be)$') {
         $depth = [int]$matches[1]
     }
-    
-    # 检查位深
     if ($depth -notin @(8, 10, 12)) {
         Show-Warning "视频编码可能不支持 $depth bit 位深" # $depth = 8
     }
@@ -988,14 +987,13 @@ function Get-RAWCSPBitDepth {
     else { # 默认 4:2:0
         if ($isEncoderInput) {
             $chromaFormat = 'i420'
-            Show-Warning "[编码器] 未知像素格式：$pixfmt，将使用默认值 i420"
+            Show-Warning "[编码器] 未知像素格式：$pixfmt，将使用默认值（i420）"
         }
         else {
             $chromaFormat = 'AUTO'
-            Show-Warning "[AviSynth] 未知像素格式：$pixfmt，将使用默认值 AUTO"
+            Show-Warning "[AviSynth] 未知像素格式：$pixfmt，将使用默认值（AUTO）"
         }
     }
-
 
     if ($isEncoderInput) {
         if ($isSVTAV1) { # SVT-AV1 使用 --color-format 和 --input-depth
@@ -1042,8 +1040,8 @@ function Edit-SvfiRenderConfig {
             throw "CSV 记录显示使用 SVFI，但未找到有效的渲染配置 INI 文件，请重试先前脚本"
         }
 
-        Show-Success "已从配置读取 SVFI 配置文件: $($sourceCSV.SvfiConfigInput)"
-        Show-Info "将修改渲染配置 ini 文件中的 target_fps 值以统一帧率设置（创建新文件，不覆盖原文件）"
+        Show-Success "已从配置读取 SVFI 配置文件：$($sourceCSV.SvfiConfigInput)"
+        Show-Info "将修改渲染配置 INI 文件中的 target_fps 值到源视频帧率（创建新文件，不覆盖原文件）"
 
         $iniExport =
             Join-Path -Path $Global:TempFolder -ChildPath ("svfi_targetfps_mod_" + (Get-Date).ToString('yyyy.MM.dd.HH.mm.ss') + ".ini")
@@ -1059,12 +1057,18 @@ function Edit-SvfiRenderConfig {
             }
         }
         if ($null -eq $foundIndex) {
-            Show-Warning "未在 SVFI 配置文件中找到 target_fps 项，将追加该项"
+            Show-Warning "未在 SVFI 配置文件中找到 target_fps 项，将追加该项（创建新文件，不覆盖原文件）"
             $iniData += $svfiFPS
         }
         else { $iniData[$foundIndex] = $svfiFPS }
 
-        [System.IO.File]::WriteAllLines($iniExport, $iniData, $Global:utf8BOM)
+        Write-TextFile -Path $iniExport -Content $iniData -UseBOM $true
+
+        # 验证换行符，必须为 CRLF
+        Show-Debug "验证写入文件的格式..."
+        if (-not (Test-TextFileFormat -Path $finalBatchPath)) {
+            return
+        }
         Show-Success "已将渲染配置文件 '$($sourceCSV.SvfiConfigInput)' 的 target_fps 行替换为 $svfiFPS"
         Write-Host "新的渲染配置文件已导出为 $iniExport"
     }
@@ -1102,19 +1106,19 @@ function Main {
         ForEach-Object { $_.FullName }
 
     if ($null -eq $ffprobeCsvPath) {
-        Show-Error "未找到 ffprobe 生成的 CSV 文件；请运行先前脚本以补全"
+        Show-Error "未找到 ffprobe 生成的 CSV 文件；请运行步骤 3 脚本以补全"
         return
     }
 
     # 2. 查找源信息 CSV
     $sourceInfoCsvPath = Join-Path $Global:TempFolder "temp_s_info.csv"
     if (-not (Test-Path $sourceInfoCsvPath)) {
-        Show-Error "未找到专用信息 CSV 文件；请运行先前脚本以补全"
+        Show-Error "未找到专用信息 CSV 文件；请运行步骤 3 脚本以补全"
         return
     }
 
-    Show-Info "正在读取 ffprobe 信息: $(Split-Path $ffprobeCsvPath -Leaf)..."
-    Show-Info "正在读取专用信息: $(Split-Path $sourceInfoCsvPath -Leaf)..."
+    Show-Info "正在读取 ffprobe 信息：$(Split-Path $ffprobeCsvPath -Leaf)..."
+    Show-Info "正在读取源专用信息：$(Split-Path $sourceInfoCsvPath -Leaf)..."
 
     $ffprobeCSV =
         Import-Csv $ffprobeCsvPath -Header A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,AA,AB,AC,AD,AE,AF,AG,AH,AI,AJ
@@ -1122,8 +1126,8 @@ function Main {
         Import-Csv $sourceInfoCsvPath -Header SourcePath,UpstreamCode,Avs2PipeModDllPath,SvfiConfigInput
 
     # 验证 CSV 数据
-    if (-not $sourceCSV.SourcePath) { # 直接验证存在，不需要添加引号
-        Show-Error "CSV 数据不完整，请重新运行源读取步骤"
+    if (-not $sourceCSV.SourcePath) { # 直接验证 CSV 项存在，不需要添加引号
+        Show-Error "CSV 数据不完整，请重运行步骤 3 脚本"
         return
     }
 
@@ -1139,7 +1143,7 @@ function Main {
     $x265Params.FPS = Get-FPSParam -CSVfps $ffprobeCSV.H -Target x265
     $x264Params.FPS = Get-FPSParam -CSVfps $ffprobeCSV.H -Target x264
 
-    Show-Debug "矩阵格式：：$($ffprobeCSV.E)；传输特质：$($ffprobeCSV.F)；三原色：$($ffprobeCSV.G)"
+    Show-Debug "矩阵格式：$($ffprobeCSV.E)；传输特质：$($ffprobeCSV.F)；三原色：$($ffprobeCSV.G)"
     $svtav1Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -Codec svtav1
     $x265Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -Codec x265
     $x264Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -Codec x264
@@ -1178,7 +1182,7 @@ function Main {
 
     # 配置编码结果文件名
     # 1. 获取默认值（从源复制）
-    Show-Debug "CSV SourcePath 原文为: $($sourceCSV.SourcePath)"
+    Show-Debug "CSV SourcePath 原文为：$($sourceCSV.SourcePath)"
     
     $defaultName = [io.path]::GetFileNameWithoutExtension($sourceCSV.SourcePath)
     # 由于自动生成的脚本源存在，因此文件名会变成 "blank_vs_script/blank_avs_script" 而非视频文件名
@@ -1186,7 +1190,7 @@ function Main {
     $isPlaceholderSource = Get-IsPlaceHolderSource -defaultName $defaultName
     $encodeOutputFileName = ""
     
-    # 使用兼容 PS 5.1 的写法计算 displayName
+    # 使用兼容 PowerShell 5.1 的写法计算 displayName
     if (-not $isPlaceholderSource) {
         $encodeOutputFileName = $defaultName
         if ($defaultName.Length -gt 17) {
@@ -1283,9 +1287,9 @@ function Main {
     # Show-Debug $x265FinalParam
     # Show-Debug $svtav1FinalParam
 
-    # 生成 ffmpeg, vspipe, avs2yuv, avs2pipemod 主控批处理
+    # 生成 ffmpeg, vspipe, avs2yuv, avs2pipemod 编码任务批处理
     Write-Host ""
-    Show-Info "定位先前脚本生成的 encode_single.bat 模板，以创建压制批处理..."
+    Show-Info "定位先前脚本生成的 encode_single.bat 模板..."
     $templateBatch = $null
     do {
         $templateBatch = Select-File -Title "选择 encode_single.bat 批处理" -BatOnly
@@ -1298,7 +1302,7 @@ function Main {
     }
     while (-not $templateBatch)
 
-    # 读取模板内容
+    # 读取模板
     $batchContent = [System.io.File]::ReadAllText($templateBatch, $Global:utf8BOM)
 
     # 准备要注入的参数块
@@ -1327,29 +1331,47 @@ REM x265_appendix=$x265RawPipeApdx
 REM svtav1_appendix=$svtav1RawPipeApdx
 "@
 
-
     # 查找替换锚点
     # 策略：找到 "REM 参数示例" 行，替换为参数块
     # 如果模板变更，则回退到在 @echo off 后面插入
-    
     $newBatchContent = $batchContent
-    if ($batchContent -match "REM 参数示例") {
-        # Regex 替换，保留原有结构
-        $newBatchContent =
-            $batchContent -replace "(?s)REM 参数示例.*?REM set svtav1_params=.*?(?=\r?\n)", $paramsBlock
+
+    # 字样匹配
+    $englishAnchor = '(?msi)^REM\s+Parameter\s+examples\b'
+    $chineseAnchor = '(?msi)^REM\s+参数示例\b'
+
+    if ($batchContent -match $englishAnchor -or $batchContent -match $chineseAnchor) {
+        # 顺序匹配英文模板、中文模板
+        if ($batchContent -match $englishAnchor) {
+            # 匹配从“REM 参数示例”到（但不包括）“REM 指定命令行”行的内容
+            $pattern = '(?msi)^REM\s+Parameter\s+examples\b.*?^(?=REM\s+Specify\s+commandline\b)'
+        }
+        else {
+            # 中文字样（保持兼容性）
+            $pattern = '(?msi)^REM\s+参数示例\b.*?^(?=REM\s+指定本次所需编码命令\b)'
+        }
+
+        # 替换操作使用 [regex]::Replace 以确保 .NET 正则表达式的行为。
+        $newBatchContent = [regex]::Replace($batchContent, $pattern, $paramsBlock)
     }
     else {
-        Show-Warning "未在模板中找到参数占位符，将在文件头部追加参数。"
+        Write-Warning "未在模板中找到参数占位符，将在文件头部追加参数。"
         $lines = [System.IO.File]::ReadAllLines($templateBatch, $Global:utf8BOM)
-        # 在第3行（通常是 setlocal 之后）插入
+
+         # 在第3行（通常是 setlocal 之后）插入
         $insertIndex = 3
-        $newLines = $lines[0..($insertIndex-1)] + ($paramsBlock -split "`r`n") + $lines[$insertIndex..($lines.Count-1)]
+
+        # 使用 CRLF 或 LF 分割 paramsBlock 以安全地获取行。
+        $paramsLines = [System.Text.RegularExpressions.Regex]::Split($paramsBlock, "\r?\n")
+
+        # 使用插入的参数创建新行
+        $newLines = $lines[0..($insertIndex-1)] + $paramsLines + $lines[$insertIndex..($lines.Count-1)]
         $newBatchContent = $newLines -join "`r`n"
     }
 
     # 保存最终文件
     $finalBatchPath = Join-Path (Split-Path $templateBatch) "encode_task_final.bat"
-    Show-Debug "输出文件: $finalBatchPath"
+    Show-Debug "输出文件：$finalBatchPath"
     Write-Host ""
     
     try {
@@ -1363,15 +1385,14 @@ REM svtav1_appendix=$svtav1RawPipeApdx
         }
     
         Show-Success "任务生成成功！直接运行该批处理文件以开始编码。"
-        Show-Warning "若批处理运行后立即退出，则打开 CMD，输入运行 + 错误导出到文本的命令，如：`r`n X:\encode_task_final.bat 2>Y:\error.txt"
+        Show-Warning "若批处理运行后立即退出，则打开 CMD，运行导出错误到文本的命令，如：`r`n X:\encode_task_final.bat 2>Y:\error.txt"
     }
     catch {
-        Show-Error "写入文件失败: $_"
+        Show-Error "写入文件失败：$_"
     }
     pause
 }
 
-# 异常处理
 try { Main }
 catch {
     Show-Error "脚本执行出错：$_"
