@@ -1,18 +1,19 @@
 ﻿<#
 .SYNOPSIS
-    视频编码工具调用管线生成器
+    Video encoding toolchain generator
 .DESCRIPTION
-    生成用于视频编码的批处理文件，支持多种编码工具链组合
+    Generate a batch file for video encoding, support multiple tool-chains
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
     1.3
 #>
 
-# 下游工具（编码器）必须支持 Y4M 管道，否则需要添加强制覆盖上游程序的逻辑
-# 选用 Y4M/RAW 由上游决定；one_line_shot_args（SVFI）只支持 RAW YUV 管道，强制覆盖下游工具
+# Downstream pipe (video encoders) must support Y4M pipe, otherwise upstream-overrides should be added
+# For simplicity, usage of Y4M/RAW pipe is dictated by upstream tools only
+# i.e., one_line_shot_args (SVFI) Support RAW YUV pipe only, and always override downstreams
 
-# 加载共用代码，工具链组合全局变量
+# Load globals
 . "$PSScriptRoot\Common\Core.ps1"
 
 $Script:DownstreamPipeParams = @{
@@ -28,7 +29,7 @@ $Script:DownstreamPipeParams = @{
     }
 }
 
-# 不同工具支持的管道格式
+# Pipe format compatibility map
 function Get-PipeType($upstream) {
     switch ($upstream) {
         'ffmpeg'       { 'y4m' }
@@ -40,7 +41,8 @@ function Get-PipeType($upstream) {
     }
 }
 
-# 不检测 VapourSynth 版本和 API，直接尝试运行命令，只要捕获到特定返回结果就说明能跑
+# Get correct Y4M pipe parameter for vspipe automatically
+# Instead of reading VapourSynth versions and map API to Y4M parameters, simply try a list of commands and find the working one
 function Get-VSPipeY4MArgument {
     param([Parameter(Mandatory=$true)][string]$VSpipePath)
 
@@ -51,9 +53,10 @@ function Get-VSPipeY4MArgument {
     )
 
     foreach ($testArgs in $tests) {
-        Write-Host (" 测试：{0} {1}" -f $VSpipePath, ($testArgs -join " "))
+        Write-Host (" Testing：{0} {1}" -f $VSpipePath, ($testArgs -join " "))
         
-        # 使用 Start-Process 启动独立进程，避免影响当前控制台的字符集
+        # Use Start-Process to execute on a different process,
+        # so it doesn't break the character code page used in current console
         $processInfo = New-Object System.Diagnostics.ProcessStartInfo
         $processInfo.FileName = $VSpipePath
         $processInfo.Arguments = $testArgs -join " "
@@ -76,19 +79,19 @@ function Get-VSPipeY4MArgument {
         if ($vsResponse -match "No script file specified") {
             return @{
                 Args = $testArgs -join " "
-                Note = "vspipe 参数自动检测成功：$($testArgs -join ' ')"
+                Note = "vspipe Y4M paramter detection succeeded: $($testArgs -join ' ')"
             }
         }
     }
     
-    throw "检测不到 vspipe 支持的 y4m 参数"
+    throw "Could not detect vspipe's Y4M parameter"
 }
 
-# 遍历所有已导入工具组合，从而导出“备用路线”
+# Traversal all pipe routes imported to create "backup routes"
 function Get-CommandFromPreset([string]$presetName, $tools, $vspipeInfo) {
         $preset = $Global:PipePresets[$presetName]
         if (-not $preset) {
-            throw "未知的 PipePreset：$presetName"
+            throw "Unknown PipePreset：$presetName"
         }
 
         $up   = $preset.Upstream
@@ -104,12 +107,12 @@ function Get-CommandFromPreset([string]$presetName, $tools, $vspipeInfo) {
             'svfi'        { '"{0}" %svfi_params% --pipe-out - | "{1}" {3} %{2}_params%' }
         }
 
-        # 检查管道格式
+        # Check pipe format
         if (-not $Script:DownstreamPipeParams.ContainsKey($pType)) {
-            throw "未知 PipeType：$pType"
+            throw "Unknown PipeType：$pType"
         }
         if (-not $Script:DownstreamPipeParams[$pType].ContainsKey($down)) {
-            throw "下游编码器 $down 不支持 $pType 管道"
+            throw "Downstream (Video Encoder) $down does not support $pType pipe"
         }
 
         if ($up -eq 'vspipe') {
@@ -120,28 +123,25 @@ function Get-CommandFromPreset([string]$presetName, $tools, $vspipeInfo) {
         }
     }
 
-# 主程序
+#region Main
 function Main {
-    # 显示标题
     Show-Border
-    Write-Host "视频编码工具调用管线生成器" -ForegroundColor Cyan
+    Write-Host "Video encoding toolchain generator" -ForegroundColor Cyan
     Show-Border
     Write-Host ""
     
-    # 显示编码示例
-    Show-Info "常用编码命令示例："
-    Write-Host "ffmpeg -i [输入] -an -f yuv4mpegpipe -strict unofficial - | x265.exe --y4m - -o"
-    Write-Host "vspipe [脚本.vpy] --y4m - | x265.exe --y4m - -o"
-    Write-Host "avs2pipemod [脚本.avs] -y4mp | x265.exe --y4m - -o"
+    Show-Info "Example of common encoding commandlines："
+    Write-Host "ffmpeg -i [source] -an -f yuv4mpegpipe -strict unofficial - | x265.exe --y4m - -o"
+    Write-Host "vspipe [source.vpy] --y4m - | x265.exe --y4m - -o"
+    Write-Host "avs2pipemod [source.avs] -y4mp | x265.exe --y4m - -o"
     Write-Host ""
     
-    # 选择输出路径
-    Show-Info "选择批处理文件保存位置..."
+    Show-Info "Select path to export batch file..."
     $outputPath = $null
     do {
-        $outputPath = Select-Folder -Description "选择批处理文件保存位置"
+        $outputPath = Select-Folder -Description "Select a path to export batch file"
         if (-not $outputPath -or -not (Test-Path $outputPath)) {
-            if ((Read-Host "未选择导出路径，请重试。输入 'q' 强制退出") -eq 'q') {
+            if ((Read-Host "No path selection, please try again. Input 'q' to force exit") -eq 'q') {
                 return
             }
         }
@@ -150,9 +150,9 @@ function Main {
     
     $batchFullPath = Join-Path -Path $outputPath -ChildPath "encode_single.bat"
 
-    Show-Success "输出文件：$batchFullPath"
+    Show-Success "Output file：$batchFullPath"
     
-    # 导入编码工具
+    # Import encoding tools
     $upstreamTools = @{
         'ffmpeg' = $null
         'vspipe' = $null
@@ -166,79 +166,83 @@ function Main {
         'svtav1' = $null
     }
 
-    Show-Info "开始导入上游编码工具（由于使用了哈希表，导入顺序会被打乱）..."
-    Write-Host " 提示：Select-File 支持 -InitialDirectory 参数，在此脚本中添加即可优化导入操作步骤" -ForegroundColor DarkGray
-    Write-Host " 如果难以实现脚本修好，你还可以创建文件夹快捷方式"
+    Show-Info "Start importing upstream tools..."
+    Write-Host " Hint: Select-File supports opening file selection -InitialDirectory parameter“
+    Write-Host " customize the import statements in this script to improve dexterity" -ForegroundColor DarkGray
+    Write-Host " If it doesn't work as intended, you may also create shortcut paths"
     
-    # 存储 vspipe 版本与其 API 版本
+    # Store vspipe version, API version
     $vspipeInfo = $null
 
-    # 上游工具
+    # Upstream tools import
     $i=0
     foreach ($tool in @($upstreamTools.Keys)) {
         $i++
-        $choice = Read-Host " [上游] ($i/$($upstreamTools.Count)) 导入 $tool？（y=是，Enter 跳过）"
+        $choice = Read-Host " [Upstream] ($i/$($upstreamTools.Count)) Import $tool? (y=yes，Enter=Skip)"
         if ($choice -eq 'y') {
             $upstreamTools[$tool] =
                 if ($tool -eq 'svfi') {
-                    Show-Info "SVFI 的可执行文件为 one_line_shot_args.exe，Steam 版的路径是 X:\SteamLibrary\steamapps\common\SVFI\"
-                    Select-File -Title "选择 one_line_shot_args.exe" -ExeOnly
+                    Show-Info "SVFI's executable is 'one_line_shot_args.exe', Steam installation path is X:\SteamLibrary\steamapps\common\SVFI\"
+                    Select-File -Title "Locate one_line_shot_args.exe" -ExeOnly
                 }
                 elseif ($tool -eq 'vspipe') {
-                    Show-Info "安装版 VapourSynth 的默认可执行文件路径是 C:\Program Files\VapourSynth\core\vspipe.exe"
-                    Select-File -Title  "选择 vspipe.exe"
+                    Show-Info "The default VapourSynth installation places vspipe.exe in C:\Program Files\VapourSynth\core\"
+                    Select-File -Title  "Locate vspipe.exe"
                 }
                 else {
-                    Select-File -Title "选择 $tool 可执行文件" -ExeOnly
+                    Select-File -Title "Locate $tool executable" -ExeOnly
                 }
 
-            Show-Success "$tool 已导入: $($upstreamTools[$tool])"
+            Show-Success "$tool imported: $($upstreamTools[$tool])"
         }
 
-        # 如果是 vspipe，检测 API 版本
+        # Detect API version for vspipe
         if ($tool -eq 'vspipe' -and $upstreamTools[$tool]) {
             Write-Host ""
-            Show-Info "检测 VapourSynth 管道参数..."
+            Show-Info "Detect VapourSynth pipe command..."
             $vspipeInfo = Get-VSPipeY4MArgument -VSpipePath $upstreamTools[$tool]
             Show-Success $($vspipeInfo.Note)
         }
     }
     
-    Show-Info "开始导入下游编码工具（由于使用了哈希表，导入顺序会被打乱）..."
-
-    # 下游工具
+    Show-Info "Start importing downstream tools..."
     $i = 0
     foreach ($tool in @($downstreamTools.Keys)) {
         $i++
-        $choice = Read-Host " [下游] ($i/$($downstreamTools.Count)) 导入 $tool？（y=是，Enter 跳过）"
+        $choice = Read-Host " [Downstream] ($i/$($downstreamTools.Count)) Import $tool? (y=yes，Enter=Skip)"
         if ($choice -eq 'y') {
-            $downstreamTools[$tool] = Select-File -Title "选择 $tool 可执行文件" -ExeOnly
-            Show-Success "$tool 已导入: $($downstreamTools[$tool])"
+            $downstreamTools[$tool] = Select-File -Title "Select $tool executable" -ExeOnly
+            Show-Success "$tool imported: $($downstreamTools[$tool])"
         }
     }
 
-    # 合并工具（手动合并以避免 Clone() 带来的对象引用/类型问题）
+    # TODO
+
+    # Merge all tools (using manual merge to avoid object reference/type issues caused by Clone())
     $tools = @{}
-    # 复制上游工具
+    # Copy upstream tools
     foreach ($k in $upstreamTools.Keys) {
         $tools[$k] = $upstreamTools[$k]
     }
-    # 复制下游工具
+    # Copy downstream tools
     foreach ($k in $downstreamTools.Keys) {
         if ($k -eq 'svtav1') {
-            Write-Host " 由于性能差距大且编译好的 EXE 不易获取，因此建议自行编译 SVT-AV1 编码器"
-            Write-Host " 编译教程可在 AV1 教程完整版（iavoe.github.io）或 SVT-AV1 教程急用版中查看"
+            Write-Host " It is recommended to compile the SVT-AV1 encoder yourself"
+            Write-Host " (large performance gap, harder to obtain compiled executable)"
+            Write-Host " The compilation tutorial can be viewed in the full version of the AV1 tutorial (iavoe.github.io)"
+            Write-Host " or the emergency version of the SVT-AV1 tutorial"
+            Write-Host " You may need webpage translation to view the compiling tutorial"
         }
         $tools[$k] = $downstreamTools[$k]
     }
 
-    Show-Debug "合并后的工具列表..."
+    Show-Debug "Merged encoding tool list..."
     foreach ($k in $tools.Keys) {
         $type = if ($tools[$k]) { $tools[$k].GetType().Name } else { "Null" }
         Write-Host "  Key: [$k] | Value: [$($tools[$k])] | Type: $type"
     }
 
-    # 检查至少一组工具
+    # Verify wer have at least 1 stream and 1 downstream tool
     $hasUpstreamTool =
         @('ffmpeg', 'vspipe', 'avs2yuv', 'avs2pipemod', 'svfi') | Where-Object { 
             $toolPath = $tools[$_]
@@ -251,20 +255,20 @@ function Main {
         }
 
     if (($hasUpstreamTool.Count -eq 0) -or ($hasDownstreamTool.Count -eq 0)) {
-        Show-Error "至少需要选择一个上游工具和一个下游工具（例如 ffmpeg + x265 或 ffmpeg + svtav1）"
+        Show-Error "At least 1 upstream tool and 1 downstream tool need to be selected (e.g. ffmpeg + x265 or ffmpeg + svtav1)"
         exit 1
     }
 
-    # 显示可用工具链
-    Show-Info "可用编码工具链："
+    # Show toochains that could work
+    Show-Info "Encoding Toolchains available："
     Write-Host ("─" * 60)
 
-    # 构建“ID → PresetName”的映射表
+    # Construct “ID → PresetName” map
     $presetIdMap = @{}
     $availablePresets =
         $Global:PipePresets.GetEnumerator() |
         Where-Object {
-            if ($null -eq $_.Value) { return $false }  # 允许 Null
+            if ($null -eq $_.Value) { return $false } # Allow Null
             $up = $_.Value.Upstream
             $down = $_.Value.Downstream
             $tools[$up] -and $tools[$down]
@@ -288,34 +292,34 @@ function Main {
     Write-Host ("─" * 60)
 
     if ($presetIdMap.Count -eq 0) {
-        Show-Error "没有可用的完整工具链组合"
+        Show-Error "No complete toolchain combination available"
         exit 1
     }
     
-    # 选择工具链
+    # Select a toolchain
     do {
         Write-Host ""
-        $inputId = Read-Host "请输入工具链编号（数字）"
+        $inputId = Read-Host "Please enter toolchain number (integer)"
 
         if ($inputId -match '^\d+$' -and $presetIdMap.ContainsKey([int]$inputId)) {
             $selectedPreset = $presetIdMap[[int]$inputId]
-            Show-Success "已选择工具链: [$inputId] $selectedPreset"
+            Show-Success "Toolchain selected: [$inputId] $selectedPreset"
             break
         }
-        Show-Error "无效编号，请输入上面列表中的数字"
+        Show-Error "Invalid number, please enter a number from the list above"
     }
     while ($true)
     
-    # 生成批处理内容，追加管道指定命令
-    # 1. 生成当前选定的主命令
+    # Generate batch processing content and append pipeline specifying commands
+    # 1. Generate the currently selected main command
     # Show-Debug "S $selectedPreset"; Show-Debug "T $tools"; Show-Debug "V $vspipeInfo"
     $command =
         Get-CommandFromPreset $selectedPreset -tools $tools -vspipeInfo $vspipeInfo
 
-    # 2. 生成其它已导入线路的备用命令 (REM 写入)
+    # 2. Generate alternate commands for other imported lines (REM write)
     $otherCommands = @()
     foreach ($p in $availablePresets) {
-        # 注意是调用 Key 属性，因此不 = $p
+        # Note: calling the Key property, not $p
         $presetName = $p.Key
 
         if ($presetName -eq $selectedPreset) { continue }
@@ -326,7 +330,7 @@ function Main {
     }
     $remCommands = $otherCommands -join "`r`n"
 
-    # 构建批处理文件（文件开头需要双换行）
+    # Build batch file (needs double line break at the beginning of the file) # !TODO：Alter Script 4 so it matches English batch title!
     $batchContent = @'
 
 @echo off
@@ -334,85 +338,85 @@ chcp 65001 >nul
 setlocal
 
 REM ========================================
-REM 视频编码工具调用管线
-REM 生成时间: {0}
-REM 工具链（变更时需指定）: {1}
+REM Video encoding toochain pipelines
+REM Generated on: {0}
+REM Toolchain (Alter this when modify): {1}
 REM ========================================
 
 echo.
-echo 开始编码任务...
+echo Starting encode...
 echo.
 
-REM 参数示例（由后续脚本编辑）
+REM Parameter examples (this section will be reworked by later scripts)
 REM set ffmpeg_params=-i input.mkv -an -f yuv4mpegpipe -strict unofficial
 REM set x265_params=--y4m - -o output.hevc
 REM set svtav1_params=-i - -b output.ivf
 
-REM 指定本次所需编码命令
+REM Specify commandline for this encode
 {2}
 
-REM 备用编码命令（手动切换）
+REM Auxiliary encoding commandlines
 {3}
 
 echo.
-echo 编码完成！
+echo Encoding completed!
 echo.
 pause
 
 endlocal
-echo 按任意键进入命令提示符，输入 exit 退出...
+echo Press any button to enter CMD, input exit to exit...
 pause >nul
 cmd /k
 '@ -f (Get-Date -Format 'yyyy-MM-dd HH:mm'), $selectedPreset, $command, $remCommands
     
-    # 保存文件
+    # Save file
     try {
         Confirm-FileDelete $batchFullPath
         Write-TextFile -Path $batchFullPath -Content $batchContent -UseBOM $true
-        Show-Success "批处理文件已生成：$batchFullPath"
+        Show-Success "Batch file generated: $batchFullPath"
         
-        # 验证换行符
-        Show-Debug "验证批处理文件格式..."
+        # Validate line breaks (must be CRLF or CMD can't read it)
+        Show-Debug "Validating batch file format..."
         if (-not (Test-TextFileFormat -Path $batchFullPath)) {
             return
         }
     
-        # 显示使用说明
+        # Show usages
         Write-Host ""
         Write-Host ("─" * 50)
-        Show-Info "使用说明："
-        Write-Host "1. 后续的脚本将基于此‘管线批处理’生成新的‘编码批处理’，从而启动编码流程"
-        Write-Host "   因此只要编码工具不变就无需在每次使用都生成新的管线批处理"
-        Write-Host "2. 建议在使用前二次确认所有工具路径正确，尤其是长时间未使用后"
-        Write-Host "3. 尽管可以通过编辑已生成的批处理来变更工具，但重新生成可以减少失误概率"
+        Show-Info "Usages："
+        Write-Host " 1. Later scripts will generate ‘Encoding Batch’ based on this ‘Toolchain/Pipeline Batch’ to start encoding properly"
+        Write-Host " 2. Regenration of ‘Toolchain/Pipeline Batch’ is not required as long as there are no changes in encoding tool programs"
+        Write-Host " 3. It is recommended to double check tool existense before encoding, especially after setting aside for a long time"
+        Write-Host " 4. You may simply modify the ‘Toolchain/Pipeline Batch’ to make changes, but regenerating is less likely to introduce errors"
         
         if ($downstream -eq 'x265') {
-            Show-Warning "x265 编码器默认输出 .hevc 文件"
-            Write-Host " 如需容器，请使用后续脚本或 ffmpeg 封装"
+            Show-Warning "x265 encoder will export .hevc files"
+            Write-Host " To multiplex, please refer to later script steps, or use ffmpeg manually"
         }
 
         if ($downstream -eq 'svtav1') {
-            Show-Warning "AV1 编码器默认输出 .ivf 文件（Indeo 格式）"
-            Write-Host " 如需容器，请使用后续脚本或 ffmpeg 封装"
+            Show-Warning "AV1 encoder will export .ivf files (Indeo format)"
+            Write-Host " To multiplex, please refer to later script steps, or use ffmpeg manually"
         }
         Write-Host ("─" * 50)
         
     }
     catch {
-        Show-Error "保存文件失败：$_"
+        Show-Error "File export failed: $_"
         exit 1
     }
     
     Write-Host ""
-    Show-Success "脚本执行完成！"
-    Read-Host "按回车键退出"
+    Show-Success "Script execution completed!"
+    Read-Host "Press any button to exit"
 }
+#endregion
 
-# 异常处理
 try { Main }
 catch {
-    Show-Error "脚本执行出错：$_"
-    Write-Host "错误详情：" -ForegroundColor Red
+    Show-Error "Script failed: $_"
+    Write-Host "Error: " -ForegroundColor Red
     Write-Host $_.Exception.ToString()
-    Read-Host "按回车键退出"
+    Read-Host "Press any button to exit"
 }
