@@ -78,7 +78,6 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 - 构建了全局脚本，简化了代码
 - 抛弃了大批量模式
 - 添加了 SVT-AV1 基础支持
-- 添加了自动识别
 - 全部参数计算功能改写为函数，提高了模块化
 - 添加了分色处理的提示文本，统一化了外观
 - 改进了 vspipe 支持
@@ -95,7 +94,7 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 - 添加了 SVT-AV1 的 ColorMatrix、Transfer、Primaries 参数生成功能
 - 已完成 ffmpeg、vspipe 上游到全部下游的运行测试
   - TODO：待完成 avs2yuv、avs2pipemod、SVFI 的测试，不过理论上由于逻辑几乎完全一致，所以应该能跑...
-- TODO：测试步骤 5（封装命令），弃用所有 Invoke-Expression 来增加安全性
+- 测试步骤 5（封装命令）已完成测试，弃用了所有 Invoke-Expression 来增加安全性
 
 **v0.2940**
 <ul>
