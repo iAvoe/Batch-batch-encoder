@@ -1202,8 +1202,8 @@ function Main {
             $displayName = $defaultName
         }
     }
-    else {
-        $displayName = "Encode " + (Get-Date -Format 'yyyy-MM-dd HH:mm')
+    else { # 警告：不要在文件名里写冒号
+        $displayName = "Encode " + (Get-Date -Format 'yyyy-MM-dd HH-mm')
     }
 
     $encodeOutputNameCode =
@@ -1233,8 +1233,12 @@ function Main {
         $encodeOutputFileName = $displayName
     }
 
-
-    Show-Success "最终文件名：$encodeOutputFileName"
+    if (Test-FilenameValid -Filename $encodeOutputFileName) {
+        Show-Success "最终文件名：$encodeOutputFileName"
+    }
+    else {
+        Show-Error "文件名 $encodeOutputFileName 不符合 Windows 命名规范，请在生成的批处理中手动更改，否则编码可能会在最后的导出步骤失败"
+    }
 
     # 生成 IO 参数 (Input/Output)
     # 1. 管道上游程序输入
@@ -1336,6 +1340,8 @@ REM ========================================================
 REM x264_appendix=$x264RawPipeApdx
 REM x265_appendix=$x265RawPipeApdx
 REM svtav1_appendix=$svtav1RawPipeApdx
+
+
 "@
 
     # 查找替换锚点

@@ -350,9 +350,13 @@ REM set x265_params=--y4m - -o output.hevc
 REM set svtav1_params=-i - -b output.ivf
 
 REM 指定本次所需编码命令
+
 {2}
 
+REM ========================================
 REM 备用编码命令（手动切换）
+REM ========================================
+
 {3}
 
 echo.

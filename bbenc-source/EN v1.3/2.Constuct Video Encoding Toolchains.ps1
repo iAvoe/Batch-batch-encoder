@@ -354,9 +354,13 @@ REM set x265_params=--y4m - -o output.hevc
 REM set svtav1_params=-i - -b output.ivf
 
 REM Specify commandline for this encode
+
 {2}
 
+REM ========================================
 REM Auxiliary encoding commandlines
+REM ========================================
+
 {3}
 
 echo.

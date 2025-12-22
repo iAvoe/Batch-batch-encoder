@@ -605,7 +605,7 @@ function Get-Keyint {
         # The keyframe interval must be greater than a consecutive B-frame,
         # but this is irrelevant to SVT-AV1
         if ($isSVTAV1) {
-            Show-Success "Maximum keyframe interval for SVT-AV1 ${second} seconds"
+            Show-Success "Maximum keyframe interval for SVT-AV1: ${second} seconds"
             return "--keyint ${second}s"
         }
 
@@ -1226,8 +1226,8 @@ function Main {
             $displayName = $defaultName
         }
     }
-    else {
-        $displayName = "Encode " + (Get-Date -Format 'yyyy-MM-dd HH:mm')
+    else { # Do not put ":" into path!
+        $displayName = "Encode " + (Get-Date -Format 'yyyy-MM-dd HH-mm')
     }
 
     $encodeOutputNameCode =
@@ -1258,7 +1258,14 @@ function Main {
         $encodeOutputFileName = $displayName
     }
 
-    Show-Success "Final file name：$encodeOutputFileName"
+    if (Test-FilenameValid -Filename $encodeOutputFileName) {
+        Show-Success "Final file name：$encodeOutputFileName"
+    }
+    else {
+        Show-Error "Filename $encodeOutputFileName failed to conform to Windows naming conventions."
+        Write-Host " Please manually change it in the generated batch file,"
+        Write-Host " otherwise expect encoding to fail in the file save step"
+    }
 
     # Generate IO Parameters (Input/Output)
     # 1. Upstream Program Input of the Pipe
@@ -1362,6 +1369,8 @@ REM ========================================================
 REM x264_appendix=$x264RawPipeApdx
 REM x265_appendix=$x265RawPipeApdx
 REM svtav1_appendix=$svtav1RawPipeApdx
+
+
 "@
 
     # Replace anchor (translated to English): keep Chinese anchor for backward compatibility
