@@ -70,7 +70,7 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 <p align="center"><img src="bmc_qr.png" alt="支持一下 -_-"><br><img src="pp_tip_qr.png" alt="支持一下 =_="></p>
 
 ## 更新信息
-**v1.3.2**
+**v1.3.6**
 - 重写了所有代码
 - 使用了数组、哈希表等等更合理的数据结构
 - 改进了报错逻辑

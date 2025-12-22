@@ -68,7 +68,7 @@ Developing these tools wasn't easy. If this tool improve your efficiency, consid
 
 ## Update Information
 
-**v1.3.2**
+**v1.3.6**
 - Rewrote entire codebase
 - Used more reasonable data structures such as arrays and hash tables
 - Improved error reporting logic
