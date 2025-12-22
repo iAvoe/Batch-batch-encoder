@@ -55,7 +55,7 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 
 
 ![Script-Step-2-example (To be added)](zh-step2-example-en.png)
-<p align="center">Example fur running step 2（It works even better in VSCode）</p>
+<p align="center">Example fur running step 2（CLI window only, this works even better in VSCode）</p>
 
 -----
 

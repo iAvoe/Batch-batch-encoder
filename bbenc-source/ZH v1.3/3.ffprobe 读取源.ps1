@@ -1,8 +1,8 @@
 ﻿<#
 .SYNOPSIS
-    ffprobe 分析调用脚本，导出到 %USERPROFILE%\temp_v_info(_is_mov).csv
+    ffprobe 视频源分析脚本
 .DESCRIPTION
-    分析源视频并导出 CSV: 总帧数，宽，高，色彩空间，传输特定等
+    分析源视频并导出到 %USERPROFILE%\temp_v_info(_is_mov).csv: 总帧数，宽，高，色彩空间，传输特定等
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION

@@ -1,53 +1,56 @@
 ﻿<#
 .SYNOPSIS
-    ffprobe 分析调用脚本，导出到 %USERPROFILE%\temp_v_info(_is_mov).csv
+    FFProbe video source analysis script
 .DESCRIPTION
-    分析源视频并导出 CSV: 总帧数，宽，高，色彩空间，传输特定等
+    Analyzes the source video and exports file to %USERPROFILE%\temp_v_info(_is_mov).csv, i.e., width, height, csp info, sei info, etc.
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
     1.3
 #>
 
-# .mov 格式支持 $ffprobeCSV.A-I + ...；其它格式支持 $ffprobeCSV.A-AA + ...
-# 若同时检测到 temp_v_info_is_mov.csv 与 temp_v_info.csv，则使用其中创建日期最新的文件
-# $ffprobeCSV.A：stream (or not stream)
-# $ffprobeCSV.B：width
-# $ffprobeCSV.C：height  
-# $ffprobeCSV.D：pixel format (pix_fmt)
-# $ffprobeCSV.E：color_space
-# $ffprobeCSV.F：color_transfer
-# $ffprobeCSV.G：color_primaries
-# $ffprobeCSV.H：avg_frame_rate
-# $ffprobeCSV.I：nb_frames (for MOV) or first frame count field (for others)
-# $ffprobeCSV.AA：NUMBER_OF_FRAMES-eng (only for non-MOV files)
-# $sourceCSV.SourcePath：视频源路径
-# $sourceCSV.UpstreamCode：指定管道上游程序
-# $sourceCSV.Avs2PipeModDLLPath：Avs2PipeMod 需要的 avisynth.dll
-# $sourceCSV.SvfiConfigPath：one_line_shot_args（SVFI）的渲染配置 X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini
+# .mov format range: $ffprobeCSV.A-I + ...; others: $ffprobeCSV.A-AA + ...
+# When both temp_v_info_is_mov.csv & temp_v_info.csv are detected, use the latest one
+# $ffprobeCSV.A: stream (or not stream)
+# $ffprobeCSV.B: width
+# $ffprobeCSV.C: height  
+# $ffprobeCSV.D: pixel format (pix_fmt)
+# $ffprobeCSV.E: color_space
+# $ffprobeCSV.F: color_transfer
+# $ffprobeCSV.G: color_primaries
+# $ffprobeCSV.H: avg_frame_rate
+# $ffprobeCSV.I: nb_frames (for MOV) or first frame count field (for others)
+# $ffprobeCSV.AA: NUMBER_OF_FRAMES-eng (only for non-MOV files)
+# $sourceCSV.SourcePath: source video path (could be vpy/avs scripts)
+# $sourceCSV.UpstreamCode: upstream tool
+# $sourceCSV.Avs2PipeModDLLPath: avisynth.dll needed by Avs2PipeMod
+# $sourceCSV.SvfiConfigPath：one_line_shot_args (SVFI)'s render config (X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini)
 
-# 加载共用代码，包括 $utf8NoBOM、Get-QuotedPath、Select-File、Select-Folder...
+# Load globals, including $utf8NoBOM、Get-QuotedPath、Select-File、Select-Folder...
 . "$PSScriptRoot\Common\Core.ps1"
 
-# 同时生成占位 AVS/VS 脚本到 %USERPROFILE%，从而在用户暂无可用脚本的情况下顶替
+# Generate both AVS/VS script to %USERPROFILE%, allowing encoding to start when the scripts are not ready
 function Get-BlankAVSVSScript {
     param([Parameter(Mandatory=$true)][string]$videoSource)
 
-    # 尝试用共用函数拿到带引号的路径
+    # Get quotes on path
     $quotedImport = Get-QuotedPath $videoSource
 
-    # 空脚本与导出路径
+    # Empty Script and Export Path
+
     $AVSScriptPath = Join-Path $Global:TempFolder "blank_avs_script.avs"
     $VSScriptPath = Join-Path $Global:TempFolder "blank_vs_script.vpy"
-    # 生成 AVS 内容（LWLibavVideoSource 需要双引号包裹路径）
-    $blankAVSScript = "LWLibavVideoSource($quotedImport) # 自动生成的占位脚本，按需修改"
-    # 生成 VapourSynth 内容（使用原始字符串 literal r"..." 以避免转义问题）
-    # 如果 Get-QuotedPath 返回例如 "C:\path\file.mp4"，则 r$quotedImport 将成为 r"C:\path\file.mp4"
+    # Generate AVS content (LWLibavVideoSource requires the path to be enclosed in double quotes)
+
+    $blankAVSScript = "LWLibavVideoSource($quotedImport) # Auto-generated filter-less script, modify if needed"
+    # Generate VapourSynth content (use raw string literal r"..." to avoid escaping issues)
+
+    # If Get-QuotedPath returns strings like "C:\path\file.mp4", then modify r$quotedImport to r"C:\path\file.mp4"
     $blankVSScript = @"
 import vapoursynth as vs
 core = vs.core
 src = core.lsmas.LWLibavSource(source=r$quotedImport)
-# 自动生成无滤镜脚本：按需在此处加入滤镜、裁切、帧率调整等
+# Add filters needed here
 src.set_output()
 "@
 
@@ -55,13 +58,13 @@ src.set_output()
         Confirm-FileDelete $AVSScriptPath
         Confirm-FileDelete $VSScriptPath
 
-        Show-Info "正在生成无滤镜脚本：`n $AVSScriptPath`n $VSScriptPath"
+        Show-Info "Generating filter-less script: `n $AVSScriptPath`n $VSScriptPath"
         Write-TextFile -Path $AVSScriptPath -Content $blankAVSScript -UseBOM $false
         Write-TextFile -Path $VSScriptPath -Content $blankVSScript -UseBOM $false
-        Show-Success "已生成无滤镜脚本到用户目录。"
+        Show-Success "Filter-less script generated to %USERPROFILE%"
 
-        # 验证换行符
-        Show-Debug "验证脚本文件格式..."
+        # Check line breaks, must be CRLF for Windows
+        Show-Debug "Validate script file format..."
         if (-not (Test-TextFileFormat -Path $AVSScriptPath)) {
             return
         }
@@ -69,19 +72,19 @@ src.set_output()
             return
         }
 
-        # 调用方根据上游类型选择使用哪个脚本
+        # Activate a script by previous selection
         return @{
             AVS = $AVSScriptPath
             VPY = $VSScriptPath
         }
     }
     catch {
-        Show-Error "生成无滤镜脚本失败：$_"
+        Show-Error "Failed to generate filter-less script: $_"
         return $null
     }
 }
 
-# 主程序
+#region Main
 function Main {
     Show-Border
     Write-Host ("ffprobe 源读取工具，导出 " + $Global:TempFolder + "temp_v_info(_is_mov).csv 供后续步骤调用") -ForegroundColor Cyan
@@ -346,6 +349,7 @@ function Main {
     Show-Success "脚本执行完成！"
     Read-Host "按回车键退出"
 }
+#endregion
 
 # 异常处理
 try { Main }

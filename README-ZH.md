@@ -52,7 +52,7 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 7. 运行步骤 5 以封装编码结果
 
 ![脚本步骤2示例](zh-step2-example.png)
-<p align="center">脚本步骤 2 示例（在 VSCode 中运行效果最佳）</p>
+<p align="center">脚本步骤 2 示例（仅 CLI 窗口，在 VSCode 中运行效果最佳）</p>
 
 ## 下载链接
 <font size=3em>皆同步更新, QQ群里有很高几率能得到问题答复<br>
