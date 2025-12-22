@@ -85,7 +85,7 @@ function Select-Folder([string]$Description = "Select folder", [string]$InitialP
     $dialog.SelectedPath = $InitialPath
     $dialog.ShowNewFolderButton = $true
 
-    Write-Host " Selection window may open on the background; Avoid pressing Enter here"
+    Write-Host " Selection window may open in the background; Avoid pressing Enter here."
     
     do {
         if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {

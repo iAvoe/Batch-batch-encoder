@@ -262,7 +262,7 @@ function Get-x264BaseParam {
     $enableFGO = $false
     if ($askUserFGO) {
         Write-Host ""
-        Write-Host " A few modified/unofficial x264 support rate-distortion optimization based on high-frequency information content (Film Grain Optimization)." -ForegroundColor Cyan
+        Write-Host " A few modified/unofficial x264 support high-frequency information rate-distortion optimization (Film Grain Optimization)." -ForegroundColor Cyan
         Write-Host " Test with 'x264.exe --fullhelp | findstr fgo' to verify if its supported (shows up)" -ForegroundColor Yellow
         if ((Read-Host " Input 'y' to add '--fgo' for better image, or Enter to disable (disable if unsure / can't confim)") -match '^[Yy]$') {
             $enableFGO = $true
@@ -585,11 +585,10 @@ function Get-Keyint {
             # The default keyframe interval for multitrack editing is equivalent to the sum of the keyframe intervals of N video tracks,
             # but the actual decoding process uses non-linear scaling,
             # so it is set to twice the default interval.
-            Show-Info "Select a keyframe interval maximum"
-            Write-Host " For resolutions higher than 2560x1440, pick from 1 section to left"
-            Write-Host " For simple & flat video content, pick from 1 section to right"
+            Write-Host " 1. For resolutions higher than 2560x1440, pick from 1 section to left"
+            Write-Host " 2. For simple & flat video content, pick from 1 section to right"
             $userSecond =
-                Read-Host " [Low Power/Multitrack Editing: 6-7 seconds | Normal: 8-10 seconds | High: 11-13+ seconds]"
+                Read-Host " General Range to specify (second): [Low Power/Multitrack Editing: 6-7 | Normal: 8-10 | High: 11-13+ ]"
             if ($userSecond -notmatch "^\d+$") {
                 if ((Read-Host " Not receiving positive integer. Press Enter to retry, input 'q' to force exit") -eq 'q') {
                     exit 1
@@ -606,7 +605,7 @@ function Get-Keyint {
         # The keyframe interval must be greater than a consecutive B-frame,
         # but this is irrelevant to SVT-AV1
         if ($isSVTAV1) {
-            Show-Success "SVT-AV1 maximum keyframe interval configured: ${second} seconds"
+            Show-Success "Maximum keyframe interval for SVT-AV1 ${second} seconds"
             return "--keyint ${second}s"
         }
 
@@ -1204,8 +1203,8 @@ function Main {
 
     # Locate the batch file for exporting the encoding task and the encoding output path.
     Write-Host ""
-    Show-Info "Configure the export path for encoding results..."
-    $encodeOutputPath = Select-Folder -Description "Select path for encoding result"
+    Show-Info "Configure the export path for encoding result output..."
+    $encodeOutputPath = Select-Folder -Description "Select path for encoding export"
 
     # Configure the filename of the encoded result
     # 1. Get the default value (copy from the source)
@@ -1253,6 +1252,11 @@ function Main {
         $encodeOutputFileName = Read-Host " Input a filename (without extension)"
     }
     # Default file name
+    # (if final file name is stll empty, set to $displayName)
+    # When $displayName = "Encode " + (Get-Date...), $encodeOutputFileName is still unset
+    if (-not $encodeOutputFileName -or $encodeOutputFileName -eq "") {
+        $encodeOutputFileName = $displayName
+    }
 
     Show-Success "Final file name：$encodeOutputFileName"
 

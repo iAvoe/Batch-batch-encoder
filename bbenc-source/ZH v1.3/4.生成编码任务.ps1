@@ -571,8 +571,10 @@ function Get-Keyint {
         
         $userSecond = $null
         do { # 默认多轨剪辑的关键帧间隔相当于 N 个视频轨的关键帧间隔之和，但实际解码占用涨跌非线性，所以设为两倍
+            Write-Host " 1. 分辨率高于 2560x1440 则偏左选一格"
+            Write-Host " 2. 画面内容简单，平面居多则偏右选一格"
             $userSecond =
-                Read-Host " 分辨率高于 2560x1440 则偏左一格，`r`n 画面内容简单则偏右一格：[低功耗/多轨剪辑：6-7 秒| 一般：8-10 秒| 高：11-13+ 秒]"
+                Read-Host " 大致范围：[低功耗/多轨剪辑：6-7 秒| 一般：8-10 秒| 高：11-13+ 秒]"
             if ($userSecond -notmatch "^\d+$") {
                 if ((Read-Host " 未输入正整数，按 Enter 重试，输入 'q' 强制退出") -eq 'q') {
                     exit 1
@@ -1226,6 +1228,11 @@ function Main {
         $encodeOutputFileName = Read-Host " 请输入文件名（不含后缀）"
     }
     # 默认文件名
+    # $displayName = "Encode " + (Get-Date -Format 'yyyy-MM-dd HH:mm' 时 $encodeOutputFileName 仍然为空
+    if (-not $encodeOutputFileName -or $encodeOutputFileName -EQ "") {
+        $encodeOutputFileName = $displayName
+    }
+
 
     Show-Success "最终文件名：$encodeOutputFileName"
 

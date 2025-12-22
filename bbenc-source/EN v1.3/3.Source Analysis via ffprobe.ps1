@@ -182,7 +182,7 @@ function Main {
             }
         
             # Ask user to generate or import existing script
-            $mode = Read-Host "Input 'y' to import a custom script; `r`n Enter to generate a filter-less script for this video source"
+            $mode = Read-Host " Input 'y' to import a custom script; `r`n Enter to generate a filter-less script for this video source"
         
             if ($mode -eq 'y') { # Custom script
                 do {
