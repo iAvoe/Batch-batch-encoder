@@ -138,7 +138,10 @@ function Main {
         'avs2pipemod'  {
             $upstreamCode = 'd'
             Show-Info "Please locate the path to avisynth.dll..."
-
+            Write-Host " To get avisynth.dll: downloaded from AviSynth+ repository"
+            Write-Host " (https://github.com/AviSynth/AviSynthPlus/releases)"
+            Write-Host " and extract AviSynthPlus_x.x.x_yyyymmdd-filesonly.7z"
+            
             do {
                 $Avs2PipeModDLL = Select-File -Title "Select avisynth.dll" -InitialDirectory ([Environment]::GetFolderPath('System')) -DllOnly
                 if (-not $Avs2PipeModDLL) {

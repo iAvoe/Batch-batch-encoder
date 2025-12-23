@@ -97,5 +97,6 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 - 已验证 ffmpeg 兼容性正常
 - 已验证 vspipe 兼容性正常
 - 已验证 avs2yuv 0.26+0.30 兼容性正常
+- 已验证 avs2pipemod 兼容性正常
 - 测试步骤 5（封装命令）已完成测试，弃用了所有 Invoke-Expression 来增加安全性
-  - TODO：待完成 avs2pipemod、SVFI 的测试，不过理论上由于逻辑几乎完全一致，所以应该能跑...
+  - TODO：待完成 SVFI 的测试

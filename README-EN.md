@@ -89,8 +89,9 @@ Developing these tools wasn't easy. If this tool improve your efficiency, consid
 - Strengthened the logic of the file import script.
 - Behavior change: Required parameters for the RAW pipeline are now recorded as an appendix in the output batch.
 - Added SVT-AV1 ColorMatrix, Transfer, and Primarys parameter generation functionality.
-- Verified: full ffmpeg support
-- Verified: full vspipe support
-- Verified: full avs2yuv (0.26+0.30) support
+- Verified: ffmpeg supported
+- Verified: vspipe supported
+- Verified: avs2yuv (0.26+0.30) supported
+- Verified: avs2pipemod supported
 - Step 5 (multiplex script) rewrite ompleted, deprecating all Invoke-Expression to increase security
-    - TODO: Testing of avs2yuv, avs2pipemod, and SVFI is pending; however, theoretically, since the logic is identical, it should run fine...
+    - TODO: Test SVFI support

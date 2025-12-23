@@ -136,6 +136,8 @@ function Main {
         'avs2pipemod'  {
             $upstreamCode = 'd'
             Show-Info "请指定 avisynth.dll 的路径..."
+            Write-Host " 在 AviSynth+ 仓库（https://github.com/AviSynth/AviSynthPlus/releases）中，"
+            Write-Host " 下载 AviSynthPlus_x.x.x_yyyymmdd-filesonly.7z，即可获取 DLL"
 
             do {
                 $Avs2PipeModDLL = Select-File -Title "选择 avisynth.dll" -InitialDirectory ([Environment]::GetFolderPath('System')) -DllOnly
