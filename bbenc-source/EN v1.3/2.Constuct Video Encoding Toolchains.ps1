@@ -49,7 +49,7 @@ function Get-PipeType($upstream) {
         'ffmpeg'       { 'y4m' }
         'vspipe'       { 'y4m' }
         'avs2pipemod'  { 'y4m' }
-        'avs2yuv'      { 'raw' }
+        'avs2yuv'      { 'y4m' } # Not RAW !
         'svfi'         { 'raw' }
         default        { 'raw' }
     }
@@ -183,12 +183,16 @@ function Main {
         if ($choice -eq 'y') {
             $upstreamTools[$tool] =
                 if ($tool -eq 'svfi') {
-                    Show-Info "SVFI's executable is 'one_line_shot_args.exe', Steam installation path is X:\SteamLibrary\steamapps\common\SVFI\"
+                    Show-Info "SVFI's executable is 'one_line_shot_args.exe',`r`n Steam installation path is X:\SteamLibrary\steamapps\common\SVFI\"
                     Select-File -Title "Locate one_line_shot_args.exe" -ExeOnly
                 }
                 elseif ($tool -eq 'vspipe') {
                     Show-Info "The default VapourSynth installation places vspipe.exe in C:\Program Files\VapourSynth\core\"
                     Select-File -Title  "Locate vspipe.exe"
+                }
+                elseif ($tool -eq 'avs2yuv') {
+                    Show-Info "Both 0.26 (AviSynth, AviSynth+) and 0.30 (AviSynth+ only) avs2yuv variations are supported"
+                    Select-File -Title "Select avs2yuv.exe or avs2yuv64.exe"
                 }
                 else {
                     Select-File -Title "Locate $tool executable" -ExeOnly
@@ -204,6 +208,8 @@ function Main {
             $vspipeInfo = Get-VSPipeY4MArgument -VSpipePath $upstreamTools[$tool]
             Show-Success $($vspipeInfo.Note)
         }
+        # avs2yuv version check should be in step 4:
+        # elseif ($tool -eq 'avs2yuv' -and $upstreamTools[$tool]) {}
     }
     
     Show-Info "Start importing downstream tools..."
@@ -370,7 +376,6 @@ pause
 
 endlocal
 echo Press any button to enter CMD, input exit to exit...
-pause >nul
 cmd /k
 '@ -f (Get-Date -Format 'yyyy-MM-dd HH:mm'), $selectedPreset, $command, $remCommands
     

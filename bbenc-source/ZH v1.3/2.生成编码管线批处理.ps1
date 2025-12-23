@@ -49,7 +49,7 @@ function Get-PipeType($upstream) {
         'ffmpeg'       { 'y4m' }
         'vspipe'       { 'y4m' }
         'avs2pipemod'  { 'y4m' }
-        'avs2yuv'      { 'raw' }
+        'avs2yuv'      { 'y4m' } # 不是 RAW !
         'svfi'         { 'raw' }
         default        { 'raw' }
     }
@@ -187,7 +187,11 @@ function Main {
                 }
                 elseif ($tool -eq 'vspipe') {
                     Show-Info "安装版 VapourSynth 的默认可执行文件路径是 C:\Program Files\VapourSynth\core\vspipe.exe"
-                    Select-File -Title  "选择 vspipe.exe"
+                    Select-File -Title "选择 vspipe.exe"
+                }
+                elseif ($tool -eq 'avs2yuv') {
+                    Show-Info "此工具同时提供 AviSynth（0.26）和支持 AviSynth+（0.30）的 avs2yuv 支持"
+                    Select-File -Title "选择 avs2yuv.exe 或 avs2yuv64.exe"
                 }
                 else {
                     Select-File -Title "选择 $tool 可执行文件" -ExeOnly
@@ -203,6 +207,8 @@ function Main {
             $vspipeInfo = Get-VSPipeY4MArgument -VSpipePath $upstreamTools[$tool]
             Show-Success $($vspipeInfo.Note)
         }
+        # avs2yuv version check should be in step 4:
+        # elseif ($tool -eq 'avs2yuv' -and $upstreamTools[$tool]) {}
     }
     
     Show-Info "开始导入下游编码工具..."
@@ -316,6 +322,7 @@ function Main {
     # 2. 生成其它已导入线路的备用命令 (REM 写入)
     $otherCommands = @()
     foreach ($p in $availablePresets) {
+        Show-Debug "Generating based on preset: $($p.Key)"
         # 注意是调用 Key 属性，因此不 = $p
         $presetName = $p.Key
 
@@ -366,7 +373,6 @@ pause
 
 endlocal
 echo 按任意键进入命令提示符，输入 exit 退出...
-pause >nul
 cmd /k
 '@ -f (Get-Date -Format 'yyyy-MM-dd HH:mm'), $selectedPreset, $command, $remCommands
     
@@ -413,7 +419,6 @@ cmd /k
     Read-Host "按回车键退出"
 }
 
-# 异常处理
 try { Main }
 catch {
     Show-Error "脚本执行出错：$_"

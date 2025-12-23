@@ -416,7 +416,6 @@ echo.
 
 endlocal
 echo Press any button to enter CMD, input exit to exit...
-pause >nul
 cmd /k
 "@ -f (Get-Date -Format 'yyyy-MM-dd HH:mm'), $cmdContent
 

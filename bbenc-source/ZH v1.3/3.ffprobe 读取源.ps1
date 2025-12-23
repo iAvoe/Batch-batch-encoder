@@ -40,6 +40,7 @@ function Get-BlankAVSVSScript {
     $AVSScriptPath = Join-Path $Global:TempFolder "blank_avs_script.avs"
     $VSScriptPath = Join-Path $Global:TempFolder "blank_vs_script.vpy"
     # 生成 AVS 内容（LWLibavVideoSource 需要双引号包裹路径）
+    # 文件夹：C:\Program Files (x86)\AviSynth+\plugins64+\ 中必须有 libvslsmashsource.dll
     $blankAVSScript = "LWLibavVideoSource($quotedImport) # 自动生成的占位脚本，按需修改"
     # 生成 VapourSynth 内容（使用原始字符串 literal r"..." 以避免转义问题）
     # 若 Get-QuotedPath 返回例如 "C:\path\file.mp4"，则 r$quotedImport 将成为 r"C:\path\file.mp4"
@@ -207,6 +208,9 @@ function Main {
                 # 注意：视频源 $videoSource 仍然用于 ffprobe
             }
             elseif ([string]::IsNullOrWhiteSpace($mode) -or $mode -eq 'n') { # 生成无滤镜脚本
+                Show-Warning "`r`n AviSynth(+) 默认不自带 LSMASHSource.dll（视频导入滤镜）请保证该文件存在，"
+                Write-Host " AVS 安装路径为：C:\Program Files (x86)\AviSynth+\plugins64+\" -ForegroundColor Yellow
+                Write-Host " 下载并解压 64bit 版：https://github.com/HomeOfAviSynthPlusEvolution/L-SMASH-Works/releases" -ForegroundColor Yellow
                 $placeholderScript = Get-BlankAVSVSScript -videoSource $videoSource
                 if (-not $placeholderScript) { 
                     Show-Error "生成无滤镜脚本失败，请重试"

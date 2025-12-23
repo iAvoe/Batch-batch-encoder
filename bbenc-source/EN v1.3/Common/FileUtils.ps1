@@ -17,7 +17,7 @@ function Confirm-FileDelete {
 
     if (-not (Test-Path -LiteralPath $Path)) { return }
 
-    Show-Warning "Detecting existing file: $Path"
+    Show-Warning "`r`n Detecting existing file: $Path"
     $confirm = Read-Host " Delete file to continue? Type 'y' to confirm, Enter to force exit (this is not moving to recycle bin)."
 
     if ($confirm -ne 'y') {

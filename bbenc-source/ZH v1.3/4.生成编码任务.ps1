@@ -251,18 +251,19 @@ function Get-x264BaseParam {
         [switch]$askUserFGO
     )
 
+    $isHelp = $pickOps -in @('helpzh', 'helpen')
     $enableFGO = $false
-    if ($askUserFGO) {
+    if ($askUserFGO -and -not $isHelp) {
         Write-Host ""
         Write-Host " 少数修改版（Mod）x264 支持基于高频信息量的率失真优化（Film Grain Optimization）" -ForegroundColor Cyan
-        Write-Host " 用 x264.exe --fullhelp | findstr fgo 检测 --fgo 参数是否被支持" -ForegroundColor Yellow
+        Write-Host " 用 x264.exe --fullhelp | findstr fgo 检测 --fgo 参数是否被支持" -ForegroundColor DarkGray
         if ((Read-Host " 输入 'y' 以启用 --fgo（提高画质），或 Enter 以禁用（不支持或无法确定则禁）") -match '^[Yy]$') {
             $enableFGO = $true
             Show-Info "启用 x264 参数 --fgo"
         }
         else { Show-Info "不用 x264 参数 --fgo" }
     }
-    else {
+    elseif (-not $isHelp) {
         Write-Host " 已跳过 --fgo 请柬..."
     }
     $fgo10 = if ($enableFGO) {" --fgo 10"} else {""}
@@ -292,7 +293,9 @@ function Get-x264BaseParam {
 function Get-x265BaseParam {
     Param ([Parameter(Mandatory=$true)]$pickOps)
     # TODO：添加 DJATOM? Mod 的深度自定义 AQ
+    # $isHelp = $pickOps -in @('helpzh', 'helpen')
     $default = "--high-tier --preset slow --me umh --subme 5 --weightb --aq-mode 4 --bframes 5 --ref 3"
+
     switch ($pickOps) {
         # 通用 General Purpose，bframes 5
         a {return $default}
@@ -325,18 +328,19 @@ function Get-svtav1BaseParam {
         [switch]$askUserDLF
     )
     
+    $isHelp = $pickOps -in @('helpzh', 'helpen')
     $enableDLF2 = $false
     Write-Host ""
-    if ($askUserDLF -and $pickOps -ne 'b') {
+    if ($askUserDLF -and (-not $isHelp) -and ($pickOps -ne 'b')) {
         Write-Host " 少数修改版 SVT-AV1 编码器（如 SVT-AV1-Essential）支持高精度去块滤镜 --enable-dlf 2"  -ForegroundColor Cyan
-        Write-Host " 用 SvtAv1EncApp.exe --help | findstr enable-dlf 即可检测`'2`'是否受支持" -ForegroundColor Yellow
+        Write-Host " 用 SvtAv1EncApp.exe --help | findstr enable-dlf 即可检测`'2`'是否受支持" -ForegroundColor DarkGray
         if ((Read-Host " 输入 'y' 以启用 --enable-dlf 2（提高画质），或 Enter 使用常规去块滤镜（不支持或无法确定则禁）") -match '^[Yy]$') {
             $enableDLF2 = $true
             Show-Info "启用了 SVT-AV1 参数 --enable-dlf 2"
         }
         else { Show-Info "启用 SVT-AV1 参数 --enable-dlf 1" }
     }
-    else {
+    elseif (-not $isHelp) {
         Write-Host " 已跳过 --enable-dlf 2 请柬..."
     }
     $deblock = if ($enableDLF2) {"--enable-dlf 2"} else {"--enable-dlf 1"}
@@ -722,25 +726,33 @@ function Get-x265ThreadPool {
     }
 }
 
-# 尝试获取视频总帧数并生成 x264，x265，SVT-AV1 参数，找不到则无法显示编码进度与 ETA
+# 问题：总帧数可以存在于 .I、.AA-AJ 等范围，但位置是随机的，不过假的值一定是 0
 function Get-FrameCount {
     Param (
-        [Parameter(Mandatory=$true)]$CSVSource, # MPEG Tag
-        [Parameter(Mandatory=$false)]$AUXSource, # MKV Tag
+        [Parameter(Mandatory=$true)]$ffprobeCSV, # 完整 CSV 对象
         [bool]$isSVTAV1
     )
     
-    if ($CSVSource -match "^\d+$") {
-        if ($isSVTAV1) { return "-n " + $CSVSource }
-        return "--frames " + $CSVSource
+    # 定义所有可能包含总帧数的列名（从 I，AA-AJ）
+    $frameCountColumns =
+        @('I') + (65..74 | ForEach-Object { [char]$_ } | ForEach-Object { "A$_" }) # I, AA, AB, AC, AD, AE, AF, AG, AH, AI, AJ
+    
+    # 遍历检查列，找到首个非零值
+    foreach ($column in $frameCountColumns) {
+        $frameCount = $ffprobeCSV.$column
+        
+        # 检查是否为数字且大于 0
+        if ($frameCount -match "^\d+$" -and [int]$frameCount -gt 0) {
+            if ($isSVTAV1) { 
+                return "-n " + $frameCount 
+            }
+            return "--frames " + $frameCount
+        }
     }
-    elseif ($AUXSource -match "^\d+$") {
-        if ($isSVTAV1) { return "-n " + $AUXSource }
-        return "--frames " + $AUXSource
-    }
-    else { return "" }
+    
+    # 如果所有列都没有找到有效帧数，返回空字符串
+    return ""
 }
-
 function Get-InputResolution {
     Param (
         [Parameter(Mandatory=$true)][int]$CSVw,
@@ -950,9 +962,9 @@ function Get-RAWCSPBitDepth {
         [Parameter(Mandatory=$true)]$CSVpixfmt,
         [bool]$isEncoderInput=$true,
         [bool]$isAvs2YuvInput=$false,
-        [bool]$isSVTAV1=$false
+        [bool]$isSVTAV1=$false,
+        [bool]$isAVSPlus=$false
     )
-
     # 移除可能的 "-pix_fmt " 前缀（尽管实际情况不会遇到）
     $pixfmt = $CSVpixfmt -replace '^-pix_fmt\s+', ''
 
@@ -1010,10 +1022,12 @@ function Get-RAWCSPBitDepth {
             }
             $csp = $cspMap[$chromaFormat]
             if (-not $csp) { $csp = 'i420' }
-            return ("--input-csp " + $csp + " --input-depth " + $depth)
+            return "--input-csp $csp --input-depth $depth"
         }
     }
     elseif ($isAvs2YuvInput) {
+        # avs2yuv 0.30 放弃了对 AviSynth 的支持（仅AviSynth+），因此 -csp 参数被取消
+        # avs2yuv 0.30 在测试中一直没有导出 Y4M 流，因此放弃支持，用更老的 0.26 版
         $cspMap = @{
             '420' = 'i420'
             '422' = 'i422'
@@ -1022,7 +1036,12 @@ function Get-RAWCSPBitDepth {
         }
         $csp = $cspMap[$chromaFormat]
         if (-not $csp) { $csp = 'AUTO' }
-        return ("-csp " + $csp + " -depth " + $depth) 
+        if ($isAVSPlus) {
+            return "-depth $depth"
+        }
+        else {
+            return "-csp $csp -depth $depth"
+        }
     }
     return ""
 }
@@ -1157,18 +1176,24 @@ function Main {
     $svtav1Params.Keyint = Get-Keyint -CSVfps $ffprobeCSV.H -bframes 999 -askUser -isSVTAV1
     $x264Params.RCLookahead = Get-RateControlLookahead -CSVfps $ffprobeCSV.H -bframes 250 # hack：以假 bframes 实现建议最大值
     $x265Params.RCLookahead = Get-RateControlLookahead -CSVfps $ffprobeCSV.H -bframes $x265SubmeInt
-    $x265Params.TotalFrames = Get-FrameCount -CSVSource $ffprobeCSV.I -AUXSource $ffprobeCSV.AA -isSVTAV1 $false
-    $x264Params.TotalFrames = Get-FrameCount -CSVSource $ffprobeCSV.I -AUXSource $ffprobeCSV.AA -isSVTAV1 $false
-    $svtav1Params.TotalFrames = Get-FrameCount -CSVSource $ffprobeCSV.I -AUXSource $ffprobeCSV.AA -isSVTAV1 $true
+
+    $x265Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $false
+    $x264Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $false
+    $svtav1Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $true
     $x265Params.PME = Get-x265PME
     $x265Params.Pools = Get-x265ThreadPool
 
     # 获取色彩空间格式
+    $avs2yuvVersionCode = 'a'
+    Write-Host ""
+    Show-Info "选择已使用的 avs2yuv 程序类型："
+    $avs2yuvVersionCode = Read-Host "avs2yuv 类型 [a: AviSynth+ (0.30) | 默认: AviSynth (up to 0.26)]"
+
     $ffmpegParams.CSP = Get-ffmpegCSP -CSVpixfmt $ffprobeCSV.D
     $svtav1Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $true
     $x265Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
     $x264Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
-    $avsyuvParams.CSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $false -isAvs2YuvInput $true -isSVTAV1 $false
+    $avsyuvParams.CSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $false -isAvs2YuvInput $true -isSVTAV1 $false -isAVSPlus ($avs2yuvVersionCode -eq 'a')
 
     # 验证并调整 SVFI 线路的 INI 文件
     $olsargParams.ConfigInput = Edit-SvfiRenderConfig -ffprobeCSV $ffprobeCSV -sourceCSV $sourceCSV

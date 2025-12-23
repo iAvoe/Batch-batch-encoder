@@ -67,7 +67,6 @@ Developing these tools wasn't easy. If this tool improve your efficiency, consid
 <p align="center"><img src="bmc_qr.png" alt="Support me -_-"><br><img src="pp_tip_qr.png" alt="Support me =_="></p>
 
 ## Update Information
-
 **v1.3.6**
 - Rewrote entire codebase
 - Used more reasonable data structures such as arrays and hash tables
@@ -90,6 +89,8 @@ Developing these tools wasn't easy. If this tool improve your efficiency, consid
 - Strengthened the logic of the file import script.
 - Behavior change: Required parameters for the RAW pipeline are now recorded as an appendix in the output batch.
 - Added SVT-AV1 ColorMatrix, Transfer, and Primarys parameter generation functionality.
-- Completed runtime testing of ffmpeg and vspe upstream to all downstream components.
+- Verified: full ffmpeg support
+- Verified: full vspipe support
+- Verified: full avs2yuv (0.26+0.30) support
+- Step 5 (multiplex script) rewrite ompleted, deprecating all Invoke-Expression to increase security
     - TODO: Testing of avs2yuv, avs2pipemod, and SVFI is pending; however, theoretically, since the logic is identical, it should run fine...
-- Step 5 (multiplex script) testing completed, deprecating all Invoke-Expression to increase security

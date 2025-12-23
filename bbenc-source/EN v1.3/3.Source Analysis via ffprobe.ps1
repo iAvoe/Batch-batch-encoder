@@ -41,7 +41,7 @@ function Get-BlankAVSVSScript {
     $AVSScriptPath = Join-Path $Global:TempFolder "blank_avs_script.avs"
     $VSScriptPath = Join-Path $Global:TempFolder "blank_vs_script.vpy"
     # Generate AVS content (LWLibavVideoSource requires the path to be enclosed in double quotes)
-
+    # libvslsmashsource.dll must exist in folder C:\Program Files (x86)\AviSynth+\plugins64+\
     $blankAVSScript = "LWLibavVideoSource($quotedImport) # Generated filter-less script, modify if needed"
     # Generate VapourSynth content (use raw string literal r"..." to avoid escaping issues)
 
@@ -134,7 +134,7 @@ function Main {
     switch ($selectedType.Name) {
         'ffmpeg'       { $upstreamCode = 'a' }
         'vspipe'       { $upstreamCode = 'b' }
-        'avs2yuv'      { $upstreamCode = 'c' }
+        'avs2yuv'      { $upstreamCode = 'c'}
         'avs2pipemod'  {
             $upstreamCode = 'd'
             Show-Info "Please locate the path to avisynth.dll..."
@@ -182,7 +182,8 @@ function Main {
             }
         
             # Ask user to generate or import existing script
-            $mode = Read-Host " Input 'y' to import a custom script; `r`n Enter to generate a filter-less script for this video source"
+            Show-Info "Select the preferred AVS/VS script usage..."
+            $mode = Read-Host " Input 'y' to import a custom script; 'n'/Enter to generate a filter-less script"
         
             if ($mode -eq 'y') { # Custom script
                 do {
@@ -209,6 +210,9 @@ function Main {
                 # Note: $videoSource is still going to be for ffprobe
             }
             elseif ([string]::IsNullOrWhiteSpace($mode) -or $mode -eq 'n') { # Generate
+                Show-Warning "`r`n  AviSynth(+) does not come with LSMASHSource.dll (video import library),"
+                Write-Host " Ensure this libaray is present in C:\Program Files (x86)\AviSynth+\plugins64+\ folder" -ForegroundColor Yellow
+                Write-Host " Download and extract 64bit version:`r`n    https://github.com/HomeOfAviSynthPlusEvolution/L-SMASH-Works/releases" -ForegroundColor Yellow
                 $placeholderScript = Get-BlankAVSVSScript -videoSource $videoSource
                 if (-not $placeholderScript) { 
                     Show-Error "Failed to create filter-less script, please try again."

@@ -259,18 +259,19 @@ function Get-x264BaseParam {
         [switch]$askUserFGO
     )
 
+    $isHelp = $pickOps -in @('helpzh', 'helpen')
     $enableFGO = $false
-    if ($askUserFGO) {
+    if ($askUserFGO -and -not $isHelp) {
         Write-Host ""
         Write-Host " A few modified/unofficial x264 support high-frequency information rate-distortion optimization (Film Grain Optimization)." -ForegroundColor Cyan
-        Write-Host " Test with 'x264.exe --fullhelp | findstr fgo' to verify if its supported (shows up)" -ForegroundColor Yellow
+        Write-Host " Test with 'x264.exe --fullhelp | findstr fgo' to verify if its supported (shows up)" -ForegroundColor DarkGray
         if ((Read-Host " Input 'y' to add '--fgo' for better image, or Enter to disable (disable if unsure / can't confim)") -match '^[Yy]$') {
             $enableFGO = $true
             Show-Info "Enabled x264 parameter --fgo"
         }
         else { Show-Info "Disabled x264 parameter --fgo" }
     }
-    else {
+    elseif (-not $isHelp) {
         Write-Host " Skipped '--fgo' prompt..."
     }
     $fgo10 = if ($enableFGO) {" --fgo 10"} else {""}
@@ -333,18 +334,19 @@ function Get-svtav1BaseParam {
         [switch]$askUserDLF
     )
     
+    $isHelp = $pickOps -in @('helpzh', 'helpen')
     $enableDLF2 = $false
     Write-Host ""
-    if ($askUserDLF -and $pickOps -ne 'b') {
+    if ($askUserDLF -and (-not $isHelp) -and ($pickOps -ne 'b')) {
         Write-Host " A few modified/unofficial SVT-AV1 encoder (i.e., SVT-AV1-Essential) supports precise deblocking filter --enable-dlf 2"  -ForegroundColor Cyan
-        Write-Host " Test with 'SvtAv1EncApp.exe --help | findstr enable-dlf' to verify if its supported (shows up)" -ForegroundColor Yellow
+        Write-Host " Test with 'SvtAv1EncApp.exe --help | findstr enable-dlf' to verify if its supported (shows up)" -ForegroundColor DarkGray
         if ((Read-Host " Input 'y' to add '--enable-dlf 2' for better image, or Enter to disable (disable if unsure / can't confim)") -match '^[Yy]$') {
             $enableDLF2 = $true
             Show-Info "Enabled SVT-AV1 parameter --enable-dlf 2"
         }
         else { Show-Info "Enabled SVT-AV1 parameter --enable-dlf 1" }
     }
-    else {
+    elseif (-not $isHelp) {
         Write-Host " Skipped --enable-dlf 2 prompt..."
     }
     $deblock = if ($enableDLF2) {"--enable-dlf 2"} else {"--enable-dlf 1"}
@@ -457,7 +459,7 @@ function Get-x265SVTAV1Profile {
     # - Main: 4:0:0 (gray) - 4:2:0, maximum 10-bit full sampling
     # - High: Additional support for 4:4:4 sampling
     # - Professional: Additional support for 4:2:2 sampling, maximum 12-bit full sampling
-    $svtav1Profile = 0 # 默认 main
+    $svtav1Profile = 0 # Default as main
     switch ($chromaFormat) {
         'i444' {
             if ($depth -eq 12) { $svtav1Profile = 2 } # Professional
@@ -739,25 +741,31 @@ function Get-x265ThreadPool {
     }
 }
 
-# Attempt to obtain the total number of video frames and generate x264, x265, and SVT-AV1 parameters
-# if these cannot be found, and RAW pipe is specified,
-# the encoding progress, ETA won't be displayed.
+# Attempt to obtain the total frame count and generate x264, x265, and SVT-AV1 parameters
+# Problem: total frames can reside in .I, .AA-AJ ranges, but its location is random, we only know fake values are 0
 function Get-FrameCount {
     Param (
-        [Parameter(Mandatory=$true)]$CSVSource, # MPEG Tag
-        [Parameter(Mandatory=$false)]$AUXSource, # MKV Tag
+        [Parameter(Mandatory=$true)]$ffprobeCSV, # Get fill CSV object
         [bool]$isSVTAV1
     )
     
-    if ($CSVSource -match "^\d+$") {
-        if ($isSVTAV1) { return "-n " + $CSVSource }
-        return "--frames " + $CSVSource
+    # All columns which can have total frame count (Range in I, AA-AJ)
+    $frameCountColumns =
+        @('I') + (65..74 | ForEach-Object { [char]$_ } | ForEach-Object { "A$_" }) # I, AA, AB, AC, AD, AE, AF, AG, AH, AI, AJ
+    
+    # Check each column, use the 1st non-zero value
+    foreach ($column in $frameCountColumns) {
+        $frameCount = $ffprobeCSV.$column
+        if ($frameCount -match "^\d+$" -and [int]$frameCount -gt 0) {
+            if ($isSVTAV1) { 
+                return "-n " + $frameCount 
+            }
+            return "--frames " + $frameCount
+        }
     }
-    elseif ($AUXSource -match "^\d+$") {
-        if ($isSVTAV1) { return "-n " + $AUXSource }
-        return "--frames " + $AUXSource
-    }
-    else { return "" }
+    
+    # Return empty string if not found
+    return ""
 }
 
 function Get-InputResolution {
@@ -970,9 +978,9 @@ function Get-RAWCSPBitDepth {
         [Parameter(Mandatory=$true)]$CSVpixfmt,
         [bool]$isEncoderInput=$true,
         [bool]$isAvs2YuvInput=$false,
-        [bool]$isSVTAV1=$false
+        [bool]$isSVTAV1=$false,
+        [bool]$isAVSPlus=$false
     )
-
     # Remove any possible "-pix_fmt" prefixes
     # (although this is unlikely to be encountered in practice)
     $pixfmt = $CSVpixfmt -replace '^-pix_fmt\s+', ''
@@ -1031,10 +1039,11 @@ function Get-RAWCSPBitDepth {
             }
             $csp = $cspMap[$chromaFormat]
             if (-not $csp) { $csp = 'i420' }
-            return ("--input-csp " + $csp + " --input-depth " + $depth)
+            return "--input-csp $csp --input-depth $depth"
         }
     }
     elseif ($isAvs2YuvInput) {
+        # avs2yuv 0.30 Dropped support for AviSynth (AviSynth+ only) therefore -csp option is gone
         $cspMap = @{
             '420' = 'i420'
             '422' = 'i422'
@@ -1043,7 +1052,13 @@ function Get-RAWCSPBitDepth {
         }
         $csp = $cspMap[$chromaFormat]
         if (-not $csp) { $csp = 'AUTO' }
-        return ("-csp " + $csp + " -depth " + $depth) 
+        if ($isAVSPlus) {
+            return "-depth $depth"
+        }
+        else {
+            return "-csp $csp -depth $depth"
+        }
+        
     }
     return ""
 }
@@ -1181,18 +1196,24 @@ function Main {
     $svtav1Params.Keyint = Get-Keyint -CSVfps $ffprobeCSV.H -bframes 999 -askUser -isSVTAV1
     $x264Params.RCLookahead = Get-RateControlLookahead -CSVfps $ffprobeCSV.H -bframes 250 # hack：implement suggested maximum value in x264 using fake bframes
     $x265Params.RCLookahead = Get-RateControlLookahead -CSVfps $ffprobeCSV.H -bframes $x265SubmeInt
-    $x265Params.TotalFrames = Get-FrameCount -CSVSource $ffprobeCSV.I -AUXSource $ffprobeCSV.AA -isSVTAV1 $false
-    $x264Params.TotalFrames = Get-FrameCount -CSVSource $ffprobeCSV.I -AUXSource $ffprobeCSV.AA -isSVTAV1 $false
-    $svtav1Params.TotalFrames = Get-FrameCount -CSVSource $ffprobeCSV.I -AUXSource $ffprobeCSV.AA -isSVTAV1 $true
+
+    $x265Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $false
+    $x264Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $false
+    $svtav1Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $true
     $x265Params.PME = Get-x265PME
     $x265Params.Pools = Get-x265ThreadPool
 
     # Obtain color space format
+    $avs2yuvVersionCode = 'a'
+    Write-Host ""
+    Show-Info "Select the version of avs2yuv.exe variation used:"
+    $avs2yuvVersionCode = Read-Host " avs2yuv type [a: AviSynth+ (0.30) | Default: AviSynth (up to 0.26)]"
+
     $ffmpegParams.CSP = Get-ffmpegCSP -CSVpixfmt $ffprobeCSV.D
     $svtav1Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $true
     $x265Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
     $x264Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
-    $avsyuvParams.CSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $false -isAvs2YuvInput $true -isSVTAV1 $false
+    $avsyuvParams.CSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $false -isAvs2YuvInput $true -isSVTAV1 $false -isAVSPlus ($avs2yuvVersionCode -eq 'a')
 
     # Verify and adjust the INI file for the SVFI line.
     $olsargParams.ConfigInput = Edit-SvfiRenderConfig -ffprobeCSV $ffprobeCSV -sourceCSV $sourceCSV
@@ -1310,7 +1331,6 @@ function Main {
     $x265RawPipeApdx = "$($x265Params.FPS) $($x265Params.RAWCSP) $($x265Params.Resolution) $($x265Params.TotalFrames)"
     $svtav1RawPipeApdx = "$($svtav1Params.FPS) $($svtav1Params.RAWCSP) $($svtav1Params.Resolution) $($svtav1Params.TotalFrames)"
     # N. RAW pipe mode
-    Show-Debug "sourceCSV.UpstreamCode：$($sourceCSV.UpstreamCode)"
     if (Get-IsRAWSource -validateUpstreamCode $sourceCSV.UpstreamCode) {
         $x264FinalParam = $x264RawPipeApdx + " " + $x264FinalParam
         $x265FinalParam = $x265RawPipeApdx + " " + $x265FinalParam
