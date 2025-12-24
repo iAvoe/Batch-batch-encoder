@@ -176,20 +176,44 @@ function Main {
     $i=0
     foreach ($tool in @($upstreamTools.Keys)) {
         $i++
-        $choice = Read-Host " [上游] ($i/$($upstreamTools.Count)) 导入 $tool？（y=是，Enter 跳过）"
+        $choice = Read-Host "`r`n [上游] ($i/$($upstreamTools.Count)) 导入 $tool？（y=是，Enter 跳过）"
         if ($choice -eq 'y') {
             $upstreamTools[$tool] =
                 if ($tool -eq 'svfi') {
-                    Show-Info "SVFI 的可执行文件为 one_line_shot_args.exe，Steam 版的路径是 X:\SteamLibrary\steamapps\common\SVFI\"
-                    Select-File -Title "选择 one_line_shot_args.exe" -ExeOnly
+                    Show-Info "正在检测 SVFI (one_line_shot_args.exe) 可能的路径..."
+                    $foundPath = Get-PSDrive -PSProvider FileSystem | ForEach-Object { 
+                        $p = "$($_.Root)SteamLibrary\steamapps\common\SVFI"
+                        if (Test-Path $p) { $p }
+                    } | Select-Object -First 1
+
+                    if ($foundPath) { # 尝试自动定位到的 SVFI 路径（Select-File 能自动回退到 Desktop）
+                        Show-Success "已定位候选路径：$foundPath"
+                        Select-File -Title "选择 one_line_shot_args.exe" -ExeOnly -InitialDirectory $foundPath
+                    }
+                    else { # DIY
+                        Show-Info "SVFI（one_line_shot_args.exe）Steam 发布版的路径是 X:\SteamLibrary\steamapps\common\SVFI\"
+                        Select-File -Title "选择 one_line_shot_args.exe" -ExeOnly
+                    }
                 }
                 elseif ($tool -eq 'vspipe') {
-                    Show-Info "安装版 VapourSynth 的默认可执行文件路径是 C:\Program Files\VapourSynth\core\vspipe.exe"
-                    Select-File -Title "选择 vspipe.exe"
+                    Show-Info "正在检测 vspipe.exe 可能的路径..."
+                    $foundPath = Get-PSDrive -PSProvider FileSystem | ForEach-Object {
+                        $p = "$($_.Root)Program Files\VapourSynth\core"
+                        if (Test-Path $p) { $p }
+                    } | Select-Object -First 1
+
+                    if ($foundPath) { # 尝试自动定位到的 vspipe 路径（Select-File 能自动回退到 Desktop）
+                        Show-Success "已定位候选路径：$foundPath"
+                        Select-File -Title "选择 vspipe.exe" -ExeOnly -InitialDirectory $foundPath
+                    }
+                    else { # DIY
+                        Show-Info "安装版 VapourSynth 的默认可执行文件路径是 C:\Program Files\VapourSynth\core\vspipe.exe"
+                        Select-File -Title "选择 vspipe.exe" -ExeOnly
+                    }
                 }
                 elseif ($tool -eq 'avs2yuv') {
                     Show-Info "此工具同时提供 AviSynth（0.26）和支持 AviSynth+（0.30）的 avs2yuv 支持"
-                    Select-File -Title "选择 avs2yuv.exe 或 avs2yuv64.exe"
+                    Select-File -Title "选择 avs2yuv.exe 或 avs2yuv64.exe" -ExeOnly
                 }
                 else {
                     Select-File -Title "选择 $tool 可执行文件" -ExeOnly
@@ -215,7 +239,7 @@ function Main {
     $i = 0
     foreach ($tool in @($downstreamTools.Keys)) {
         $i++
-        $choice = Read-Host " [下游] ($i/$($downstreamTools.Count)) 导入 $tool？（y=是，Enter 跳过）"
+        $choice = Read-Host "`r`n [下游] ($i/$($downstreamTools.Count)) 导入 $tool？（y=是，Enter 跳过）"
         if ($choice -eq 'y') {
             $downstreamTools[$tool] = Select-File -Title "选择 $tool 可执行文件" -ExeOnly
             Show-Success "$tool 已导入: $($downstreamTools[$tool])"

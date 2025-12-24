@@ -182,16 +182,40 @@ function Main {
         if ($choice -eq 'y') {
             $upstreamTools[$tool] =
                 if ($tool -eq 'svfi') {
-                    Show-Info "SVFI's executable is 'one_line_shot_args.exe',`r`n Steam installation path is X:\SteamLibrary\steamapps\common\SVFI\"
-                    Select-File -Title "Locate one_line_shot_args.exe" -ExeOnly
+                    Show-Info "Detecting possible paths for SVFI (one_line_shot_args.exe)..."
+                    $foundPath = Get-PSDrive -PSProvider FileSystem | ForEach-Object { 
+                        $p = "$($_.Root)SteamLibrary\steamapps\common\SVFI"
+                        if (Test-Path $p) { $p }
+                    } | Select-Object -First 1
+
+                    if ($foundPath) { # Try the auto-located SVFI path (Select-File can fallback)
+                        Show-Success "Candidate path to one_line_short_args.exe located: $foundPath"
+                        Select-File -Title "Select one_line_shot_args.exe" -ExeOnly -InitialDirectory $foundPath
+                    }
+                    else { # Couldn't locate, let user take over
+                        Show-Info "SVFI (one_line_shot_args.exe) Steam release path is: X:\SteamLibrary\steamapps\common\SVFI\"
+                        Select-File -Title "Select one_line_shot_args.exe" -ExeOnly
+                    }
                 }
                 elseif ($tool -eq 'vspipe') {
-                    Show-Info "The default VapourSynth installation places vspipe.exe in C:\Program Files\VapourSynth\core\"
-                    Select-File -Title  "Locate vspipe.exe"
+                    Show-Info "Detecting possible paths for vspipe.exe..."
+                    $foundPath = Get-PSDrive -PSProvider FileSystem | ForEach-Object {
+                        $p = "$($_.Root)Program Files\VapourSynth\core"
+                        if (Test-Path $p) { $p }
+                    } | Select-Object -First 1
+
+                    if ($foundPath) { # Try the auto-located vspipe path (Select-File can fallback)
+                        Show-Success "Candidate path to vspipe located: $foundPath"
+                        Select-File -Title "Select vspipe.exe" -ExeOnly -InitialDirectory $foundPath
+                    }
+                    else { # DIY
+                        Show-Info "The default VapourSynth installation places vspipe.exe in C:\Program Files\VapourSynth\core\"
+                        Select-File -Title "Select vspipe.exe" -ExeOnly
+                    }
                 }
                 elseif ($tool -eq 'avs2yuv') {
                     Show-Info "Both 0.26 (AviSynth, AviSynth+) and 0.30 (AviSynth+ only) avs2yuv variations are supported"
-                    Select-File -Title "Select avs2yuv.exe or avs2yuv64.exe"
+                    Select-File -Title "Select avs2yuv.exe or avs2yuv64.exe" -ExeOnly
                 }
                 else {
                     Select-File -Title "Locate $tool executable" -ExeOnly

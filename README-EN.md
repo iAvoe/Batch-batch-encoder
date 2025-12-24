@@ -72,6 +72,7 @@ Developing these tools wasn't easy. If this tool improve your efficiency, consid
   - Automatic retrieval of Task ID and source video path (JSON parsed) from the rendering configuration INI
   - Automatic construction of pipeline parameters, thus skipping the video import step.
 - Fixed a flaw in SVT-AV1 parameter construction
+- Added auto path detection for one_line_shot_args.exe and vspipe.exe (simplified tool import process)
 
 **v1.3.7**
 - Rewrote entire codebase

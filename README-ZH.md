@@ -76,6 +76,7 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 - 完成了 SVFI 上游适配：
   - 自动从渲染配置 INI 获取 Task ID 和源视频路径（JSON 解析）并构建管道参数，从而跳过视频导入步骤
 - 修复了 SVT-AV1 下游参数构建的格式失误
+- 添加了 one_line_shot_args.exe 与 vspipe.exe 的自动路径检测功能（导入更简单）
 
 **v1.3.7**
 - 重写了所有代码
