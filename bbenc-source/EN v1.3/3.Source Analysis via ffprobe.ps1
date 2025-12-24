@@ -153,11 +153,24 @@ function Main {
         }
         'SVFI'         {
             $upstreamCode = 'e'
-            Show-Info "Please locate the path to SVFI render configuration INI file"
-            Write-Host " For Steam installation, it would be, X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini"
+            Show-Info "Locating SVFI render config INI path..."
+            $foundPath = Get-PSDrive -PSProvider FileSystem | ForEach-Object { 
+                $p = "$($_.Root)SteamLibrary\steamapps\common\SVFI\Configs"
+                if (Test-Path $p) { $p }
+            } | Select-Object -First 1
+
+            Show-Info "Please select the desginated SVFI render configuration INI file"
+            Write-Host " For Steam installation, it would be X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini"
 
             do {
-                $OneLineShotArgsINI = Select-File -Title "Select SVFI render configuration (.ini)" -IniOnly
+                if ($foundPath) { # The the auto-located path
+                    Show-Success "Candidate path found: $foundPath"
+                    $OneLineShotArgsINI = Select-File -Title "Select render configuration（.ini）" -IniOnly -InitialDirectory $foundPath
+                }
+                else { # DIY
+                    $OneLineShotArgsINI = Select-File -Title "Select render configuration（.ini）" -IniOnly
+                }
+
                 if (-not $OneLineShotArgsINI) {
                     $placeholderScript = Read-Host "No INI file selected. Press Enter to retry, input 'q' to force exit"
                     if ($placeholderScript -eq 'q') { exit }

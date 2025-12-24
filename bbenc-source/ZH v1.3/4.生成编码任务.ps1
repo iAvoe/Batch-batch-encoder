@@ -190,7 +190,8 @@ function Get-EncodingIOArgument {
             { $_ -in @('svfi', 'one_line_shot_args', 'ols', 'olsa') } { 
                 return "--input $quotedInput"
             }
-            { $_ -in @('vspipe', 'vs', 'avs2yuv', 'avsy', 'a2y', 'avs2pipemod', 'avsp', 'a2p') } { 
+            { $_ -in @('vspipe', 'vs', 'avs2yuv', 'avsy', 'a2y', 'avs2pipemod', 'avsp', 'a2p') } {
+                # TODO：强制修改 VS 扩展名到 vpy、AVS 扩展名到 .avs 
                 return "$quotedInput"
             }
             { $_ -in @('x264', 'h264', 'avc') } {

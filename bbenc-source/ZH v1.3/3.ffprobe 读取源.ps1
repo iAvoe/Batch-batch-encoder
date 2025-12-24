@@ -149,11 +149,24 @@ function Main {
         }
         'SVFI'         {
             $upstreamCode = 'e'
+            Show-Info "正在检测 SVFI 渲染配置 INI 可能的路径..."
+            $foundPath = Get-PSDrive -PSProvider FileSystem | ForEach-Object { 
+                $p = "$($_.Root)SteamLibrary\steamapps\common\SVFI\Configs"
+                if (Test-Path $p) { $p }
+            } | Select-Object -First 1
+
             Show-Info "请指定 SVFI 渲染配置 INI 文件的路径"
             Write-Host " 如 X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini"
 
             do {
-                $OneLineShotArgsINI = Select-File -Title "选择 SVFI 渲染配置文件（.ini）" -IniOnly
+                if ($foundPath) { # 尝试自动定位到的 SVFI 路径（Select-File 能自动回退到 Desktop）
+                    Show-Success "已定位候选路径：$foundPath"
+                    $OneLineShotArgsINI = Select-File -Title "选择 SVFI 渲染配置文件（.ini）" -IniOnly -InitialDirectory $foundPath
+                }
+                else { # DIY
+                    $OneLineShotArgsINI = Select-File -Title "选择 SVFI 渲染配置文件（.ini）" -IniOnly
+                }
+
                 if (-not $OneLineShotArgsINI -or -not (Test-Path -LiteralPath $OneLineShotArgsINI)) {
                     $placeholderScript = Read-Host " INI 路径不存在；按 Enter 重试，输入 'q' 强制退出"
                     if ($placeholderScript -eq 'q') { exit }
