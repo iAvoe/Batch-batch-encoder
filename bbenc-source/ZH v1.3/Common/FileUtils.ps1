@@ -18,7 +18,7 @@ function Confirm-FileDelete {
     if (-not (Test-Path -LiteralPath $Path)) { return }
 
     Show-Warning "`r`n 检测到已存在文件：$Path"
-    $confirm = Read-Host " 是否删除该文件以继续？输入 'y' 确认，其它任意键取消（这不是移到回收站）"
+    $confirm = Read-Host " 是否删除该文件以继续？输入 'y' 确认，其它任意键取消（永久删除）"
 
     if ($confirm -ne 'y') {
         Show-Info "用户取消操作，脚本终止"
@@ -263,4 +263,19 @@ function Get-StreamMetadata {
         Show-Debug "错误详情：$($_.ScriptStackTrace)"
         return $null
     }
+}
+
+# 从 SVFI INI 文件中直接提取路径用
+function Convert-IniPath {
+    param([string]$iniPath)
+    
+    # 先处理 Unicode 转义
+    $path = [regex]::Unescape($iniPath)
+    
+    # 移除可能存在的双引号
+    $path = $path.Trim('"')
+    
+    # 双反换单反斜杠
+    $path = $path -replace '\\\\', '\'
+    return $path
 }

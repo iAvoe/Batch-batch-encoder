@@ -50,7 +50,7 @@ function Get-PipeType($upstream) {
         'vspipe'       { 'y4m' }
         'avs2pipemod'  { 'y4m' }
         'avs2yuv'      { 'y4m' } # Not RAW !
-        'svfi'         { 'raw' }
+        'svfi'         { 'y4m' } # Not RAW !
         default        { 'raw' }
     }
 }
@@ -103,39 +103,38 @@ function Get-VSPipeY4MArgument {
 
 # Traversal all pipe routes imported to create "backup routes"
 function Get-CommandFromPreset([string]$presetName, $tools, $vspipeInfo) {
-        $preset = $Global:PipePresets[$presetName]
-        if (-not $preset) {
-            throw "Unknown PipePreset: $presetName"
-        }
-
-        $up   = $preset.Upstream
-        $down = $preset.Downstream
-
-        $pType = Get-PipeType $up
-        $pArg  = $Script:DownstreamPipeParams[$pType][$down]
-        $template = switch ($up) {
-            'ffmpeg'      { '"{0}" %ffmpeg_params% -f yuv4mpegpipe -an -strict unofficial - | "{1}" {3} %{2}_params%' }
-            'vspipe'      { '"{0}" %vspipe_params% {3} - | "{1}" {4} %{2}_params%' }
-            'avs2yuv'     { '"{0}" %avs2yuv_params% - | "{1}" {3} %{2}_params%' }
-            'avs2pipemod' { '"{0}" %avs2pipemod_params% -y4mp | "{1}" {3} %{2}_params%' }
-            'svfi'        { '"{0}" %svfi_params% --pipe-out - | "{1}" {3} %{2}_params%' }
-        }
-
-        # Check pipe format
-        if (-not $Script:DownstreamPipeParams.ContainsKey($pType)) {
-            throw "Unknown PipeType: $pType"
-        }
-        if (-not $Script:DownstreamPipeParams[$pType].ContainsKey($down)) {
-            throw "Downstream (Video Encoder) $down does not support $pType pipe"
-        }
-
-        if ($up -eq 'vspipe') {
-            return $template -f $tools[$up], $tools[$down], $down, $vspipeInfo.Args, $pArg
-        }
-        else {
-            return $template -f $tools[$up], $tools[$down], $down, $pArg
-        }
+    $preset = $Global:PipePresets[$presetName]
+    if (-not $preset) {
+        throw "Unknown PipePreset: $presetName"
     }
+
+    $up   = $preset.Upstream
+    $down = $preset.Downstream
+    $pType = Get-PipeType $up
+    $pArg  = $Script:DownstreamPipeParams[$pType][$down]
+    $template = switch ($up) {
+        'ffmpeg'      { '"{0}" %ffmpeg_params% -f yuv4mpegpipe -an -strict unofficial - | "{1}" {3} %{2}_params%' }
+        'vspipe'      { '"{0}" %vspipe_params% {3} - | "{1}" {4} %{2}_params%' }
+        'avs2yuv'     { '"{0}" %avs2yuv_params% - | "{1}" {3} %{2}_params%' }
+        'avs2pipemod' { '"{0}" %avs2pipemod_params% -y4mp | "{1}" {3} %{2}_params%' } # No dash upstream formatting
+        'svfi'        { '"{0}" %svfi_params% --pipe-out | "{1}" {3} %{2}_params%' } # No dash upstream formatting
+    }
+
+    # Check pipe format
+    if (-not $Script:DownstreamPipeParams.ContainsKey($pType)) {
+        throw "Unknown PipeType: $pType"
+    }
+    if (-not $Script:DownstreamPipeParams[$pType].ContainsKey($down)) {
+        throw "Downstream (Video Encoder) $down does not support $pType pipe"
+    }
+
+    if ($up -eq 'vspipe') {
+        return $template -f $tools[$up], $tools[$down], $down, $vspipeInfo.Args, $pArg
+    }
+    else {
+        return $template -f $tools[$up], $tools[$down], $down, $pArg
+    }
+}
 
 #region Main
 function Main {

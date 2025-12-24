@@ -192,7 +192,7 @@ function Get-EncodingIOArgument {
                 return "-i $quotedInput"
             }
             { $_ -in @('svfi', 'one_line_shot_args', 'ols', 'olsa') } { 
-                return "-i $quotedInput"
+                return "--input $quotedInput"
             }
             { $_ -in @('vspipe', 'vs', 'avs2yuv', 'avsy', 'a2y', 'avs2pipemod', 'avsp', 'a2p') } { 
                 return "$quotedInput"
@@ -351,12 +351,12 @@ function Get-svtav1BaseParam {
     }
     $deblock = if ($enableDLF2) {"--enable-dlf 2"} else {"--enable-dlf 1"}
 
-    $default = ("--preset 2 --scd 1 --enable-tf 2 --tf-strength 2 --crf 30 --enable-qm 1 --enable-variance-boost 1 --variance-boost-curve 2 --variance-boost-strength 2 --variance-octile 2 --sharpness 6 --progress 1" + $deblock)
+    $default = ("--preset 2 --scd 1 --enable-tf 2 --tf-strength 2 --crf 30 --enable-qm 1 --enable-variance-boost 1 --variance-boost-curve 2 --variance-boost-strength 2 --variance-octile 2 --sharpness 6 --progress 1 " + $deblock)
     switch ($pickOps) {
         # 画质 Quality
         a {return $default}
         # 压缩 Compression
-        b {return ("--preset 2 --scd 1 --enable-tf 2 --tf-strength 2 --crf 30 --sharpness 4 --progress 1" + $deblock)}
+        b {return ("--preset 2 --scd 1 --enable-tf 2 --tf-strength 2 --crf 30 --sharpness 4 --progress 1 " + $deblock)}
         # 速度 Speed
         c {return "--preset 2 --scd 1 --scm 0 --enable-tf 2 --tf-strength 2 --crf 30 --tune 0 --enable-variance-boost 1 --variance-boost-curve 2 --variance-boost-strength 2 --variance-octile 2 --sharpness 4 --progress 1"}
         helpzh {
@@ -1027,8 +1027,23 @@ function Get-RAWCSPBitDepth {
     }
 
     if ($isEncoderInput) {
-        if ($isSVTAV1) { # SVT-AV1 uses --color-format and --input-depth
-            return "--color-format $chromaFormat --input-depth $depth"
+        if ($isSVTAV1) { # --color-format, --input-depth
+            # SVT-AV1 uses integer --color-format
+            $svtColorMap = @{
+                'i400' = 0
+                'gray' = 0
+                'i420' = 1
+                'nv12' = 1
+                'i422' = 2
+                'nv16' = 2
+                'i444' = 3
+            }
+            $svtColor = $svtColorMap[$chromaFormat]
+            if ($null -eq $svtColor) {
+                Show-Warning "[SVT-AV1] Unknown color format: $chromaFormat, falling back to yuv420"
+                $svtColor = 1
+            }
+            return "--color-format $svtColor --input-depth $depth"
         }
         else { # x265 uses --input-csp and --input-depth
             $cspMap = @{
@@ -1061,61 +1076,6 @@ function Get-RAWCSPBitDepth {
         
     }
     return ""
-}
-
-function Edit-SvfiRenderConfig {
-    param(
-        [Parameter(Mandatory=$true)]$ffprobeCSV,
-        [Parameter(Mandatory=$true)]$sourceCSV,
-        [Parameter(Mandatory=$false)]$validateUpstreamCode='e'
-    )
-
-    $iniExport = $null
-    if ($sourceCSV.UpstreamCode -eq $validateUpstreamCode) {
-
-        $quotedSvfiConfig = Get-QuotedPath $sourceCSV.SvfiConfigInput
-        if ([string]::IsNullOrWhiteSpace($sourceCSV.SvfiConfigInput) -or -not (Test-Path -LiteralPath $quotedSvfiConfig)) {
-            throw "CSV record specifies to use SVFI, but render configuration INI file was not found. Please try the previous script again."
-        }
-
-        Show-Success "SVFI render configuration file loaded: $($sourceCSV.SvfiConfigInput)"
-        Show-Info "The target_fps value in the rendering configuration file will be modified to match the source video"
-        Write-Host " (Creating a new file, there won't be overwriting in the original file)" -BackgroundColor Cyan
-
-        $iniExport =
-            Join-Path -Path $Global:TempFolder -ChildPath ("svfi_targetfps_mod_" + (Get-Date).ToString('yyyy.MM.dd.HH.mm.ss') + ".ini")
-        $svfiFPS = "target_fps=" + $ffprobeCSV.H
-
-        $iniData = Get-Content $quotedSvfiConfig -ErrorAction Stop
-
-        $foundIndex = $null
-        for ($i=0; $i -lt $iniData.Count; $i++) {
-            if ($iniData[$i] -match '^\s*target_fps\s*=') {
-                $foundIndex = $i
-                break
-            }
-        }
-        if ($null -eq $foundIndex) {
-            Show-Warning "The target_fps field was not found in the SVFI render configuration file, adding this field"
-            $iniData += $svfiFPS
-        }
-        else { $iniData[$foundIndex] = $svfiFPS }
-
-        Write-TextFile -Path $iniExport -Content $iniData -UseBOM $true
-
-        # Validate line breaks, must be CRLF
-        Show-Debug "Validating file format..."
-        if (-not (Test-TextFileFormat -Path $finalBatchPath)) {
-            return
-        }
-        Show-Success "Replaced target_fps line in '$($sourceCSV.SvfiConfigInput)' to $svfiFPS"
-        Write-Host "New render configuration file written: $iniExport"
-    }
-    else { $iniExport = $sourceCSV.SvfiConfigInput }
-
-    $iniExport = Get-QuotedPath $iniExport
-
-    return "-c $iniExport"
 }
 
 # Since the auto-generated script source exists, the filename will become "blank_vs_script/blank_avs_script" instead of the video filename.
@@ -1164,11 +1124,11 @@ function Main {
     $ffprobeCSV =
         Import-Csv $ffprobeCsvPath -Header A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,AA,AB,AC,AD,AE,AF,AG,AH,AI,AJ
     $sourceCSV =
-        Import-Csv $sourceInfoCsvPath -Header SourcePath,UpstreamCode,Avs2PipeModDllPath,SvfiConfigInput
+        Import-Csv $sourceInfoCsvPath -Header SourcePath,UpstreamCode,Avs2PipeModDllPath,SvfiConfigInput,SvfiTaskId
 
     # Validate CSV data
     if (-not $sourceCSV.SourcePath) { # Validate CSV field existance, no quote needed
-        Show-Error "CSV data corrupted. Please rerun step 3 script"
+        Show-Error "temp_s_info CSV data corrupted. Please rerun step 3 script"
         return
     }
 
@@ -1205,9 +1165,11 @@ function Main {
 
     # Obtain color space format
     $avs2yuvVersionCode = 'a'
-    Write-Host ""
-    Show-Info "Select the version of avs2yuv.exe variation used:"
-    $avs2yuvVersionCode = Read-Host " avs2yuv type [a: AviSynth+ (0.30) | Default: AviSynth (up to 0.26)]"
+    if ($sourceCSV.UpstreamCode -eq 'c') {
+        Write-Host ""
+        Show-Info "Select the correct version of avs2yuv(64).exe used:"
+        $avs2yuvVersionCode = Read-Host " [a/Default Enter: AviSynth+ (0.30) | b: AviSynth (up to 0.26)]"
+    }
 
     $ffmpegParams.CSP = Get-ffmpegCSP -CSVpixfmt $ffprobeCSV.D
     $svtav1Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $true
@@ -1215,12 +1177,17 @@ function Main {
     $x264Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
     $avsyuvParams.CSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $false -isAvs2YuvInput $true -isSVTAV1 $false -isAVSPlus ($avs2yuvVersionCode -eq 'a')
 
-    # Verify and adjust the INI file for the SVFI line.
-    $olsargParams.ConfigInput = Edit-SvfiRenderConfig -ffprobeCSV $ffprobeCSV -sourceCSV $sourceCSV
-
     # Avs2PipeMod's required DLL
     $quotedDllPath = Get-QuotedPath $sourceCSV.Avs2PipeModDllPath
     $avsmodParams.DLLInput = "-dll $quotedDllPath"
+
+    # SVFI's required INI file AND Task ID
+    if (-not [string]::IsNullOrWhiteSpace($sourceCSV.SvfiConfigInput)) {
+        $quotedSvfiConfig = Get-QuotedPath $sourceCSV.SvfiConfigInput
+        $olsargParams.ConfigInput = "--config $quotedSvfiConfig --task-id $($sourceCSV.SvfiTaskId)"
+        Show-Debug "olsargParams.ConfigInput: $($olsargParams.ConfigInput)"
+    }
+    else { $olsargParams.ConfigInput = "" }
 
     # Locate the batch file for exporting the encoding task and the encoding output path.
     Write-Host ""

@@ -67,7 +67,13 @@ Developing these tools wasn't easy. If this tool improve your efficiency, consid
 <p align="center"><img src="bmc_qr.png" alt="Support me -_-"><br><img src="pp_tip_qr.png" alt="Support me =_="></p>
 
 ## Update Information
-**v1.3.6**
+**v1.3.8**
+- SVFI adaptation achieved
+  - Automatic retrieval of Task ID and source video path (JSON parsed) from the rendering configuration INI
+  - Automatic construction of pipeline parameters, thus skipping the video import step.
+- Fixed a flaw in SVT-AV1 parameter construction
+
+**v1.3.7**
 - Rewrote entire codebase
 - Used more reasonable data structures such as arrays and hash tables
 - Improved error reporting logic
@@ -94,4 +100,3 @@ Developing these tools wasn't easy. If this tool improve your efficiency, consid
 - Verified: avs2yuv (0.26+0.30) supported
 - Verified: avs2pipemod supported
 - Step 5 (multiplex script) rewrite ompleted, deprecating all Invoke-Expression to increase security
-    - TODO: Test SVFI support

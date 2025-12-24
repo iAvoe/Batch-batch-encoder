@@ -37,14 +37,12 @@ function Get-BlankAVSVSScript {
     $quotedImport = Get-QuotedPath $videoSource
 
     # Empty Script and Export Path
-
     $AVSScriptPath = Join-Path $Global:TempFolder "blank_avs_script.avs"
     $VSScriptPath = Join-Path $Global:TempFolder "blank_vs_script.vpy"
     # Generate AVS content (LWLibavVideoSource requires the path to be enclosed in double quotes)
     # libvslsmashsource.dll must exist in folder C:\Program Files (x86)\AviSynth+\plugins64+\
     $blankAVSScript = "LWLibavVideoSource($quotedImport) # Generated filter-less script, modify if needed"
     # Generate VapourSynth content (use raw string literal r"..." to avoid escaping issues)
-
     # If Get-QuotedPath returns strings like "C:\path\file.mp4", then modify r$quotedImport to r"C:\path\file.mp4"
     $blankVSScript = @"
 import vapoursynth as vs
@@ -92,11 +90,11 @@ function Main {
     Show-Border
     Write-Host ""
 
-    Show-Info "Example of common encoding commandlines:"
-    Write-Host "ffmpeg -i [source] -an -f yuv4mpegpipe -strict unofficial - | x265.exe --y4m - -o"
-    Write-Host "vspipe [script.vpy] --y4m - | x265.exe --y4m - -o"
-    Write-Host "avs2pipemod [script.avs] -y4mp | x265.exe --y4m - -o"
-    Write-Host ""
+    # Show-Info "Example of common encoding commandlines:"
+    # Write-Host "ffmpeg -i [source] -an -f yuv4mpegpipe -strict unofficial - | x265.exe --y4m - -o"
+    # Write-Host "vspipe [script.vpy] --y4m - | x265.exe --y4m - -o"
+    # Write-Host "avs2pipemod [script.avs] -y4mp | x265.exe --y4m - -o"
+    # Write-Host ""
 
     # Select source type based on upstream tool
     $sourceTypes = @{
@@ -104,13 +102,13 @@ function Main {
         'B' = @{ Name = 'vspipe'; Ext = '.vpy'; Message = ".vpy source" }
         'C' = @{ Name = 'avs2yuv'; Ext = '.avs'; Message = ".avs source" }
         'D' = @{ Name = 'avs2pipemod'; Ext = '.avs'; Message = ".avs source" }
-        'E' = @{ Name = 'SVFI'; Ext = ''; Message = "Video source" }
+        'E' = @{ Name = 'SVFI'; Ext = ''; Message = ".ini source" }
     }
 
     # Get source file type
     $selectedType = $null
     do {
-        Show-Info "Select the designated tool as the pipe upstream..."
+        Show-Info "Select the pipe upstream tool program referred by previous script..."
         $sourceTypes.GetEnumerator() | Sort-Object Key | ForEach-Object {
             Write-Host "  $($_.Key): $($_.Value.Name)"
         }
@@ -173,6 +171,7 @@ function Main {
     $videoSource = $null # ffprobe will analyze this one
     $scriptSource = $null # script source for encoding, but cannot be read by ffprobe
     $encodeImportSourcePath = $null
+    $svfiTaskId = $null
 
     # If upstream is set to vspipe / avs2yuv / avs2pipemod, offer filter-less script generation option
     if ($isScriptUpstream) {
@@ -212,7 +211,8 @@ function Main {
                 Show-Success "Script source selected: $scriptSource"
                 # Note: $videoSource is still going to be for ffprobe
             }
-            elseif ([string]::IsNullOrWhiteSpace($mode) -or $mode -eq 'n') { # Generate
+            # Generate filter-less script
+            elseif ([string]::IsNullOrWhiteSpace($mode) -or $mode -eq 'n') {
                 Show-Warning "`r`n  AviSynth(+) does not come with LSMASHSource.dll (video import library),"
                 Write-Host " Ensure this libaray is present in C:\Program Files (x86)\AviSynth+\plugins64+\ folder" -ForegroundColor Yellow
                 Write-Host " Download and extract 64bit version:`r`n    https://github.com/HomeOfAviSynthPlusEvolution/L-SMASH-Works/releases" -ForegroundColor Yellow
@@ -242,7 +242,88 @@ function Main {
 
         $encodeImportSourcePath = $scriptSource
     }
-    else { # ffmpeg、SVFI: video source
+    # SVFI: parse source video from INI file
+    elseif ($OneLineShotArgsINI -and (Test-Path -LiteralPath $OneLineShotArgsINI)) {
+        # SVFI's source path config within ini file (actually its one-liner)：gui_inputs="{
+        #     \"inputs\": [{
+        #         \"task_id\": \"...\",
+        #         \"input_path\": \"X:\\\\Video\\\\\\u5176\\u5b83-\\u52a8\\u6f2b\\u753b\\u516c\\u79cd\\\\视频.mp4\",
+        #         \"is_surveillance_folder\": false
+        #     }]
+        # }"
+        # Read and find line starts with gui_inputs, i.e.:
+        # gui_inputs="{\"inputs\": [{\"task_id\": \"798_2aa174\", \"input_path\": \"X:\\\\Video\\\\\\u5176\\u5b83-\\u52a8\\u6f2b\\u753b\\u516c\\u79cd\\\\[Airota][Yuru Yuri\\u3001][OVA][BDRip 1080p AVC AAC][CHS].mp4\", \"is_surveillance_folder\": false}]}"
+
+        Show-Info "Attempting to get source video path from SVFI render configuration INI file..."
+
+        try { # Read INI & locate gui_inputs line
+            $iniContent = Get-Content -LiteralPath $OneLineShotArgsINI -Raw -ErrorAction Stop
+            $pattern = 'gui_inputs\s*=\s*"((?:[^"\\]|\\.)*)"'
+            $guiInputsMatch = [regex]::Match($iniContent, $pattern)
+            if (-not $guiInputsMatch.Success) {
+                Show-Error "Missing gui_inputs section in SVFI INI file, please recreate INI with SVFI"
+                Read-Host "Press Enter to exit"
+                return
+            }
+
+            # Extract the JSON string containing the path (remove the outer gui_inputs="...")
+            $jsonString = $guiInputsMatch.Groups[1].Value
+            $jsonString = $jsonString -replace '\\"', '"'
+            $jsonString = $jsonString -replace '\\\\', '\\'
+            Show-Debug "Parsed JSON: $jsonString"
+
+            # Translate JSON and extract the video source path to a PowerShell variable
+            try {
+                $jsonObject = $jsonString | ConvertFrom-Json -ErrorAction Stop
+                if ($null -eq $jsonObject.inputs -or ($jsonObject.inputs.Count -eq 0)) {
+                    Show-Error "Missing video import statement in SVFI INI file, please recreate INI with SVFI"
+                    Read-Host "Press Enter to exit"
+                    return
+                }
+
+                # Fetch path to the first video source
+                Show-Success "Source import statement detected successfully"
+                Show-Warning "Only the first video source in the INI file will be used"
+                $jsonSource = $jsonObject.inputs[0].input_path
+                if ([string]::IsNullOrWhiteSpace($jsonSource)) {
+                    Show-Error "Blank input statement found in SVFI INI file, please recreate INI with SVFI"
+                    Read-Host "Press Enter to exit"
+                    return
+                }
+                $svfiTaskId = $jsonObject.inputs[0].task_id
+                if ([string]::IsNullOrWhiteSpace($svfiTaskId)) {
+                    Show-Error "task_id statment corrupted in SVFI INI file, please recreate INI with SVFI"
+                    Read-Host "Press Enter to exit"
+                    return
+                }
+                Show-Success "SVFI Task ID detected: $svfiTaskId"
+
+                $videoSource = Convert-IniPath -iniPath $jsonSource # FileUtils.ps1 function
+                Show-Success "Source video detected from $videoSource"
+
+                # 验证视频文件是否存在
+                if (-not (Test-Path -LiteralPath $videoSource)) {
+                    Show-Error "Source video fill no longer exists on disk: $videoSource, please recreate INI with SVFI"
+                    Read-Host "Press Enter to exit"
+                    return
+                }
+            }
+            catch {
+                Show-Error "Failed to parse JSON：$_"
+                Show-Debug "Original JSON string：$jsonString"
+                    Read-Host "Press Enter to exit"
+                return
+            }
+        }
+        catch {
+            Show-Error "Could not read SVFI INI：$_"
+                    Read-Host "Press Enter to exit"
+            return
+        }
+
+        $encodeImportSourcePath = $videoSource
+    }
+    else { # ffmpeg: video source
         do {
             Show-Info "Select the video source file for ffprobe to analyze"
             $videoSource = Select-File -Title "Locate video source (.mp4/.mov/...), RAW (.yuv/.y4m/...)"
@@ -332,7 +413,7 @@ function Main {
 
         # Construct source CSV row
         $sourceInfoCSV = @"
-"$encodeImportSourcePath",$upstreamCode,"$Avs2PipeModDLL","$OneLineShotArgsINI"
+"$encodeImportSourcePath",$upstreamCode,"$Avs2PipeModDLL","$OneLineShotArgsINI","$svfiTaskId"
 "@
         
         Write-TextFile -Path $ffprobeCSVExportPath -Content $ffprobeOutputCSV -UseBOM $true

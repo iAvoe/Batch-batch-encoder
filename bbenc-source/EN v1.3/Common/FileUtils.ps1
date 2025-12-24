@@ -18,7 +18,7 @@ function Confirm-FileDelete {
     if (-not (Test-Path -LiteralPath $Path)) { return }
 
     Show-Warning "`r`n Detecting existing file: $Path"
-    $confirm = Read-Host " Delete file to continue? Type 'y' to confirm, Enter to force exit (this is not moving to recycle bin)."
+    $confirm = Read-Host " Delete file to continue? Type 'y' to confirm, Enter to force exit (permanent deletion)."
 
     if ($confirm -ne 'y') {
         Show-Info "Exiting script"
@@ -265,4 +265,19 @@ function Get-StreamMetadata {
         Show-Debug "Error details: $($_.ScriptStackTrace)"
         return $null
     }
+}
+
+# Extract path from SVFI INI file（CRLF linebreak, UTF-8 No BOM）
+function Convert-IniPath {
+    param([string]$iniPath)
+    
+    # Unicode conversion
+    $path = [regex]::Unescape($iniPath)
+    
+    # Remove outside double quotes
+    $path = $path.Trim('"')
+    
+    # double inverted slash to single
+    $path = $path -replace '\\\\', '\'
+    return $path
 }

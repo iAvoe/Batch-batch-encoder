@@ -188,7 +188,7 @@ function Get-EncodingIOArgument {
                 return "-i $quotedInput"
             }
             { $_ -in @('svfi', 'one_line_shot_args', 'ols', 'olsa') } { 
-                return "-i $quotedInput"
+                return "--input $quotedInput"
             }
             { $_ -in @('vspipe', 'vs', 'avs2yuv', 'avsy', 'a2y', 'avs2pipemod', 'avsp', 'a2p') } { 
                 return "$quotedInput"
@@ -345,12 +345,12 @@ function Get-svtav1BaseParam {
     }
     $deblock = if ($enableDLF2) {"--enable-dlf 2"} else {"--enable-dlf 1"}
 
-    $default = ("--preset 2 --scd 1 --enable-tf 2 --tf-strength 2 --crf 30 --enable-qm 1 --enable-variance-boost 1 --variance-boost-curve 2 --variance-boost-strength 2 --variance-octile 2 --sharpness 6 --progress 1" + $deblock)
+    $default = ("--preset 2 --scd 1 --enable-tf 2 --tf-strength 2 --crf 30 --enable-qm 1 --enable-variance-boost 1 --variance-boost-curve 2 --variance-boost-strength 2 --variance-octile 2 --sharpness 6 --progress 1 " + $deblock)
     switch ($pickOps) {
         # 画质 Quality
         a {return $default}
         # 压缩 Compression
-        b {return ("--preset 2 --scd 1 --enable-tf 2 --tf-strength 2 --crf 30 --sharpness 4 --progress 1" + $deblock)}
+        b {return ("--preset 2 --scd 1 --enable-tf 2 --tf-strength 2 --crf 30 --sharpness 4 --progress 1 " + $deblock)}
         # 速度 Speed
         c {return "--preset 2 --scd 1 --scm 0 --enable-tf 2 --tf-strength 2 --crf 30 --tune 0 --enable-variance-boost 1 --variance-boost-curve 2 --variance-boost-strength 2 --variance-octile 2 --sharpness 4 --progress 1"}
         helpzh {
@@ -1010,8 +1010,23 @@ function Get-RAWCSPBitDepth {
     }
 
     if ($isEncoderInput) {
-        if ($isSVTAV1) { # SVT-AV1 使用 --color-format 和 --input-depth
-            return "--color-format $chromaFormat --input-depth $depth"
+        if ($isSVTAV1) { # --color-format，--input-depth
+            # SVT-AV1 使用数字枚举的 --color-format
+            $svtColorMap = @{
+                'i400' = 0
+                'gray' = 0
+                'i420' = 1
+                'nv12' = 1
+                'i422' = 2
+                'nv16' = 2
+                'i444' = 3
+            }
+            $svtColor = $svtColorMap[$chromaFormat]
+            if ($null -eq $svtColor) {
+                Show-Warning "[SVT-AV1] 未知色度格式：$chromaFormat，回退到 yuv420"
+                $svtColor = 1
+            }
+            return "--color-format $svtColor --input-depth $depth"
         }
         else { # x265 使用 --input-csp 和 --input-depth
             $cspMap = @{
@@ -1044,60 +1059,6 @@ function Get-RAWCSPBitDepth {
         }
     }
     return ""
-}
-
-function Edit-SvfiRenderConfig {
-    param(
-        [Parameter(Mandatory=$true)]$ffprobeCSV,
-        [Parameter(Mandatory=$true)]$sourceCSV,
-        [Parameter(Mandatory=$false)]$validateUpstreamCode='e'
-    )
-
-    $iniExport = $null
-    if ($sourceCSV.UpstreamCode -eq $validateUpstreamCode) {
-
-        $quotedSvfiConfig = Get-QuotedPath $sourceCSV.SvfiConfigInput
-        if ([string]::IsNullOrWhiteSpace($sourceCSV.SvfiConfigInput) -or -not (Test-Path -LiteralPath $quotedSvfiConfig)) {
-            throw "CSV 记录显示使用 SVFI，但未找到有效的渲染配置 INI 文件，请重试先前脚本"
-        }
-
-        Show-Success "已从配置读取 SVFI 配置文件：$($sourceCSV.SvfiConfigInput)"
-        Show-Info "将修改渲染配置 INI 文件中的 target_fps 值到源视频帧率（创建新文件，不覆盖原文件）"
-
-        $iniExport =
-            Join-Path -Path $Global:TempFolder -ChildPath ("svfi_targetfps_mod_" + (Get-Date).ToString('yyyy.MM.dd.HH.mm.ss') + ".ini")
-        $svfiFPS = "target_fps=" + $ffprobeCSV.H
-
-        $iniData = Get-Content $quotedSvfiConfig -ErrorAction Stop
-
-        $foundIndex = $null
-        for ($i=0; $i -lt $iniData.Count; $i++) {
-            if ($iniData[$i] -match '^\s*target_fps\s*=') {
-                $foundIndex = $i
-                break
-            }
-        }
-        if ($null -eq $foundIndex) {
-            Show-Warning "未在 SVFI 配置文件中找到 target_fps 项，将追加该项（创建新文件，不覆盖原文件）"
-            $iniData += $svfiFPS
-        }
-        else { $iniData[$foundIndex] = $svfiFPS }
-
-        Write-TextFile -Path $iniExport -Content $iniData -UseBOM $true
-
-        # 验证换行符，必须为 CRLF
-        Show-Debug "验证写入文件的格式..."
-        if (-not (Test-TextFileFormat -Path $finalBatchPath)) {
-            return
-        }
-        Show-Success "已将渲染配置文件 '$($sourceCSV.SvfiConfigInput)' 的 target_fps 行替换为 $svfiFPS"
-        Write-Host "新的渲染配置文件已导出为 $iniExport"
-    }
-    else { $iniExport = $sourceCSV.SvfiConfigInput }
-
-    $iniExport = Get-QuotedPath $iniExport
-
-    return "-c $iniExport"
 }
 
 # 由于自动生成的脚本源存在，因此文件名会变成 "blank_vs_script/blank_avs_script" 而非视频文件名。若匹配到则消除默认（Enter）选项
@@ -1144,11 +1105,11 @@ function Main {
     $ffprobeCSV =
         Import-Csv $ffprobeCsvPath -Header A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,AA,AB,AC,AD,AE,AF,AG,AH,AI,AJ
     $sourceCSV =
-        Import-Csv $sourceInfoCsvPath -Header SourcePath,UpstreamCode,Avs2PipeModDllPath,SvfiConfigInput
+        Import-Csv $sourceInfoCsvPath -Header SourcePath,UpstreamCode,Avs2PipeModDllPath,SvfiConfigInput,SvfiTaskId
 
     # 验证 CSV 数据
     if (-not $sourceCSV.SourcePath) { # 直接验证 CSV 项存在，不需要添加引号
-        Show-Error "CSV 数据不完整，请重运行步骤 3 脚本"
+        Show-Error "temp_s_info CSV 数据不完整，请重运行步骤 3 脚本"
         return
     }
 
@@ -1185,9 +1146,11 @@ function Main {
 
     # 获取色彩空间格式
     $avs2yuvVersionCode = 'a'
-    Write-Host ""
-    Show-Info "选择已使用的 avs2yuv 程序类型："
-    $avs2yuvVersionCode = Read-Host "avs2yuv 类型 [a: AviSynth+ (0.30) | 默认: AviSynth (up to 0.26)]"
+    if ($sourceCSV.UpstreamCode -eq 'c') {
+        Write-Host ""
+        Show-Info "选择使用的 avs2yuv(64).exe 类型："
+        $avs2yuvVersionCode = Read-Host " [a/默认 Enter: AviSynth+ (0.30) | b: AviSynth (up to 0.26)]"
+    }
 
     $ffmpegParams.CSP = Get-ffmpegCSP -CSVpixfmt $ffprobeCSV.D
     $svtav1Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $true
@@ -1195,12 +1158,17 @@ function Main {
     $x264Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
     $avsyuvParams.CSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $false -isAvs2YuvInput $true -isSVTAV1 $false -isAVSPlus ($avs2yuvVersionCode -eq 'a')
 
-    # 验证并调整 SVFI 线路的 INI 文件
-    $olsargParams.ConfigInput = Edit-SvfiRenderConfig -ffprobeCSV $ffprobeCSV -sourceCSV $sourceCSV
-
     # Avs2PipeMod 需要的 DLL
     $quotedDllPath = Get-QuotedPath $sourceCSV.Avs2PipeModDllPath
     $avsmodParams.DLLInput = "-dll $quotedDllPath"
+
+    # SVFI 需要的配置文件以及 Task ID
+    if (-not [string]::IsNullOrWhiteSpace($sourceCSV.SvfiConfigInput)) {
+        $quotedSvfiConfig = Get-QuotedPath $sourceCSV.SvfiConfigInput
+        $olsargParams.ConfigInput = "--config $quotedSvfiConfig --task-id $($sourceCSV.SvfiTaskId)"
+        Show-Debug "olsargParams.ConfigInput: $($olsargParams.ConfigInput)"
+    }
+    else { $olsargParams.ConfigInput = "" }
 
     # 定位导出编码任务批处理文件、编码输出路径
     Write-Host ""
@@ -1307,21 +1275,11 @@ function Main {
     $x265RawPipeApdx = "$($x265Params.FPS) $($x265Params.RAWCSP) $($x265Params.Resolution) $($x265Params.TotalFrames)"
     $svtav1RawPipeApdx = "$($svtav1Params.FPS) $($svtav1Params.RAWCSP) $($svtav1Params.Resolution) $($svtav1Params.TotalFrames)"
     # N. RAW 管道兼容
-    Show-Debug "sourceCSV.UpstreamCode：$($sourceCSV.UpstreamCode)"
     if (Get-IsRAWSource -validateUpstreamCode $sourceCSV.UpstreamCode) {
         $x264FinalParam = $x264RawPipeApdx + " " + $x264FinalParam
         $x265FinalParam = $x265RawPipeApdx + " " + $x265FinalParam
         $svtav1FinalParam = $svtav1RawPipeApdx + " " + $svtav1FinalParam
     }
-
-    # Show-Debug $ffmpegFinalParam
-    # Show-Debug $vspipeFinalParam
-    # Show-Debug $avsyuvFinalParam
-    # Show-Debug $avsmodFinalParam
-    # Show-Debug $olsargFinalParam
-    # Show-Debug $x264FinalParam
-    # Show-Debug $x265FinalParam
-    # Show-Debug $svtav1FinalParam
 
     # 生成 ffmpeg, vspipe, avs2yuv, avs2pipemod 编码任务批处理
     Write-Host ""

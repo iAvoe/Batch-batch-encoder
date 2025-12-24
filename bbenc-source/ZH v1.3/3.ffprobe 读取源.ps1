@@ -89,7 +89,6 @@ function Main {
     Show-Border
     Write-Host ""
 
-    # 显示编码示例
     # Show-Info "常用编码命令示例："
     # Write-Host "ffmpeg -i [输入] -an -f yuv4mpegpipe -strict unofficial - | x265.exe --y4m - -o"
     # Write-Host "vspipe [脚本.vpy] --y4m - | x265.exe --y4m - -o"
@@ -102,13 +101,13 @@ function Main {
         'B' = @{ Name = 'vspipe'; Ext = '.vpy'; Message = ".vpy 源" }
         'C' = @{ Name = 'avs2yuv'; Ext = '.avs'; Message = ".avs 源" }
         'D' = @{ Name = 'avs2pipemod'; Ext = '.avs'; Message = ".avs 源" }
-        'E' = @{ Name = 'SVFI'; Ext = ''; Message = "视频源" }
+        'E' = @{ Name = 'SVFI'; Ext = ''; Message = ".ini 源" } 
     }
 
     # 获取源文件类型
     $selectedType = $null
     do {
-        Show-Info "选择要启用的管道上游程序（确认源符合程序要求）："
+        Show-Info "选择先前脚本所用的管道上游程序（确认源符合程序要求）："
         $sourceTypes.GetEnumerator() | Sort-Object Key | ForEach-Object {
             Write-Host "  $($_.Key): $($_.Value.Name)"
         }
@@ -138,7 +137,6 @@ function Main {
             Show-Info "请指定 avisynth.dll 的路径..."
             Write-Host " 在 AviSynth+ 仓库（https://github.com/AviSynth/AviSynthPlus/releases）中，"
             Write-Host " 下载 AviSynthPlus_x.x.x_yyyymmdd-filesonly.7z，即可获取 DLL"
-
             do {
                 $Avs2PipeModDLL = Select-File -Title "选择 avisynth.dll" -InitialDirectory ([Environment]::GetFolderPath('System')) -DllOnly
                 if (-not $Avs2PipeModDLL) {
@@ -147,7 +145,6 @@ function Main {
                 }
             }
             while (-not $Avs2PipeModDLL)
-
             Show-Success "已记录 avisynth.dll 路径：$Avs2PipeModDLL"
         }
         'SVFI'         {
@@ -157,12 +154,12 @@ function Main {
 
             do {
                 $OneLineShotArgsINI = Select-File -Title "选择 SVFI 渲染配置文件（.ini）" -IniOnly
-                if (-not $OneLineShotArgsINI) {
-                    $placeholderScript = Read-Host " 未选择 INI。按 Enter 重试，输入 'q' 强制退出"
+                if (-not $OneLineShotArgsINI -or -not (Test-Path -LiteralPath $OneLineShotArgsINI)) {
+                    $placeholderScript = Read-Host " INI 路径不存在；按 Enter 重试，输入 'q' 强制退出"
                     if ($placeholderScript -eq 'q') { exit }
                 }
             }
-            while (-not $OneLineShotArgsINI)
+            while (-not $OneLineShotArgsINI -or -not (Test-Path -LiteralPath $OneLineShotArgsINI))
         }
         default        { $upstreamCode = 'a' }
     }
@@ -171,6 +168,7 @@ function Main {
     $videoSource = $null # ffprobe 将分析这个视频文件
     $scriptSource = $null # 脚本文件路径，如果有则在导出的 CSV 中覆盖视频源
     $encodeImportSourcePath = $null
+    $svfiTaskId = $null
 
     # 若上游是 vspipe / avs2yuv / avs2pipemod，提供生成无滤镜脚本选项
     if ($isScriptUpstream) {
@@ -209,7 +207,8 @@ function Main {
                 Show-Success "已选择脚本文件：$scriptSource"
                 # 注意：视频源 $videoSource 仍然用于 ffprobe
             }
-            elseif ([string]::IsNullOrWhiteSpace($mode) -or $mode -eq 'n') { # 生成无滤镜脚本
+            # 生成无滤镜脚本
+            elseif ([string]::IsNullOrWhiteSpace($mode) -or $mode -eq 'n') {
                 Show-Warning "`r`n AviSynth(+) 默认不自带 LSMASHSource.dll（视频导入滤镜）请保证该文件存在，"
                 Write-Host " AVS 安装路径为：C:\Program Files (x86)\AviSynth+\plugins64+\" -ForegroundColor Yellow
                 Write-Host " 下载并解压 64bit 版：https://github.com/HomeOfAviSynthPlusEvolution/L-SMASH-Works/releases" -ForegroundColor Yellow
@@ -239,7 +238,87 @@ function Main {
 
         $encodeImportSourcePath = $scriptSource
     }
-    else { # ffmpeg、SVFI：视频源
+    # SVFI：从 INI 文件中读取视频路径，以及 task_id
+    elseif ($OneLineShotArgsINI -and (Test-Path -LiteralPath $OneLineShotArgsINI)) { 
+        # SVFI ini 文件中的视频路径（实际上内容为单行）：gui_inputs="{
+        #     \"inputs\": [{
+        #         \"task_id\": \"必须获取并赋值到 CSV\",
+        #         \"input_path\": \"X:\\\\Video\\\\\\u5176\\u5b83-\\u52a8\\u6f2b\\u753b\\u516c\\u79cd\\\\视频.mp4\",
+        #         \"is_surveillance_folder\": false
+        #     }]
+        # }"
+        # 读取文件并找到 gui_inputs 行，如：
+        # gui_inputs="{\"inputs\": [{\"task_id\": \"798_2aa174\", \"input_path\": \"X:\\\\Video\\\\\\u5176\\u5b83-\\u52a8\\u6f2b\\u753b\\u516c\\u79cd\\\\[Airota][Yuru Yuri\\u3001][OVA][BDRip 1080p AVC AAC][CHS].mp4\", \"is_surveillance_folder\": false}]}"
+        Show-Info " 将尝试从 SVFI 渲染配置 INI 中读取视频源路径..."
+
+        try { # 读取 INI 并查找 gui_inputs 行
+            $iniContent = Get-Content -LiteralPath $OneLineShotArgsINI -Raw -ErrorAction Stop
+            $pattern = 'gui_inputs\s*=\s*"((?:[^"\\]|\\.)*)"'
+            $guiInputsMatch = [regex]::Match($iniContent, $pattern)
+            if (-not $guiInputsMatch.Success) {
+                Show-Error "在 SVFI INI 文件中未找到 gui_inputs 字段，请重新用 SVFI 生成 INI 文件"
+                Read-Host "按 Enter 退出"
+                return
+            }
+
+            # 提取含路径的 JSON 字符串（移除外层 gui_inputs="..."）
+            $jsonString = $guiInputsMatch.Groups[1].Value
+            $jsonString = $jsonString -replace '\\"', '"'
+            $jsonString = $jsonString -replace '\\\\', '\\'
+            Show-Debug "JSON 解析结果：$jsonString"
+
+            # 转译 JSON 并提取视频源路径到 PowerShell 变量
+            try {
+                $jsonObject = $jsonString | ConvertFrom-Json -ErrorAction Stop
+                if ($null -eq $jsonObject.inputs -or ($jsonObject.inputs.Count -eq 0)) {
+                    Show-Error "SVFI INI 文件中缺少视频源导入（input）语句，请重新用 SVFI 生成 INI 文件"
+                    Read-Host "按 Enter 退出"
+                    return
+                }
+
+                # 获取首个输入文件的路径
+                Show-Success "成功检测到导入语句"
+                Show-Warning "将导入其中的首个视频源，忽略其它视频源"
+                $jsonSource = $jsonObject.inputs[0].input_path
+                if ([string]::IsNullOrWhiteSpace($jsonSource)) {
+                    Show-Error "SVFI INI 文件中的导入语句指向空路径，请重新用 SVFI 生成 INI 文件"
+                    Read-Host "按 Enter 退出"
+                    return
+                }
+                $svfiTaskId = $jsonObject.inputs[0].task_id
+                if ([string]::IsNullOrWhiteSpace($svfiTaskId)) {
+                    Show-Error "SVFI INI 文件中的 task_id 语句损坏，请重新用 SVFI 生成 INI 文件"
+                    Read-Host "按 Enter 退出"
+                    return
+                }
+                Show-Success "从 SVFI INI 中解析到 Task ID: $svfiTaskId"
+
+                $videoSource = Convert-IniPath -iniPath $jsonSource # FileUtils.ps1 函数
+                Show-Success "从 SVFI INI 中解析到视频源：$videoSource"
+
+                # 验证视频文件是否存在
+                if (-not (Test-Path -LiteralPath $videoSource)) {
+                    Show-Error "视频文件已不存在：$videoSource，请重新用 SVFI 生成 INI 文件"
+                    Read-Host "按 Enter 退出"
+                    return
+                }
+            }
+            catch {
+                Show-Error "解析 JSON 失败：$_"
+                Show-Debug "原始 JSON 字符串：$jsonString"
+                Read-Host "按 Enter 退出"
+                return
+            }
+        }
+        catch {
+            Show-Error "读取 SVFI INI 文件失败：$_"
+            Read-Host "按 Enter 退出"
+            return
+        }
+
+        $encodeImportSourcePath = $videoSource
+    }
+    else { # ffmpeg：视频源
         do {
             Show-Info "选择要分析的视频源文件"
             $videoSource = Select-File -Title "定位视频文件，如视频（.mp4/.mov/...）、RAW（.yuv/.y4m/...）"
@@ -327,9 +406,9 @@ function Main {
 
         # 构建源 CSV 行
         $sourceInfoCSV = @"
-"$encodeImportSourcePath",$upstreamCode,"$Avs2PipeModDLL","$OneLineShotArgsINI"
+"$encodeImportSourcePath",$upstreamCode,"$Avs2PipeModDLL","$OneLineShotArgsINI","$svfiTaskId"
 "@
-        
+
         Write-TextFile -Path $ffprobeCSVExportPath -Content $ffprobeOutputCSV -UseBOM $true
         # [System.IO.File]::WriteAllLines($ffprobeCSVExportPathDebug, $ffprobeOutputCSVDebug)
 
@@ -352,7 +431,6 @@ function Main {
     Read-Host "按回车键退出"
 }
 
-# 异常处理
 try { Main }
 catch {
     Show-Error "脚本执行出错：$_"

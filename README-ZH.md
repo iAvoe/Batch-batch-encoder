@@ -72,6 +72,11 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 <p align="center"><img src="bmc_qr.png" alt="支持一下 -_-"><br><img src="pp_tip_qr.png" alt="支持一下 =_="></p>
 
 ## 更新信息
+**v1.3.8**
+- 完成了 SVFI 上游适配：
+  - 自动从渲染配置 INI 获取 Task ID 和源视频路径（JSON 解析）并构建管道参数，从而跳过视频导入步骤
+- 修复了 SVT-AV1 下游参数构建的格式失误
+
 **v1.3.7**
 - 重写了所有代码
 - 使用了数组、哈希表等等更合理的数据结构
@@ -99,4 +104,3 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 - 已验证 avs2yuv 0.26+0.30 兼容性正常
 - 已验证 avs2pipemod 兼容性正常
 - 测试步骤 5（封装命令）已完成测试，弃用了所有 Invoke-Expression 来增加安全性
-  - TODO：待完成 SVFI 的测试

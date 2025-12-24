@@ -28,7 +28,6 @@ $Script:DownstreamPipeParams = @{
     }
 }
 
-    
 # 编码工具
 $upstreamTools = [ordered]@{
     'ffmpeg' = $null
@@ -50,7 +49,7 @@ function Get-PipeType($upstream) {
         'vspipe'       { 'y4m' }
         'avs2pipemod'  { 'y4m' }
         'avs2yuv'      { 'y4m' } # 不是 RAW !
-        'svfi'         { 'raw' }
+        'svfi'         { 'y4m' } # 不是 RAW !
         default        { 'raw' }
     }
 }
@@ -101,39 +100,38 @@ function Get-VSPipeY4MArgument {
 
 # 遍历所有已导入工具组合，从而导出“备用路线”
 function Get-CommandFromPreset([string]$presetName, $tools, $vspipeInfo) {
-        $preset = $Global:PipePresets[$presetName]
-        if (-not $preset) {
-            throw "未知的 PipePreset：$presetName"
-        }
-
-        $up   = $preset.Upstream
-        $down = $preset.Downstream
-
-        $pType = Get-PipeType $up
-        $pArg  = $Script:DownstreamPipeParams[$pType][$down]
-        $template = switch ($up) {
-            'ffmpeg'      { '"{0}" %ffmpeg_params% -f yuv4mpegpipe -an -strict unofficial - | "{1}" {3} %{2}_params%' }
-            'vspipe'      { '"{0}" %vspipe_params% {3} - | "{1}" {4} %{2}_params%' }
-            'avs2yuv'     { '"{0}" %avs2yuv_params% - | "{1}" {3} %{2}_params%' }
-            'avs2pipemod' { '"{0}" %avs2pipemod_params% -y4mp | "{1}" {3} %{2}_params%' }
-            'svfi'        { '"{0}" %svfi_params% --pipe-out - | "{1}" {3} %{2}_params%' }
-        }
-
-        # 检查管道格式
-        if (-not $Script:DownstreamPipeParams.ContainsKey($pType)) {
-            throw "未知 PipeType：$pType"
-        }
-        if (-not $Script:DownstreamPipeParams[$pType].ContainsKey($down)) {
-            throw "下游编码器 $down 不支持 $pType 管道"
-        }
-
-        if ($up -eq 'vspipe') {
-            return $template -f $tools[$up], $tools[$down], $down, $vspipeInfo.Args, $pArg
-        }
-        else {
-            return $template -f $tools[$up], $tools[$down], $down, $pArg
-        }
+    $preset = $Global:PipePresets[$presetName]
+    if (-not $preset) {
+        throw "未知的 PipePreset：$presetName"
     }
+
+    $up   = $preset.Upstream
+    $down = $preset.Downstream
+    $pType = Get-PipeType $up
+    $pArg  = $Script:DownstreamPipeParams[$pType][$down]
+    $template = switch ($up) {
+        'ffmpeg'      { '"{0}" %ffmpeg_params% -f yuv4mpegpipe -an -strict unofficial - | "{1}" {3} %{2}_params%' }
+        'vspipe'      { '"{0}" %vspipe_params% {3} - | "{1}" {4} %{2}_params%' }
+        'avs2yuv'     { '"{0}" %avs2yuv_params% - | "{1}" {3} %{2}_params%' }
+        'avs2pipemod' { '"{0}" %avs2pipemod_params% -y4mp | "{1}" {3} %{2}_params%' } # 不在 pipe 上游写 -
+        'svfi'        { '"{0}" %svfi_params% --pipe-out | "{1}" {3} %{2}_params%' } # 不在 pipe 上游写 -
+    }
+
+    # 检查管道格式
+    if (-not $Script:DownstreamPipeParams.ContainsKey($pType)) {
+        throw "未知 PipeType：$pType"
+    }
+    if (-not $Script:DownstreamPipeParams[$pType].ContainsKey($down)) {
+        throw "下游编码器 $down 不支持 $pType 管道"
+    }
+
+    if ($up -eq 'vspipe') {
+        return $template -f $tools[$up], $tools[$down], $down, $vspipeInfo.Args, $pArg
+    }
+    else {
+        return $template -f $tools[$up], $tools[$down], $down, $pArg
+    }
+}
 
 # 主程序
 function Main {
