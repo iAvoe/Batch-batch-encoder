@@ -65,6 +65,10 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 
 教程地图、工具下载见：<a href="https://iavoe.github.io/">iavoe.github.io</a>
 
+## 缺陷信息
+
+用于生成备用管线（pipe 命令行）的导入命令最终都使用单一源文件，这可能是视频、.vpy 或 .avs 文件。因此，根据选择的管道上游程序不同，备用命令行中的上游程序输入/导入参数可能会导入到无效的文件。于是尽管格式正确，切换命令时需要手动编辑批处理。
+
 ## 打赏信息
 
 开发这些工具并不容易。如果这套工具提高了你的效率，那么不妨赞助或推广一下下下。

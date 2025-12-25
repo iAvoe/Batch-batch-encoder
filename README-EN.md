@@ -51,7 +51,7 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
     1. If multiple formats are required, simply remove the comments from the alternative parameters.
 7. Run step 5 to encapsulate the encoding results.
 
-![Script-Step-2-example (To be added)](zh-step2-example-en.png)
+![Script-Step-2-example (To be added)](en-step2-example.png)
 <p align="center">Example fur running step 2（CLI window only, this works even better in VSCode）</p>
 
 -----
@@ -59,6 +59,10 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 ## Downloads
 1. <a href='./bbenc-source'>On Github</a>
 2. <a href='https://drive.google.com/drive/folders/170tmk7yJBIz5eJuy7KXzqIgtvtDajyDu?usp=sharing'>Google Drive</a>,
+
+## Caveat
+
+The import commands for generating alternative routes are ultimatly using a single source, it can be video, .vpy or .avs. Therefore, input/import arguments/parameters for backup pipe upstream program, depending on user selection, will get unwanted files, despite will correct formatting. Manual batch editing when switching routes is needed.
 
 ## Support pls
 
