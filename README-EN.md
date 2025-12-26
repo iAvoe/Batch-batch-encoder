@@ -62,7 +62,7 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 
 ## Caveat
 
-The import commands for generating alternative routes are ultimatly using a single source, it can be video, .vpy or .avs. Therefore, input/import arguments/parameters for backup pipe upstream program, depending on user selection, will get unwanted files, despite will correct formatting. Manual batch editing when switching routes is needed.
+The import commands for generating alternative routes are ultimatly using a single source, it can be video, `.vpy` or `.avs`. Therefore, input/import arguments/parameters for backup pipe upstream program, depending on user selection, might be written with unwanted files, despite will correct formatting. Manual batch editing when switching routes is needed.
 
 ## Support pls
 
