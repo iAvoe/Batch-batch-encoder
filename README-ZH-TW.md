@@ -83,6 +83,7 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 - 添加了導入 one_line_shot_args.exe 與 vspipe.exe 的自動路徑檢測功能（導入更簡單）
 - 添加了導入 SVFI INI 文件的自動路徑檢測功能（導入更簡單）
 - 添加了繁體中文版
+  - 改善了用詞當地化程度
 
 **v1.3.7**
 - 重寫了所有代碼

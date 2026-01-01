@@ -2,14 +2,14 @@
 .SYNOPSIS
     基於 ffmpeg、ffprobe 的多軌道複雜封裝命令生成器
 .DESCRIPTION
-    封裝對過視音頻、字幕字體批處理的工具，運行批處理即可完成封裝操作
+    封裝對過視音訊、字幕字體批處理的工具，運行批處理即可完成封裝操作
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
     1.3
 #>
 
-# 加載共用代碼
+# 載入共用代碼
 . "$PSScriptRoot\Common\Core.ps1"
 
 # 檢測幀率值是否正常
@@ -39,7 +39,7 @@ function Get-FrameRateFromContainer {
 }
 
 
-# 調用 ffprobe 獲取指定流的信息，直接返回對象，不寫臨時文件
+# 調用 ffprobe 獲取指定流的資訊，直接返回對象，不寫臨時文件
 function Get-StreamArgs {
     param (
         [string]$FFprobePath,
@@ -52,18 +52,18 @@ function Get-StreamArgs {
     $argsResult = @()
     $hasVideo = $false
     
-    # 檢查是否為視頻容器格式
+    # 檢查是否為影片容器格式
     $isVideoContainer = $ext -in @('.mkv', '.mp4', '.mov', '.f4v', '.flv', '.avi', '.m3u', '.mxv')
     $isAudioContainer = $ext -in @('.m4a', '.mka', '.mks')
     $isSingleFile = -not ($isVideoContainer -or $isAudioContainer)
     
-    Show-Debug "分析文件：$FilePath（擴展名：$ext）"
+    Show-Debug "分析文件：$FilePath（副檔名：$ext）"
     
-    # 處理視頻容器
+    # 處理影片容器
     if ($isVideoContainer) {
-        Show-Info "視頻容器格式，分析所有流..."
+        Show-Info "影片容器格式，分析所有流..."
         
-        # 視頻流
+        # 影片串流
         $vData = Get-StreamMetadata -FFprobePath $FFprobePath -FilePath $FilePath -StreamType "v"
         if ($vData -and $IsFirstVideo) {
             $codec = if ($vData.CodecTag -and $vData.CodecTag -ne "0") { 
@@ -73,8 +73,8 @@ function Get-StreamArgs {
                 $vData.CodecName 
             }
             
-            Show-Success "視頻流：$codec"
-            if ($vData.FrameRate) { # 默認視頻容器格式一定含幀率信息
+            Show-Success "影片串流：$codec"
+            if ($vData.FrameRate) { # 默認影片容器格式一定含幀率資訊
                 $argsResult += "-r $($vData.FrameRate) -c:v copy"
             }
             else {
@@ -83,11 +83,11 @@ function Get-StreamArgs {
             $hasVideo = $true
         }
         elseif ($vData) {
-            Show-Warning "跳過額外視頻流（僅保留第一個視頻）"
+            Show-Warning "跳過額外影片串流（僅保留第一個影片）"
         }
         
         if (Get-StreamMetadata -FFprobePath $FFprobePath -FilePath $FilePath -StreamType "a") {
-            Show-Success "發現音頻流"
+            Show-Success "發現音訊串流"
             $argsResult += "-c:a copy"
         }
         
@@ -96,11 +96,11 @@ function Get-StreamArgs {
             $argsResult += "-c:s copy"
         }
     }
-    elseif ($isAudioContainer) { # 處理音頻容器
-        Show-Info "發現音頻容器格式..."
+    elseif ($isAudioContainer) { # 處理音訊容器
+        Show-Info "發現音訊容器格式..."
         
         if (Get-StreamMetadata -FFprobePath $FFprobePath -FilePath $FilePath -StreamType "a") {
-            Show-Success "發現音頻流"
+            Show-Success "發現音訊串流"
             $argsResult += "-c:a copy"
         }
         
@@ -109,14 +109,14 @@ function Get-StreamArgs {
             $argsResult += "-c:s copy"
         }
     }
-    elseif ($isSingleFile) { # 處理單文件（未封裝視頻、音頻、字幕等）
-        Show-Info "單文件格式，分析流類型..."
+    elseif ($isSingleFile) { # 處理單文件（未封裝影片、音訊、字幕等）
+        Show-Info "單檔案格式，分析流類型..."
         
-        # 嘗試檢測文件格式
+        # 嘗試檢測檔案格式
         $vData = Get-StreamMetadata -FFprobePath $FFprobePath -FilePath $FilePath -StreamType "v"
         
         if ($vData -and $IsFirstVideo) {
-            Show-Success "發現視頻流：$($vData.CodecName)"
+            Show-Success "發現影片串流：$($vData.CodecName)"
             
             # 獲取當前文件的幀率
             $currentFrameRate = $vData.FrameRate
@@ -130,12 +130,12 @@ function Get-StreamArgs {
             }
             else {
                 # 情況2：單文件沒有有效幀率，提供選擇
-                Show-Warning "未封裝的視頻流不具備有效幀率信息"
+                Show-Warning "未封裝的影片串流不具備有效幀率資訊"
                 
                 # 提供用戶選擇
                 Write-Host "`n選擇幀率來源：" -ForegroundColor Cyan
                 Write-Host "1：手動輸入幀率" -ForegroundColor Yellow
-                Write-Host "2：從其他封裝視頻文件讀取（推薦）" -ForegroundColor Yellow
+                Write-Host "2：從其他封裝影片檔案讀取（推薦）" -ForegroundColor Yellow
                 Write-Host "3：使用常用預設幀率" -ForegroundColor Yellow
                 Write-Host "q：跳過此文件" -ForegroundColor DarkGray
                 
@@ -153,8 +153,8 @@ function Get-StreamArgs {
                         }
                     }
                     '2' { # 從其他文件讀取幀率
-                        Show-Info "選擇一個包含幀率信息的封裝視頻文件（.mp4/.mov/.flv/...）"
-                        $containerFile = Select-File -Title "選擇封裝視頻文件以讀取幀率"
+                        Show-Info "選擇一個包含幀率資訊的封裝影片檔案（.mp4/.mov/.flv/...）"
+                        $containerFile = Select-File -Title "選擇封裝影片檔案以讀取幀率"
                         
                         if ($containerFile -and (Test-Path -LiteralPath $containerFile)) {
                             $frameRate = Get-FrameRateFromContainer -FFprobePath $FFprobePath -FilePath $containerFile
@@ -170,7 +170,7 @@ function Get-StreamArgs {
                         }
                     }
                     '3' { # 選擇常見幀率
-                        Write-Warning "幀率必須與源完全一致，否則視頻無法正確播放"
+                        Write-Warning "幀率必須與源完全一致，否則影片無法正確播放"
                         Write-Host "`n常用幀率預設：" -ForegroundColor Cyan
                         Write-Host "1. 23.976（24000/1001）" -ForegroundColor Yellow
                         Write-Host "2. 24" -ForegroundColor Yellow
@@ -221,15 +221,15 @@ function Get-StreamArgs {
                 $hasVideo = $true
             }
             else {
-                Show-Warning "未設置幀率，大概率會導致播放問題"
+                Show-Warning "未設置幀率，高機率會導致播放問題"
                 $argsResult += "-c:v copy"
                 $hasVideo = $true
             }
         }
-        elseif (-not $vData) { # 嘗試音頻流
+        elseif (-not $vData) { # 嘗試音訊串流
             $aData = Get-StreamMetadata -FFprobePath $FFprobePath -FilePath $FilePath -StreamType "a"
             if ($aData) {
-                Show-Success "發現音頻流：$($aData.CodecName)"
+                Show-Success "發現音訊串流：$($aData.CodecName)"
                 $argsResult += "-c:a copy"
             }
         }
@@ -239,7 +239,7 @@ function Get-StreamArgs {
             $argsResult += "-c:s copy"
         }
         elseif ($ext -in @('.ttf', '.ttc', '.otf')) {
-            Show-Success "字體文件：$ext"
+            Show-Success "字體檔案：$ext"
             $argsResult += "-c:t copy"
         }
     }
@@ -277,8 +277,8 @@ function Main {
 
     # 2. 導入素材
     Show-Info "導入素材文件（循環）"
-    Write-Host "提示：僅第一個視頻文件會被用作主視頻流" -ForegroundColor Yellow
-    Write-Host "      後續文件只添加音頻、字幕等軌道" -ForegroundColor Yellow
+    Write-Host "提示：僅第一個影片檔案會被用作主影片串流" -ForegroundColor Yellow
+    Write-Host "      後續文件只添加音訊、字幕等軌道" -ForegroundColor Yellow
     
     $inputsAgg = ""   # 所有的 -i "path"
     $mapsAgg   = ""   # 所有的 -map xArgs
@@ -296,7 +296,7 @@ function Main {
             
             if ($result.ContainsVideo) {
                 $hasVideo = $true
-                Show-Success "已添加主視頻流"
+                Show-Success "已添加主影片串流"
             }
             
             $mapIndex++
@@ -310,14 +310,14 @@ function Main {
     }
 
     # 3. 輸出批處理
-    # 3-1. 確定文件名
+    # 3-1. 確定檔案名
     $defaultName = [IO.Path]::GetFileNameWithoutExtension($strmPath) + "_mux"
-    $outName = Read-Host "請輸入輸出文件名 (留空默認：$defaultName)"
+    $outName = Read-Host "請輸入輸出檔案名 (留空默認：$defaultName)"
     if ([string]::IsNullOrWhiteSpace($outName)) { $outName = $defaultName }
     
-    # 3-2. 簡單校驗文件名
+    # 3-2. 簡單校驗檔案名
     if (-not (Test-FilenameValid $outName)) {
-        Show-Warning "文件名包含非法字符，已自動修正"
+        Show-Warning "檔案名包含非法字元，已自動修正"
         $invalid = [IO.Path]::GetInvalidFileNameChars()
         foreach ($c in $invalid) { $outName = $outName.Replace($c, '_') }
     }
@@ -326,7 +326,7 @@ function Main {
     Write-Host "`r`n選擇封裝容器:"
     Write-Host " 1：MP4（適合通用）"
     Write-Host " 2：MOV（適合剪輯）"
-    Write-Host " 3：MKV（兼容字幕、字體）"
+    Write-Host " 3：MKV（相容字幕、字體）"
     Write-Host " 4：MXF（專業用途）"
     Write-Warning " ffmpeg 正在棄用 MP4 時間碼（pts）生成功能，屆時 MP4 格式選項將不可用"
     
@@ -349,7 +349,7 @@ function Main {
     $finalOutput = Join-Path $muxPath ($outName + $containerExt)
     $cmdLine = "& $(Get-QuotedPath $ffmpegPath) $inputsAgg $mapsAgg $(Get-QuotedPath $finalOutput)"
 
-    # 兼容性檢查與自動修復
+    # 相容性檢查與自動修復
     if (($containerExt -in ".mp4", ".mov", ".mxf") -and $cmdLine -match "-c:t copy") {
         Show-Warning "檢測到字體流（-c:t copy），但 MP4/MOV/MXF 不支持"
         Write-Host "`r`n請選擇一個選項繼續："
@@ -369,7 +369,7 @@ function Main {
     }
 
     if (($containerExt -in ".mp4", ".mov") -and $cmdLine -match "-c:s copy") {
-        Show-Warning "檢測到字幕流 (-c:s copy)，MP4/MOV 支持較差，大概率無法封裝"
+        Show-Warning "檢測到字幕流 (-c:s copy)，MP4/MOV 支持較差，高機率無法封裝"
         Write-Host "`r`n請選擇一個選項繼續："
         Write-Host " d：刪除導入語句"
         Write-Host " m：將容器格式更改為 MKV"
@@ -384,7 +384,7 @@ function Main {
         }
     }
     
-    # 生成文件名
+    # 生成檔案名
     $batFilename = "ffmpeg_mux.bat"
     $batPath = Join-Path $exptPath $batFilename
 
@@ -414,12 +414,12 @@ echo ========================================
 echo.
 
 endlocal
-echo 按任意鍵進入命令提示符，輸入 exit 退出...
+echo 按任意鍵進入命令提示字元，輸入 exit 退出...
 cmd /k
 "@ -f (Get-Date -Format 'yyyy-MM-dd HH:mm'), $cmdContent
 
     # 確保 ffmpeg 路徑帶引號
-    #（雖然 $ffmpegPath 變量裡可能沒帶，但上面組合時加了）
+    #（雖然 $ffmpegPath 變數裡可能沒帶，但上面組合時加了）
     
     Show-Border
     Write-TextFile -Path $batPath -Content $batContent -UseBOM $true
@@ -436,5 +436,5 @@ catch {
     Show-Error "腳本執行出錯：$_"
     Write-Host "錯誤詳情：" -ForegroundColor Red
     Write-Host $_.Exception.ToString()
-    Read-Host "按回車鍵退出"
+    Read-Host "按Enter 鍵退出"
 }

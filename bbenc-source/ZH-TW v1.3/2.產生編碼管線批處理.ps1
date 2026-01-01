@@ -1,18 +1,18 @@
 ﻿<#
 .SYNOPSIS
-    視頻編碼工具調用管線生成器
+    影片編碼工具調用管線生成器
 .DESCRIPTION
-    生成用於視頻編碼的批處理文件，支持多種編碼工具鏈組合
+    生成用於影片編碼的批處理文件，支持多種編碼工具鏈組合
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
     1.3
 #>
 
-# 下游工具（編碼器）必須支持 Y4M 管道，否則需要添加強制覆蓋上游程序的邏輯
+# 下游工具（編碼器）必須支持 Y4M 管道，否則需要添加強制覆蓋上遊程序的邏輯
 # 選用 Y4M/RAW 由上游決定；one_line_shot_args（SVFI）只支持 RAW YUV 管道，強制覆蓋下游工具
 
-# 加載共用代碼，工具鏈組合全局變量
+# 載入共用代碼，工具鏈組合全局變數
 . "$PSScriptRoot\Common\Core.ps1"
 
 $Script:DownstreamPipeParams = @{
@@ -67,7 +67,7 @@ function Get-VSPipeY4MArgument {
     foreach ($testArgs in $tests) {
         Write-Host (" 測試：{0} {1}" -f $VSpipePath, ($testArgs -join " "))
         
-        # 使用 Start-Process 啟動獨立進程，避免影響當前控制檯的字符集
+        # 使用 Start-Process 啟動獨立進程，避免影響當前控制台的字元集
         $processInfo = New-Object System.Diagnostics.ProcessStartInfo
         $processInfo.FileName = $VSpipePath
         $processInfo.Arguments = $testArgs -join " "
@@ -133,16 +133,16 @@ function Get-CommandFromPreset([string]$presetName, $tools, $vspipeInfo) {
     }
 }
 
-# 主程序
+# 主程式
 function Main {
     # 顯示標題
     Show-Border
-    Write-Host "視頻編碼工具調用管線生成器" -ForegroundColor Cyan
+    Write-Host "影片編碼工具調用管線生成器" -ForegroundColor Cyan
     Show-Border
     Write-Host ""
     
-    # 顯示編碼示例
-    Show-Info "常用編碼命令示例："
+    # 顯示編碼範例
+    Show-Info "常用編碼命令範例："
     Write-Host "ffmpeg -i [輸入] -an -f yuv4mpegpipe -strict unofficial - | x265.exe --y4m - -o"
     Write-Host "vspipe [腳本.vpy] --y4m - | x265.exe --y4m - -o"
     Write-Host "avs2pipemod [腳本.avs] -y4mp | x265.exe --y4m - -o"
@@ -166,10 +166,10 @@ function Main {
     Show-Success "輸出文件：$batchFullPath"
 
     Show-Info "開始導入上游編碼工具..."
-    Write-Host " 提示：Select-File 支持 -InitialDirectory 參數，在此腳本中添加即可優化導入操作步驟" -ForegroundColor DarkGray
-    Write-Host " 如果難以實現腳本修好，你還可以創建文件夾快捷方式"
+    Write-Host " 提示：Select-File 支持 -InitialDirectory 參數，在此腳本中添加即可最佳化導入操作步驟" -ForegroundColor DarkGray
+    Write-Host " 如果難以實現腳本修好，你還可以創建文件夾捷徑"
     
-    # 存儲 vspipe 版本與其 API 版本
+    # 儲存 vspipe 版本與其 API 版本
     $vspipeInfo = $null
 
     # 上游工具
@@ -191,7 +191,7 @@ function Main {
                         Select-File -Title "選擇 one_line_shot_args.exe" -ExeOnly -InitialDirectory $foundPath
                     }
                     else { # DIY
-                        Show-Info "SVFI（one_line_shot_args.exe）Steam 發佈版的路徑是 X:\SteamLibrary\steamapps\common\SVFI\"
+                        Show-Info "SVFI（one_line_shot_args.exe）Steam 發布版的路徑是 X:\SteamLibrary\steamapps\common\SVFI\"
                         Select-File -Title "選擇 one_line_shot_args.exe" -ExeOnly
                     }
                 }
@@ -256,7 +256,7 @@ function Main {
     foreach ($k in $downstreamTools.Keys) {
         if ($k -eq 'svtav1') {
             Write-Host " 由於性能差距大且編譯好的 EXE 不易獲取，因此建議自行編譯 SVT-AV1 編碼器"
-            Write-Host " 編譯教程可在 AV1 教程完整版（iavoe.github.io）或 SVT-AV1 教程急用版中查看"
+            Write-Host " 編譯教學可在 AV1 教學完整版（iavoe.github.io）或 SVT-AV1 教學急用版中查看"
         }
         $tools[$k] = $downstreamTools[$k]
     }
@@ -345,7 +345,7 @@ function Main {
     $otherCommands = @()
     foreach ($p in $availablePresets) {
         Show-Debug "Generating based on preset: $($p.Key)"
-        # 注意是調用 Key 屬性，因此不 = $p
+        # 注意是調用 Key 屬性，因此嗎 = $p
         $presetName = $p.Key
 
         if ($presetName -eq $selectedPreset) { continue }
@@ -364,7 +364,7 @@ chcp 65001 >nul
 setlocal
 
 REM ========================================
-REM 視頻編碼工具調用管線
+REM 影片編碼工具調用管線
 REM 生成時間: {0}
 REM 工具鏈（變更時需指定）: {1}
 REM ========================================
@@ -373,7 +373,7 @@ echo.
 echo 開始編碼任務...
 echo.
 
-REM 參數示例（由後續腳本編輯）
+REM 參數範例（由後續腳本編輯）
 REM set ffmpeg_params=-i input.mkv -an -f yuv4mpegpipe -strict unofficial
 REM set x265_params=--y4m - -o output.hevc
 REM set svtav1_params=-i - -b output.ivf
@@ -394,7 +394,7 @@ echo.
 pause
 
 endlocal
-echo 按任意鍵進入命令提示符，輸入 exit 退出...
+echo 按任意鍵進入命令提示字元，輸入 exit 退出...
 cmd /k
 '@ -f (Get-Date -Format 'yyyy-MM-dd HH:mm'), $selectedPreset, $command, $remCommands
     
@@ -405,7 +405,7 @@ cmd /k
         Show-Success "批處理文件已生成：$batchFullPath"
         
         # 驗證換行符
-        Show-Debug "驗證批處理文件格式..."
+        Show-Debug "驗證批處理檔案格式..."
         if (-not (Test-TextFileFormat -Path $batchFullPath)) {
             return
         }
@@ -417,7 +417,7 @@ cmd /k
         Write-Host "1. 後續的腳本將基於此‘管線批處理’生成新的‘編碼批處理’，從而啟動編碼流程"
         Write-Host "   因此只要編碼工具不變就無需在每次使用都生成新的管線批處理"
         Write-Host "2. 建議在使用前二次確認所有工具路徑正確，尤其是長時間未使用後"
-        Write-Host "3. 儘管可以通過編輯已生成的批處理來變更工具，但重新生成可以減少失誤概率"
+        Write-Host "3. 儘管可以透過編輯已生成的批處理來變更工具，但重新生成可以減少失誤機率"
         
         if ($downstream -eq 'x265') {
             Show-Warning "x265 編碼器默認輸出 .hevc 文件"
@@ -438,7 +438,7 @@ cmd /k
     
     Write-Host ""
     Show-Success "腳本執行完成！"
-    Read-Host "按回車鍵退出"
+    Read-Host "按Enter 鍵退出"
 }
 
 try { Main }
@@ -446,5 +446,5 @@ catch {
     Show-Error "腳本執行出錯：$_"
     Write-Host "錯誤詳情：" -ForegroundColor Red
     Write-Host $_.Exception.ToString()
-    Read-Host "按回車鍵退出"
+    Read-Host "按Enter 鍵退出"
 }
