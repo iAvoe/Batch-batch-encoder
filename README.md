@@ -1,2 +1,3 @@
---> <a href='README-ZH.md'>README - 简中.md</a><br>
+--> <a href='README-ZH-CN.md'>README - 简中.md</a><br>
+--> <a href='README-ZH-TW.md'>README - 繁中.md</a><br>
 --> <a href='README-EN.md'>README - English.md</a>

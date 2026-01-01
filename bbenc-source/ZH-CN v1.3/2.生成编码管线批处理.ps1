@@ -165,7 +165,7 @@ function Main {
 
     Show-Success "输出文件：$batchFullPath"
 
-    Show-Info "开始导入上游编码工具（由于使用了哈希表，导入顺序会被打乱）..."
+    Show-Info "开始导入上游编码工具..."
     Write-Host " 提示：Select-File 支持 -InitialDirectory 参数，在此脚本中添加即可优化导入操作步骤" -ForegroundColor DarkGray
     Write-Host " 如果难以实现脚本修好，你还可以创建文件夹快捷方式"
     

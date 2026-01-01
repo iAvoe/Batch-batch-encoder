@@ -1,29 +1,33 @@
 ﻿<#
 .SYNOPSIS
-    脚本运行环境检测工具
+    Script execution environment validator
 .DESCRIPTION
-    检查系统是否支持运行 PowerShell 和批处理脚本
+    Verify if the current system supports running batch and PowerShell scripts
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
     1.3
 #>
 
-# 加载共用代码
+# Load globals
 . "$PSScriptRoot\Common\Core.ps1"
 
-#region 辅助函数
+#region Functions
 function Test-Administrator {
     <#
     .SYNOPSIS
-        检查当前会话是否以管理员权限运行
+        Check script user role level
     #>
     [Security.Principal.WindowsPrincipal]$principal = [Security.Principal.WindowsIdentity]::GetCurrent()
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
 function Request-AdministratorElevation {
-    Show-Info "正在请求管理员权限..."
+    <#
+    .SYNOPSIS
+        Request Administrator priviledge
+    #>
+    Show-Info "Requesting Administrator priviledge..."
     
     $scriptPath = $PSCommandPath
     $arguments = @(
@@ -43,13 +47,14 @@ function Request-AdministratorElevation {
         exit $process.ExitCode
     }
     catch {
-        Write-Error "权限提升失败：$_"
-        Write-Host "按任意键退出..." -ForegroundColor Yellow
+        Show-Error "Failed to elevate priviledge $_"
+        Write-Host "Press any button to exit..." -ForegroundColor Yellow
         $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
         exit 1
     }
 }
 
+# Caveat: we only care about NTFS
 function Test-FileSystemPermission {
     [CmdletBinding()]
     param(
@@ -61,25 +66,26 @@ function Test-FileSystemPermission {
     $report = [System.Text.StringBuilder]::new()
     
     try {
-        # 确保路径存在
+        # Ensure path exists
         if (-not (Test-Path -Path $Path)) {
-            [void]$report.AppendLine("× 路径不存在: $Path")
+            [void]$report.AppendLine("× Path not exist: $Path")
             return $report.ToString()
         }
         
         $acl = Get-Acl -Path $Path -ErrorAction Stop
         
-        # 获取当前用户的身份
+        # Get user name and role
         $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
         $userName = $currentUser.Name
         $userSid = $currentUser.User
         
-        # 检查权限
+        # Check user priviledge
         $hasModify = $false
         $hasFullControl = $false
         
+        # User should have access to their %USERPROFILE%, or this script suite won't work
         foreach ($access in $acl.Access) {
-            # 检查用户是否匹配（考虑SID、用户名、组等）
+            # Try to find user (SID、user name、group...)
             if ($access.IdentityReference -eq $userName -or 
                 $access.IdentityReference -eq $userSid.Value -or
                 $access.IdentityReference -eq "BUILTIN\Users" -or
@@ -97,21 +103,21 @@ function Test-FileSystemPermission {
         }
         
         if ($hasModify) {
-            [void]$report.AppendLine("√ 用户 $env:USERNAME 拥有对 $Path 的一般读写权限")
+            [void]$report.AppendLine("√ User $env:USERNAME has basic Read/Write permission on $Path")
         }
         else {
-            [void]$report.AppendLine("× 用户 $env:USERNAME 没有对 $Path 的一般读写权限")
+            [void]$report.AppendLine("× User $env:USERNAME lacks basic Read/Write permission on $Path")
         }
         
         if ($hasFullControl) {
-            [void]$report.AppendLine("√ 用户 $env:USERNAME 拥有对 $Path 的完全控制权限")
+            [void]$report.AppendLine("√ User $env:USERNAME has full access to $Path")
         }
         else {
-            [void]$report.AppendLine("× 用户 $env:USERNAME 没有对 $Path 的完全控制权限")
+            [void]$report.AppendLine("× User $env:USERNAME has full access to $Path")
         }
     }
     catch {
-        [void]$report.AppendLine("× 无法检查 $Path 的权限: $_")
+        [void]$report.AppendLine("× Could not validate access premission to $($Path): $_")
     }
     
     return $report.ToString()
@@ -122,7 +128,7 @@ function Get-UACRegistryValues {
         $regPath = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
         
         if (-not (Test-Path -Path $regPath)) {
-            throw "UAC 注册表损坏（如果你看到这行，则建议尽快运行 Windows 修复）"
+            throw "Broken UAC Registry (If you see this, try repair Windows sooner than later)"
         }
         
         $values = Get-ItemProperty -Path $regPath -ErrorAction Stop
@@ -135,7 +141,7 @@ function Get-UACRegistryValues {
         }
     }
     catch {
-        Write-Warning "无法读取 UAC 注册表设置: $_"
+        Write-Warning "Could not read UAC Registry: $_"
         return $null
     }
 }
@@ -150,82 +156,80 @@ function Set-UACRegistryValues {
     try {
         $regPath = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
         
-        # 备份当前设置
+        # Backup current value
         $backup = Get-UACRegistryValues
         if ($backup) {
             $backupJson = $backup | ConvertTo-Json -Compress
             $backupPath = "$env:TEMP\UAC_Backup_$(Get-Date -Format 'yyyyMMdd_HHmmss').json"
             $backupJson | Out-File -FilePath $backupPath -Encoding UTF8
-            Write-Host "已备份 UAC 设置到: $backupPath" -ForegroundColor Green
+            Write-Host " Stored UAC backup in: $backupPath" -ForegroundColor Green
         }
         
-        # 设置新值
+        # Set new value
         foreach ($key in $Values.Keys) {
             Set-ItemProperty -Path $regPath -Name $key -Value $Values[$key] -Type DWord -ErrorAction Stop
-            Write-Host "已设置 $key = $($Values[$key])" -ForegroundColor Green
+            Write-Host "Configured $key = $($Values[$key])" -ForegroundColor Green
         }
         
-        Write-Host "UAC 设置已更新，需要重启系统才能生效。" -ForegroundColor Yellow
+        Write-Host " UAC Setting updated. Reboot required" -ForegroundColor Yellow
         return $true
     }
     catch {
-        Write-Error "设置 UAC 失败: $_"
+        Write-Error "Failed to configure UAC: $_"
         return $false
     }
 }
 
 function Show-HardwareInformation {
-    # 操作系统信息
     try {
         $os = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
-        Show-Info "操作系统: $($os.Caption) (Build $($os.BuildNumber))"
+        Show-Info "OS: $($os.Caption) (Build $($os.BuildNumber))"
     }
     catch {
-        Show-Warning "无法获取操作系统信息: $_"
+        Show-Warning "Could not read OS attributes: $_"
     }
     
     Show-Border
-    Show-Info "主板信息"
+    Show-Info "Motherboard"
     Show-Border
     
     try {
         $baseboard = Get-CimInstance -ClassName Win32_Baseboard -ErrorAction Stop
         
         $info = @(
-            "名称: $($baseboard.Product)",
-            "厂商: $($baseboard.Manufacturer)",
-            "型号: $($baseboard.Model)",
-            "序列号: $($baseboard.SerialNumber)",
-            "版本: $($baseboard.Version)"
+            "Name:     $($baseboard.Product)",
+            "Brand:    $($baseboard.Manufacturer)",
+            "Model:    $($baseboard.Model)",
+            "Serial:   $($baseboard.SerialNumber)",
+            "Revision: $($baseboard.Version)"
         )
         
         $info | ForEach-Object { Write-Host "  $_" }
     }
     catch {
-        Show-Warning "无法获取主板信息: $_"
+        Show-Warning "Could not read Motherboard attributes: $_"
     }
     
     Show-Border
-    Show-Info "BIOS信息"
+    Show-Info "BIOS"
     Show-Border
     
     try {
         $bios = Get-CimInstance -ClassName Win32_BIOS -ErrorAction Stop
-        
         $info = @(
-            "名称: $($bios.Name)",
-            "版本: $($bios.SMBIOSBIOSVersion)",
-            "发布日期: $(($bios.ReleaseDate).ToString('yyyy-MM-dd'))"
+            "Name:    $($bios.Name)",
+            "Version: $($bios.SMBIOSBIOSVersion)",
+            "Release: $(($bios.ReleaseDate).ToString('yyyy-MM-dd'))"
         )
         
         $info | ForEach-Object { Write-Host "  $_" }
     }
     catch {
-        Show-Warning "无法获取BIOS信息: $_"
+        Show-Warning "Could not read BIOS attributes: $_"
     }
     
     Show-Border
-    Show-Info "处理器信息"
+    Show-Info "Processor"
     Show-Border
     
     try {
@@ -233,15 +237,15 @@ function Show-HardwareInformation {
         
         foreach ($processor in $processors) {
             $info = @(
-                "处理器: $($processor.Name)",
-                "插槽: $($processor.SocketDesignation)",
-                "当前频率: $($processor.CurrentClockSpeed) MHz",
-                "最大频率: $($processor.MaxClockSpeed) MHz",
-                "核心数: $($processor.NumberOfCores)",
-                "线程数: $($processor.NumberOfLogicalProcessors)",
-                "L2缓存: $([math]::Round($processor.L2CacheSize/1KB, 2)) MB",
-                "L3缓存: $([math]::Round($processor.L3CacheSize/1KB, 2)) MB",
-                "当前负载: $($processor.LoadPercentage)%"
+                "Name:         $($processor.Name)",
+                "Socket:       $($processor.SocketDesignation)",
+                "Current Freq: $($processor.CurrentClockSpeed) MHz",
+                "Maximum Freq: $($processor.MaxClockSpeed) MHz",
+                "Core(s):      $($processor.NumberOfCores)",
+                "Thread(s):    $($processor.NumberOfLogicalProcessors)",
+                "L2 Cache:     $([math]::Round($processor.L2CacheSize/1KB, 2)) MB",
+                "L3 Cache:     $([math]::Round($processor.L3CacheSize/1KB, 2)) MB",
+                "Current Load: $($processor.LoadPercentage)%"
             )
             
             $info | ForEach-Object { Write-Host "  $_" }
@@ -249,11 +253,11 @@ function Show-HardwareInformation {
         }
     }
     catch {
-        Show-Warning "无法获取处理器信息: $_"
+        Show-Warning "Could not read Processor attributes: $_"
     }
     
     Show-Border
-    Show-Info "内存信息"
+    Show-Info "Memory"
     Show-Border
     
     try {
@@ -265,84 +269,81 @@ function Show-HardwareInformation {
             $totalMemory += $sizeGB
             
             $info = @(
-                "模块: $($module.Tag)",
-                "容量: $sizeGB GB",
-                "厂商: $($module.Manufacturer)",
-                "型号: $($module.PartNumber)",
-                "速度: $($module.Speed) MHz",
-                "序列号: $($module.SerialNumber)"
+                "Module:   $($module.Tag)",
+                "Capacity: $sizeGB GB",
+                "Brand:    $($module.Manufacturer)",
+                "Model:    $($module.PartNumber)",
+                "Speed:    $($module.Speed) MHz",
+                "Serial:   $($module.SerialNumber)"
             )
             
             $info | ForEach-Object { Write-Host "  $_" }
             Write-Host ""
         }
         
-        Show-Success "总内存: $totalMemory GB"
+        Show-Success "Total Memory: $totalMemory GB"
     }
     catch {
-        Show-Warning "无法获取内存信息: $_"
+        Show-Warning "Could not read Memory attributes: $_"
     }
 }
 #endregion
 
-#region 主逻辑
+#region Main
 function Main {
-    # 1. 检查 PowerShell 版本
-    Show-Info "PowerShell 版本检查"
+    Show-Info "PowerShell Version"
     if ($PSVersionTable.PSVersion -lt [Version]"5.1") {
-        Show-Warning "PowerShell 版本低于 5.1 ($($PSVersionTable.PSVersion)), 某些功能可能无法正常工作"
+        Show-Warning "PowerShell version is below 5.1 ($($PSVersionTable.PSVersion)), this may be incompatible"
     }
     else {
-        Show-Success "PowerShell 版本符合要求 ($($PSVersionTable.PSVersion))"
+        Show-Success "PowerShell version meets minimum execution requirements ($($PSVersionTable.PSVersion))"
     }
     
-    # 2. 仅在需要管理员权限时请求提升
+    # Request administrator priviledge only when needed
     
-    # 3. 检查文件系统权限
-    Show-Info "文件系统权限检查"
-    Show-Info "检查 C:\ 根目录权限（仅供故障排查）..."
+    Show-Info "File System Permission Check"
+    Show-Info "Validating access to C:\ directory root (Debug only)..."
     $cDriveReport = Test-FileSystemPermission -Path "C:\"
     Write-Host $cDriveReport
     
-    Show-Info "检查用户配置文件目录权限..."
+    Show-Info "Validating access to %USERPROFILE% directory ($($env:USERPROFILE))..."
     $profileReport = Test-FileSystemPermission -Path $env:USERPROFILE
     Write-Host $profileReport
     
     # 4. UAC 管理
-    Show-Info "用户账户控制（UAC）管理"
+    Show-Info "User Access Control (UAC) Configuration"
     
     $currentUAC = Get-UACRegistryValues
     if ($currentUAC) {
         if ($currentUAC.EnableLUA -eq 1) {
-            Show-Info "UAC 当前已启用"
+            Show-Info "UAC is currently enabled"
         }
         else {
-            Show-Warning "UAC 当前已禁用"
+            Show-Warning "UAC is currently disabled"
         }
     }
     
     do {
         Write-Host @"
- 选择 UAC 操作选项：
- A: 禁用 UAC（每次运行脚本不再弹出警告）
- B: 不进行更改
- C: 恢复 UAC（公用电脑建议）
- Q: 退出脚本
+ Select an option：
+ A: Disable UAC (Hide trust prompt when running scripts)
+ B: Do nothing (Continue)
+ C: Restore UAC (Recommended on public systems)
+ Q: Exit
 "@ -ForegroundColor Yellow
         
-        $choice = Read-Host " 选择 (A/B/C/Q)"
+        $choice = Read-Host " Please input (A/B/C/Q)"
         
         switch ($choice.ToUpper()) {
             'A' {
-                # 禁用 UAC
                 if (-not (Test-Administrator)) {
-                    Show-Warning "需要管理员权限来修改 UAC 设置"
-                    Write-Host " 你也可以在控制面板/设置里自行调整" -ForegroundColor Yellow
-                    if ((Read-Host "是否请求管理员权限?（Y/N）").ToUpper() -eq 'Y') {
+                    Show-Warning "Requesting Administrator previledge to modify UAC"
+                    Write-Host " You could do this manually in Control Panel or Settings" -ForegroundColor Yellow
+                    if ((Read-Host "Request Administrator previledge? (Y/N)").ToUpper() -eq 'Y') {
                         Request-AdministratorElevation
                     }
                     else {
-                        Show-Info "已跳过 UAC 修改"
+                        Show-Info "Skipped UAC modification"
                         break
                     }
                 }
@@ -354,29 +355,27 @@ function Main {
                     EnableLUA                  = 0
                 }
                 
-                Show-Warning "警告：禁用 UAC 会降低系统安全性！"
-                if ((Read-Host "确认要禁用 UAC 吗? (输入 'CONFIRM' 以确认)") -eq 'CONFIRM') {
+                Show-Warning "Warning：Dsiabling UAC lowers OS security!"
+                if ((Read-Host "Are you sure? (Input 'CONFIRM' to proceed)") -eq 'CONFIRM') {
                     if (Set-UACRegistryValues -Values $uacValues) {
-                        Show-Success "UAC 已禁用，需要重启系统生效"
+                        Show-Success "UAC Disabled. Reboot required"
                     }
                 }
                 else {
-                    Show-Info "已取消操作"
+                    Show-Info "Skipped"
                 }
                 
                 break
             }
-            
-            'C' {
-                # 恢复 UAC
+            'C' { # Restore UAC
                 if (-not (Test-Administrator)) {
-                    Show-Warning "需要管理员权限来修改 UAC 设置"
-                    Write-Host " 你也可以在控制面板/设置里自行调整" -ForegroundColor Yellow
-                    if ((Read-Host "是否请求管理员权限?（Y/N）").ToUpper() -eq 'Y') {
+                    Show-Warning "Requesting Administrator previledge to modify UAC"
+                    Write-Host " You could do this manually in Control Panel or Settings" -ForegroundColor Yellow
+                    if ((Read-Host "Request Administrator previledge? (Y/N)").ToUpper() -eq 'Y') {
                         Request-AdministratorElevation
                     }
                     else {
-                        Show-Info "已跳过 UAC 修改"
+                        Show-Info "Skipped"
                         break
                     }
                 }
@@ -389,51 +388,49 @@ function Main {
                 }
                 
                 if (Set-UACRegistryValues -Values $uacValues) {
-                    Show-Success "UAC 已恢复到默认设置，需要重启系统生效"
+                    Show-Success "UAC Setting restored. Reboot required"
                 }
                 
                 break
             }
-            
             'B' {
-                Show-Info "跳过 UAC 修改"
+                Show-Info "Skipped"
                 break
             }
-            
             'Q' {
-                Show-Info "退出脚本"
+                Show-Info "Exit"
                 exit 0
             }
-            
             default {
-                Show-Error "无效的选择，请重新输入"
+                Show-Error "Unknown option, please try again"
             }
         }
-    } while ($choice.ToUpper() -notin @('A', 'B', 'C', 'Q'))
+    }
+    while ($choice.ToUpper() -notin @('A', 'B', 'C', 'Q'))
     
-    # 5. 显示系统硬件信息
-    Show-Info "系统硬件信息" -ForegroundColor
+    # Show Hardware details
+    Show-Info "System hardware information" -ForegroundColor
+    
     Show-HardwareInformation
     
-    # 6. 完成提示
+    # Complete
     Show-Border
-    Show-Success "系统检测完成"
+    Show-Success "Script environment validation completed"
     
     if ($currentUAC -and $currentUAC.EnableLUA -eq 0) {
-        Show-Warning "注意：UAC 当前已禁用，建议在处理完毕后重新启用以提高安全性"
+        Show-Warning "UAC is currently disabled, please consider raise UAC level after using this script suite"
     }
     
     Write-Host ""
-    Write-Host "按任意键退出..." -ForegroundColor Gray
+    Write-Host "Press any button to exit..." -ForegroundColor Gray
     $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
 }
 #endregion
 
-# 执行主函数
 try { Main }
 catch {
-    Show-Error "脚本执行出错: $_"
-    Write-Host "按任意键退出..." -ForegroundColor Yellow
+    Show-Error "Script execution failed: $_"
+    Write-Host "Press any button to exit..." -ForegroundColor Yellow
     $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
     exit 1
 }

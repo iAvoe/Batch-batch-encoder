@@ -1,6 +1,6 @@
 # PowerShell 批处理自定义参数压制工具
 
-为了实现急用版压制教程上位替代，将编码参数配置阶段的效率提高到极致而开发的软件规格脚本。逻辑上根据视频源属性，用户需求，引用各个程序的命令行格式等规则为前提，构建上游仅 Y4M 管道导出 + 下游深度定制参数的效率提升工具。
+为提高编码参数配置阶段效率而开发的软件规格脚本，用于构建多种视频编码压制任务。逻辑上根据视频源属性，用户需求，引用各个程序的命令行格式等规则为前提，构建上游仅 Y4M 管道导出 + 下游深度定制参数的效率提升工具，实现了急用版压制教程的上位替代。
 
 ## 环境
 
@@ -51,17 +51,17 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
     1. 若有多种格式的需求，去除备用参数的注释即可
 7. 运行步骤 5 以封装编码结果
 
-![脚本步骤2示例](zh-step2-example.png)
+![脚本步骤 2 示例](zh-step2-example.png)
 <p align="center">脚本步骤 2 示例（仅 CLI 窗口，在 VSCode 中运行效果最佳）</p>
 
 ## 下载链接
 
-皆同步更新, QQ群里有很高几率能得到问题答复
+皆同步更新，QQ 群里有很高几率能得到问题答复
 
-1. <a href='https://github.com/iAvoe/Batch-batch-encoder/tree/main/bbenc-source'>Github直链</a>, 
+1. <a href='https://github.com/iAvoe/Batch-batch-encoder/tree/main/bbenc-source'>Github 直链</a>, 
 2. <a href='https://drive.google.com/drive/folders/170tmk7yJBIz5eJuy7KXzqIgtvtDajyDu?usp=sharing'>谷歌盘</a>, 
-3. <a href='https://pan.baidu.com/s/1jAXn066e6K7vSfUd5zJEcg'>百度云, 提取码 hevc</a>, 
-4. QQ群存档: <a href='https://jq.qq.com/?_wv=1027&k=5YJFXyf'>691892901</a><br>
+3. <a href='https://pan.baidu.com/s/1jAXn066e6K7vSfUd5zJEcg'>百度云，提取码 hevc</a>, 
+4. QQ 群存档：<a href='https://jq.qq.com/?_wv=1027&k=5YJFXyf'>691892901</a><br>
 
 教程地图、工具下载见：<a href="https://iavoe.github.io/">iavoe.github.io</a>
 
@@ -82,6 +82,7 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 - 修复了 SVT-AV1 下游参数构建的格式失误
 - 添加了导入 one_line_shot_args.exe 与 vspipe.exe 的自动路径检测功能（导入更简单）
 - 添加了导入 SVFI INI 文件的自动路径检测功能（导入更简单）
+- 添加了繁体中文版
 
 **v1.3.7**
 - 重写了所有代码
