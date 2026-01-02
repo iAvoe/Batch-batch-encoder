@@ -52,7 +52,7 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 7. Run step 5 to encapsulate the encoding results.
 
 ![Script-Step-2-example (To be added)](en-step2-example.png)
-<p align="center">Example fur running step 2（CLI window only, this works even better in VSCode）</p>
+<p align="center">Example fur running step 2 (CLI window only, this works even better in VSCode)</p>
 
 -----
 
@@ -71,6 +71,9 @@ Developing these tools wasn't easy. If this tool improve your efficiency, consid
 <p align="center"><img src="bmc_qr.png" alt="Support me -_-"><br><img src="pp_tip_qr.png" alt="Support me =_="></p>
 
 ## Update Information
+**v1.3.9**
+- Brought variable cleanup (endlocal) forward, so CMD window can be closed cleanly right after encoding session
+
 **v1.3.8**
 - SVFI adaptation achieved
   - Automatic retrieval of Task ID and source video path (JSON parsed) from the rendering configuration INI

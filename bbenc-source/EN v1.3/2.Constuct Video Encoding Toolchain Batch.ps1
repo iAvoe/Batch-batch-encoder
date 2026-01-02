@@ -393,12 +393,10 @@ REM ========================================
 {3}
 
 echo.
-echo Encoding completed!
+echo Encoding Finished! Input exit to exit...
 echo.
-pause
 
 endlocal
-echo Press any button to enter CMD, input exit to exit...
 cmd /k
 '@ -f (Get-Date -Format 'yyyy-MM-dd HH:mm'), $selectedPreset, $command, $remCommands
     

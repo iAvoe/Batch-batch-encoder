@@ -76,6 +76,9 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 <p align="center"><img src="bmc_qr.png" alt="支持一下 -_-"><br><img src="pp_tip_qr.png" alt="支持一下 =_="></p>
 
 ## 更新信息
+**v1.3.9**
+- 提前批处理的变量清理（endlocal）时机，避免编码后直接关闭 CMD 窗口产生残留
+
 **v1.3.8**
 - 完成了 SVFI 上游适配：
   - 自动从渲染配置 INI 获取 Task ID 和源视频路径（JSON 解析）并构建管道参数，从而跳过视频导入步骤

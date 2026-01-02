@@ -389,12 +389,10 @@ REM ========================================
 {3}
 
 echo.
-echo 编码完成！
+echo 编码完成！输入 exit 退出...
 echo.
-pause
 
 endlocal
-echo 按任意键进入命令提示符，输入 exit 退出...
 cmd /k
 '@ -f (Get-Date -Format 'yyyy-MM-dd HH:mm'), $selectedPreset, $command, $remCommands
     
