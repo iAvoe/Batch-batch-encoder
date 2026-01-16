@@ -387,7 +387,8 @@ REM Specify commandline for this encode
 {2}
 
 REM ========================================
-REM Auxiliary encoding commandlines
+REM Aux encoding cmdlines (Manual switch;
+REM Remains empty with singular encoder import)
 REM ========================================
 
 {3}

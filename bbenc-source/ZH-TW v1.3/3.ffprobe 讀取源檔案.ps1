@@ -129,10 +129,10 @@ function Main {
         $selectedType.Name -in @('vspipe', 'avs2yuv', 'avs2pipemod')
 
     switch ($selectedType.Name) {
-        'ffmpeg'       { $upstreamCode = 'a' }
-        'vspipe'       { $upstreamCode = 'b' }
-        'avs2yuv'      { $upstreamCode = 'c' }
-        'avs2pipemod'  {
+        'ffmpeg'      { $upstreamCode = 'a' }
+        'vspipe'      { $upstreamCode = 'b' }
+        'avs2yuv'     { $upstreamCode = 'c' }
+        'avs2pipemod' {
             $upstreamCode = 'd'
             Show-Info "請指定 avisynth.dll 的路徑..."
             Write-Host " 在 AviSynth+ 倉庫（https://github.com/AviSynth/AviSynthPlus/releases）中，"
@@ -147,7 +147,7 @@ function Main {
             while (-not $Avs2PipeModDLL)
             Show-Success "已記錄 avisynth.dll 路徑：$Avs2PipeModDLL"
         }
-        'SVFI'         {
+        'SVFI'        {
             $upstreamCode = 'e'
             Show-Info "正在檢測 SVFI 渲染配置 INI 可能的路徑..."
             $foundPath = Get-PSDrive -PSProvider FileSystem | ForEach-Object { 
@@ -174,7 +174,7 @@ function Main {
             }
             while (-not $OneLineShotArgsINI -or -not (Test-Path -LiteralPath $OneLineShotArgsINI))
         }
-        default        { $upstreamCode = 'a' }
+        default       { $upstreamCode = 'a' }
     }
 
     # 定義變數
@@ -186,7 +186,7 @@ function Main {
     # 若上游是 vspipe / avs2yuv / avs2pipemod，提供生成無濾鏡腳本選項
     if ($isScriptUpstream) {
         do {
-            # 首先選擇影片源文件（用於ffprobe分析）
+            # 選擇影片源文件（ffprobe 分析）
             Show-Info "選擇（腳本引用的）影片源文件（ffprobe 將分析此文件）"
             while ($null -eq $videoSource) {
                 $videoSource = Select-File -Title "選擇影片源文件（例如 .mp4/.mkv/.mov）"
@@ -197,6 +197,7 @@ function Main {
             $mode = Read-Host "輸入 'y' 導入自訂腳本，輸入 'n' 或 Enter 為影片源生成無濾鏡腳本"
         
             if ($mode -eq 'y') { # 導入自訂腳本
+                Show-Warning "由於腳本支持的導入源路徑的種類繁多，如先定義路徑變數或直接寫入、`r`n 不同解析器、多種字面意義符搭配不同字串引號、多影片源等條件組合起來過於複雜，`r`n 因此請自行檢查腳本中的影片源是否真實存在`r`n"
                 do {
                     $scriptSource = Select-File -Title "定位腳本文件（.avs/.vpy...）"
                     if (-not $scriptSource) {

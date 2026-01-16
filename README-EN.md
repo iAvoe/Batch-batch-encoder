@@ -73,6 +73,7 @@ Developing these tools wasn't easy. If this tool improve your efficiency, consid
 ## Update Information
 **v1.3.9**
 - Brought variable cleanup (endlocal) forward, so CMD window can be closed cleanly right after encoding session
+- Added explanations for why not implementing reading video sources, or verifying video existence from .vs and .avs scripts
 
 **v1.3.8**
 - SVFI adaptation achieved

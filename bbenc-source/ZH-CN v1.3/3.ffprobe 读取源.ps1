@@ -129,10 +129,10 @@ function Main {
         $selectedType.Name -in @('vspipe', 'avs2yuv', 'avs2pipemod')
 
     switch ($selectedType.Name) {
-        'ffmpeg'       { $upstreamCode = 'a' }
-        'vspipe'       { $upstreamCode = 'b' }
-        'avs2yuv'      { $upstreamCode = 'c' }
-        'avs2pipemod'  {
+        'ffmpeg'      { $upstreamCode = 'a' }
+        'vspipe'      { $upstreamCode = 'b' }
+        'avs2yuv'     { $upstreamCode = 'c' }
+        'avs2pipemod' {
             $upstreamCode = 'd'
             Show-Info "请指定 avisynth.dll 的路径..."
             Write-Host " 在 AviSynth+ 仓库（https://github.com/AviSynth/AviSynthPlus/releases）中，"
@@ -147,7 +147,7 @@ function Main {
             while (-not $Avs2PipeModDLL)
             Show-Success "已记录 avisynth.dll 路径：$Avs2PipeModDLL"
         }
-        'SVFI'         {
+        'SVFI'        {
             $upstreamCode = 'e'
             Show-Info "正在检测 SVFI 渲染配置 INI 可能的路径..."
             $foundPath = Get-PSDrive -PSProvider FileSystem | ForEach-Object { 
@@ -174,7 +174,7 @@ function Main {
             }
             while (-not $OneLineShotArgsINI -or -not (Test-Path -LiteralPath $OneLineShotArgsINI))
         }
-        default        { $upstreamCode = 'a' }
+        default       { $upstreamCode = 'a' }
     }
 
     # 定义变量
@@ -183,10 +183,10 @@ function Main {
     $encodeImportSourcePath = $null
     $svfiTaskId = $null
 
-    # 若上游是 vspipe / avs2yuv / avs2pipemod，提供生成无滤镜脚本选项
+    # vspipe / avs2yuv / avs2pipemod：提供生成无滤镜脚本选项
     if ($isScriptUpstream) {
         do {
-            # 首先选择视频源文件（用于ffprobe分析）
+            # 选择视频源文件（ffprobe 分析）
             Show-Info "选择（脚本引用的）视频源文件（ffprobe 将分析此文件）"
             while ($null -eq $videoSource) {
                 $videoSource = Select-File -Title "选择视频源文件（例如 .mp4/.mkv/.mov）"
@@ -197,6 +197,7 @@ function Main {
             $mode = Read-Host "输入 'y' 导入自定义脚本，输入 'n' 或 Enter 为视频源生成无滤镜脚本"
         
             if ($mode -eq 'y') { # 导入自定义脚本
+                Show-Warning "由于脚本支持的导入源路径的种类繁多，如先定义路径变量或直接写入、`r`n 不同解析器、多种字面意义符搭配不同字符串引号、多视频源等条件组合起来过于复杂，`r`n 因此请自行检查脚本中的视频源是否真实存在`r`n"
                 do {
                     $scriptSource = Select-File -Title "定位脚本文件（.avs/.vpy...）"
                     if (-not $scriptSource) {

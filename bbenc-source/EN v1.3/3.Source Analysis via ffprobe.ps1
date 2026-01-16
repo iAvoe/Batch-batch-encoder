@@ -130,10 +130,10 @@ function Main {
         $selectedType.Name -in @('vspipe', 'avs2yuv', 'avs2pipemod')
 
     switch ($selectedType.Name) {
-        'ffmpeg'       { $upstreamCode = 'a' }
-        'vspipe'       { $upstreamCode = 'b' }
-        'avs2yuv'      { $upstreamCode = 'c'}
-        'avs2pipemod'  {
+        'ffmpeg'      { $upstreamCode = 'a' }
+        'vspipe'      { $upstreamCode = 'b' }
+        'avs2yuv'     { $upstreamCode = 'c'}
+        'avs2pipemod' {
             $upstreamCode = 'd'
             Show-Info "Please locate the path to avisynth.dll..."
             Write-Host " To get avisynth.dll: downloaded from AviSynth+ repository"
@@ -151,7 +151,7 @@ function Main {
 
             Show-Success "Path for avisynth.dll added: $Avs2PipeModDLL"
         }
-        'SVFI'         {
+        'SVFI'        {
             $upstreamCode = 'e'
             Show-Info "Locating SVFI render config INI path..."
             $foundPath = Get-PSDrive -PSProvider FileSystem | ForEach-Object { 
@@ -178,7 +178,7 @@ function Main {
             }
             while (-not $OneLineShotArgsINI)
         }
-        default        { $upstreamCode = 'a' }
+        default       { $upstreamCode = 'a' }
     }
 
     $videoSource = $null # ffprobe will analyze this one
@@ -189,7 +189,7 @@ function Main {
     # If upstream is set to vspipe / avs2yuv / avs2pipemod, offer filter-less script generation option
     if ($isScriptUpstream) {
         do {
-            # Select the video source file to analysis
+            # Select movie source file (ffprobe analysis)
             Show-Info "Select the video source file (referenced by the script) for ffprobe to analyze"
             while ($null -eq $videoSource) {
                 $videoSource = Select-File -Title "Select video source (.mp4/.mkv/.mov)"
@@ -201,6 +201,7 @@ function Main {
             $mode = Read-Host " Input 'y' to import a custom script; 'n'/Enter to generate a filter-less script"
         
             if ($mode -eq 'y') { # Custom script
+                Show-Warning "AVS/VS script supports a wide variety of source path formats,`r`n such as define-variable first or directly-specify in import,`r`n different parsers, literal path symbol usages, different string quotes,`r`n and multiple video sources, resulting a complicated combination.`r`n `r`n Therefore, please manually check if the video source pathes are correct `r`n"
                 do {
                     $scriptSource = Select-File -Title "Locate the script file (.avs/.vpy...)"
                     if (-not $scriptSource) {
@@ -220,6 +221,8 @@ function Main {
                     }
                 }
                 while (-not $scriptSource)
+
+                # TODO: Check the video path in the custom script and try different path syntaxes.
             
                 Show-Success "Script source selected: $scriptSource"
                 # Note: $videoSource is still going to be for ffprobe
@@ -260,7 +263,7 @@ function Main {
         # SVFI's source path config within ini file (actually its one-liner)：gui_inputs="{
         #     \"inputs\": [{
         #         \"task_id\": \"...\",
-        #         \"input_path\": \"X:\\\\Video\\\\\\u5176\\u5b83-\\u52a8\\u6f2b\\u753b\\u516c\\u79cd\\\\视频.mp4\",
+        #         \"input_path\": \"X:\\\\Video\\\\\\u5176\\u5b83-\\u52a8\\u6f2b\\u753b\\u516c\\u79cd\\\\Video.mp4\",
         #         \"is_surveillance_folder\": false
         #     }]
         # }"

@@ -77,7 +77,8 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 
 ## 更新信息
 **v1.3.9**
-- 提前批处理的变量清理（endlocal）时机，避免编码后直接关闭 CMD 窗口产生残留
+- 提前了批处理的变量清理（endlocal）时机，避免编码后直接关闭 CMD 窗口产生残留
+- 添加了无法实现从 .vs，.avs 脚本读取视频源或者验证视频存在功能原因的说明
 
 **v1.3.8**
 - 完成了 SVFI 上游适配：
