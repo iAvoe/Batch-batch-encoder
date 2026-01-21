@@ -189,7 +189,7 @@ function Main {
     # If upstream is set to vspipe / avs2yuv / avs2pipemod, offer filter-less script generation option
     if ($isScriptUpstream) {
         do {
-            # Select movie source file (ffprobe analysis)
+            # Select source file (ffprobe analysis)
             Show-Info "Select the video source file (referenced by the script) for ffprobe to analyze"
             while ($null -eq $videoSource) {
                 $videoSource = Select-File -Title "Select video source (.mp4/.mkv/.mov)"
