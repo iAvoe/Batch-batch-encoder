@@ -76,6 +76,9 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 <p align="center"><img src="bmc_qr.png" alt="支持一下 -_-"><br><img src="pp_tip_qr.png" alt="支持一下 =_="></p>
 
 ## 更新信息
+**v1.4.7**
+- 添加了宽高比（SAR）检测与警告
+
 **v1.4.6**
 - 在 1.4.5 基础上进行了代码清理和美化
 
