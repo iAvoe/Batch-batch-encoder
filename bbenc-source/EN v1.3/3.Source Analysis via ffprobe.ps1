@@ -229,7 +229,7 @@ function Main {
             }
             # Generate filter-less script
             elseif ([string]::IsNullOrWhiteSpace($mode) -or $mode -eq 'n') {
-                Show-Warning "`r`n  AviSynth(+) does not come with LSMASHSource.dll (video import library),"
+                Show-Warning "AviSynth(+) does not come with LSMASHSource.dll (video import library),"
                 Write-Host " Ensure this libaray is present in C:\Program Files (x86)\AviSynth+\plugins64+\ folder" -ForegroundColor Yellow
                 Write-Host " Download and extract 64bit version:`r`n    https://github.com/HomeOfAviSynthPlusEvolution/L-SMASH-Works/releases" -ForegroundColor Yellow
                 $placeholderScript = Get-BlankAVSVSScript -videoSource $videoSource

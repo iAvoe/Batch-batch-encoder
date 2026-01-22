@@ -17,7 +17,7 @@ function Confirm-FileDelete {
 
     if (-not (Test-Path -LiteralPath $Path)) { return }
 
-    Show-Warning "`r`n 检测到已存在文件：$Path"
+    Show-Warning "检测到已存在文件：$Path"
     $confirm = Read-Host " 是否删除该文件以继续？输入 'y' 确认，其它任意键取消（永久删除）"
 
     if ($confirm -ne 'y') {
@@ -26,7 +26,7 @@ function Confirm-FileDelete {
     }
 
     Remove-Item $Path -Force
-    Show-Success "`r`n已删除旧文件：$Path"
+    Show-Success "已删除旧文件：$Path"
 }
 
 function Select-File(

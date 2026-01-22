@@ -223,7 +223,7 @@ function Main {
             }
             # 生成无滤镜脚本
             elseif ([string]::IsNullOrWhiteSpace($mode) -or $mode -eq 'n') {
-                Show-Warning "`r`n AviSynth(+) 默认不自带 LSMASHSource.dll（视频导入滤镜）请保证该文件存在，"
+                Show-Warning "AviSynth(+) 默认不自带 LSMASHSource.dll（视频导入滤镜）请保证该文件存在，"
                 Write-Host " AVS 安装路径为：C:\Program Files (x86)\AviSynth+\plugins64+\" -ForegroundColor Yellow
                 Write-Host " 下载并解压 64bit 版：https://github.com/HomeOfAviSynthPlusEvolution/L-SMASH-Works/releases" -ForegroundColor Yellow
                 $placeholderScript = Get-BlankAVSVSScript -videoSource $videoSource
