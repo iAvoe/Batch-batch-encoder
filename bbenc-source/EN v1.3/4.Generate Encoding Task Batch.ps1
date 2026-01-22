@@ -866,7 +866,6 @@ function Get-ColorSpaceSEI {
         else { # same as x264
             $result += "--colormatrix $CSVColorMatrix"
         }
-
     }
     elseif (($Codec -eq "av1") -or ($Codec -eq "svtav1")) {
         $c = switch ($CSVColorMatrix) {
@@ -940,7 +939,6 @@ function Get-ColorSpaceSEI {
         else {
             $result += "--colorprim $CSVPrimaries"
         }
-
     }
     elseif (($Codec -eq 'hevc') -or ($Codec -eq 'x265')) {
 
@@ -950,7 +948,6 @@ function Get-ColorSpaceSEI {
         else {
             $result += "--colorprim $CSVPrimaries"
         }
-
     }
     elseif (($Codec -eq "av1") -or ($Codec -eq "svtav1")) {
 
@@ -989,8 +986,7 @@ function Get-ffmpegCSP {
             "gray","gray10le","gray12le",
             "nv12","nv16"
         )][Parameter(Mandatory=$true)]$CSVpixfmt)
-    # Remove any possible "-pix_fmt" prefixes
-    # (although this is unlikely to be encountered in practice)
+    # Remove any possible "-pix_fmt" prefixes (although its unlikely encounter)
     $pixfmt = $CSVpixfmt -replace '^-pix_fmt\s+', ''
     return "-pix_fmt " + $pixfmt
 }
@@ -1003,10 +999,8 @@ function Get-RAWCSPBitDepth {
         [bool]$isSVTAV1=$false,
         [bool]$isAVSPlus=$false
     )
-    # Remove any possible "-pix_fmt" prefixes
-    # (although this is unlikely to be encountered in practice)
+    # Remove any possible "-pix_fmt" prefixes (although its unlikely encounter)
     $pixfmt = $CSVpixfmt -replace '^-pix_fmt\s+', ''
-
     $chromaFormat = $null
     $depth = 8
 

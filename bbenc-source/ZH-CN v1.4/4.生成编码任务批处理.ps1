@@ -836,7 +836,6 @@ function Get-ColorSpaceSEI {
         else { # 同 x264
             $result += "--colormatrix $CSVColorMatrix"
         }
-
     }
     elseif (($Codec -eq "av1") -or ($Codec -eq "svtav1")) {
         $c = switch ($CSVColorMatrix) {
@@ -910,7 +909,6 @@ function Get-ColorSpaceSEI {
         else {
             $result += "--colorprim $CSVPrimaries"
         }
-
     }
     elseif (($Codec -eq 'hevc') -or ($Codec -eq 'x265')) {
 
@@ -920,7 +918,6 @@ function Get-ColorSpaceSEI {
         else {
             $result += "--colorprim $CSVPrimaries"
         }
-
     }
     elseif (($Codec -eq "av1") -or ($Codec -eq "svtav1")) {
 
@@ -974,7 +971,6 @@ function Get-RAWCSPBitDepth {
     )
     # 移除可能的 "-pix_fmt " 前缀（尽管实际情况不会遇到）
     $pixfmt = $CSVpixfmt -replace '^-pix_fmt\s+', ''
-
     $chromaFormat = $null
     $depth = 8
 
@@ -1049,7 +1045,6 @@ function Get-RAWCSPBitDepth {
     }
     elseif ($isAvs2YuvInput) {
         # avs2yuv 0.30 放弃了对 AviSynth 的支持（仅AviSynth+），因此 -csp 参数被取消
-        # avs2yuv 0.30 在测试中一直没有导出 Y4M 流，因此放弃支持，用更老的 0.26 版
         $cspMap = @{
             '420' = 'i420'
             '422' = 'i422'
