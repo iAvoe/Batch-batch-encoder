@@ -186,7 +186,7 @@ function ConvertTo-Fraction {
     throw "ConvertTo-Fraction：無法解析幀率除法字串：$fraction"
 }
 
-# 生成管道上遊程序導入、下遊程序導出命令（管道命令已經在先前腳本中寫完，目錄不存在則自動創建）
+# 生成管道上遊程序導入、下遊程序導出命令（管道命令已經在先前腳本中寫完，自動創建目錄）
 function Get-EncodingIOArgument {
     Param (
         [ValidateSet(
@@ -262,9 +262,8 @@ function Get-EncodingIOArgument {
         }
         else { $outputFileName }
     
-    # 路徑加引號（$quoteInput 已定義；勿刪參數括號，否則 $outputExtension 會丟）
+    # 路徑加引號（$quoteInput 已定義；勿刪參數括號，否則副檔名會丟）
     $quotedOutput = Get-QuotedPath ($combinedOutputPath+$outputExtension)
-    # 源副檔名攔截
     $sourceExtension = [System.IO.Path]::GetExtension($source)
 
     # 生成管道上游導入與下游導出參數
@@ -276,7 +275,7 @@ function Get-EncodingIOArgument {
             { $_ -in @('svfi', 'one_line_shot_args', 'ols', 'olsa') } { 
                 return "--input $quotedInput"
             }
-            # $sourceCSV.sourcePath 只有 .vpy 或 .avs（一個源），然而先前步驟允許選擇多種上遊程序
+            # $sourceCSV.sourcePath 只有 .vpy 或 .avs 單個源，而先前步驟允許選擇多種上遊程序
             # 因此必然會出現 .vpy 腳本輸入出現在 AVS 程序，或反過來的情況
             # 儘管“自動生成占位腳本”功能會同時提供 .vpy 和 .avs 腳本，但用戶選擇輸入自訂腳本就不會做這一步
             # 這個問題需要透過修改源的副檔名來紓解，但默認修改檔案名後的源一定不存在，此時只警告用戶然後繼續
@@ -295,7 +294,8 @@ function Get-EncodingIOArgument {
                         Show-Warning "源 $newSource 不存在，vspipe 線路的導入需手動糾正"
                     }
                 }
-                # 返回輸入路徑和隔行掃描參數（avs2pipemod 線路下自動提供 $interlacedArg）
+                # 返回輸入路徑和隔行掃描參數
+                # （avs2pipemod 線路下自動提供 $interlacedArg）
                 if ($interlacedArg -ne "") {
                     return "$quotedInput $interlacedArg"
                 }
@@ -313,17 +313,16 @@ function Get-EncodingIOArgument {
                         }
                     }
                     else {
-                        Show-Warning "源 $newSource 不存在，AviSynth 工具線路的導入需手動糾正"
+                        Show-Warning ("源 $newSource 不存在，" + $_ + " 工具線路的導入需手動糾正")
                     }
                 }
-                # 返回輸入路徑和隔行掃描參數（avs2pipemod 線路下自動提供 $interlacedArg）
+                # 返回輸入路徑和隔行掃描參數
                 if ($interlacedArg -ne "") {
                     return "$quotedInput $interlacedArg"
                 }
                 else { return "$quotedInput" }
             }
             { $_ -in @('x264', 'h264', 'avc') } {
-                # 測試：x264 在 --output 參數前面添加 --tff/bff？
                 if ($interlacedArg -ne "") {
                     return "- $interlacedArg"
                 }
@@ -335,7 +334,7 @@ function Get-EncodingIOArgument {
                 }
                 else { return "--input -" }
             }
-            { $_ -in @('svt-av1', 'svtav1', 'ivf') } { # SVT-AV1 從標準輸入讀取，原生不支持隔行
+            { $_ -in @('svt-av1', 'svtav1', 'ivf') } { # SVT-AV1 原生不支持隔行
                 return "-i -"
             }
         }

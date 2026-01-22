@@ -187,9 +187,8 @@ function ConvertTo-Fraction {
     throw "Could not parse framerate division string: $fraction"
 }
 
-# Generate upstream program import and downstream program export commands
-# the pipe commands have already been written in the previous script;
-# if the directory does not exist, it will be created automatically
+# Generate upstream program's I and downstream's O commands
+# (Pipe commands are completed by the previous script; auto-create needed directories)
 function Get-EncodingIOArgument {
     Param (
         [ValidateSet(
@@ -208,12 +207,39 @@ function Get-EncodingIOArgument {
         [string]$outputFileName, # Export filename, not used for import
         [string]$outputExtension
     )
+    # Interlaced specifier params
+    $interlacedArg = ""
+    if ($script:interlacedArgs.isInterlaced) {
+        switch ($program) {
+            # avs2pipemod: y4mp (progressive), y4mt (tff), y4mb (bff)
+            { $_ -in @('avs2pipemod', 'avsp', 'a2p') } {
+                $interlacedArg =
+                    if ($script:interlacedArgs.isTFF) { "-y4mt" }
+                    else { "-y4mb" }
+            }
+            { $_ -in @('x264', 'h264', 'avc') } {
+                # x264: --tff, --bff
+                $interlacedArg =
+                    if ($script:interlacedArgs.isTFF) { "--tff" }
+                    else { "--bff" }
+            }
+            { $_ -in @('x265', 'h265', 'hevc') } {
+                # x265: --interlace 0 (progressive), 1 (tff), 2 (bff)
+                $interlacedArg =
+                    if ($script:interlacedArgs.isTFF) { "--interlace 1" }
+                    else { "--interlace 2" }
+            }
+            # No argument for other programs
+        }
+    }
 
     # Validate file input (generate input argument)
     $quotedInput = $null
     if ($isImport) {
-        # Video filename commonly contains square brackets, -Path option is doomed
-        if (-not (Test-Path -LiteralPath $source)) {
+        if ([string]::IsNullOrWhiteSpace($source)) {
+            throw "Import mode needs parameter: source"
+        }
+        if (-not (Test-Path -LiteralPath $source)) { # Treat all names as with square brackets
             throw "Input file missing: $source"
         }
         $quotedInput = Get-QuotedPath $source
@@ -223,8 +249,9 @@ function Get-EncodingIOArgument {
             throw "Export (downstream) mode requires the outputFileName parameter"
         }
     }
-    
-    # Combine the complete output path (w/out automatically adding the file extension).
+
+    # Combined output paths (without automatically adding file extensions)
+    $combinedOutputPath = $null
     if (-not [string]::IsNullOrWhiteSpace($outputFilePath)) {
         $quotedExport = Get-QuotedPath $outputFilePath
         if (-not (Test-Path -LiteralPath $quotedExport)) {
@@ -236,37 +263,93 @@ function Get-EncodingIOArgument {
             Join-Path -Path $outputFilePath -ChildPath $outputFileName
         }
         else { $outputFileName }
-    
-    # Enclose path with quotes ($quoteInput is already defined)
-    $quotedOutput = Get-QuotedPath ($combinedOutputPath + $outputExtension)
+
+    # Add quote to path ($quoteInput specified；Dont delete brackets here or we lose extension)
+    $quotedOutput = Get-QuotedPath ($combinedOutputPath+$outputExtension)
+    $sourceExtension = [System.IO.Path]::GetExtension($source)
 
     # Generate upstream import and downstream export parameters for pipelines
-    if ($isImport) {
-        switch ($program) {
+    if ($isImport) { # Import mode
+        switch -Wildcard ($program) {
             'ffmpeg' { 
                 return "-i $quotedInput"
             }
             { $_ -in @('svfi', 'one_line_shot_args', 'ols', 'olsa') } { 
                 return "--input $quotedInput"
             }
-            { $_ -in @('vspipe', 'vs', 'avs2yuv', 'avsy', 'a2y', 'avs2pipemod', 'avsp', 'a2p') } { 
-                return "$quotedInput"
+            # $sourceCSV.sourcePath accepts only .vpy/.avs files,
+            # but upstream steps may include an toolchain incompatible with script
+            # While auto-generated placeholder script source provide both scripts,
+            # specifying custom scripts bypasses it.
+            # Users can change the source extension as a workaround,
+            # though the renamed file won't exist by default—in such cases, just warn and continue
+            { $_ -in @('vspipe', 'vs') } {
+                if ($sourceExtension -ne '.vpy') {
+                    $newSource = [System.IO.Path]::ChangeExtension($source, ".vpy")
+                    Show-Warning "vspipe route without .vpy script source, trying to match: $(Split-Path $newSource -Leaf)"
+                    if (Test-Path -LiteralPath $newSource) {
+                        $source = $newSource
+                        $quotedInput = Get-QuotedPath $source
+                        if (Show-Success -ErrorAction SilentlyContinue) {
+                            Show-Success "Successfully switched to $newSource"
+                        }
+                    }
+                    else {
+                        Show-Warning "$newSource not found, vspipe route needs manual correction"
+                    }
+                }
+                # Return input path and interlaced specifier params
+                # (avs2pipemod route has $interlacedArg provided)
+                if ($interlacedArg -ne "") {
+                    return "$quotedInput $interlacedArg"
+                }
+                else { return "$quotedInput" }
+            }
+            { $_ -in @('avs2yuv', 'avsy', 'a2y', 'avs2pipemod', 'avsp', 'a2p') } {
+                if ($sourceExtension -ne '.avs') {
+                    $newSource = [System.IO.Path]::ChangeExtension($source, ".avs")
+                    Show-Warning ($_ + " route without .avs script source, trying to match: $(Split-Path $newSource -Leaf)")
+                    if (Test-Path -LiteralPath $newSource) {
+                        $source = $newSource
+                        $quotedInput = Get-QuotedPath $source
+                        if (Show-Success -ErrorAction SilentlyContinue) {
+                            Show-Success "Successfully switched to $newSource"
+                        }
+                    }
+                    else {
+                        Show-Warning ("$newSource not found, " + $_ + " route needs manual correction")
+                    }
+                }
+                # Return input path and interlaced specifier params
+                if ($interlacedArg -ne "") {
+                    return "$quotedInput $interlacedArg"
+                }
+                else { return "$quotedInput" }
             }
             { $_ -in @('x264', 'h264', 'avc') } {
-                return "-"
+                if ($interlacedArg -ne "") {
+                    return "- $interlacedArg"
+                }
+                else { return "-" }
             }
             { $_ -in @('x265', 'h265', 'hevc') } {
-                return "--input -"
+                if ($interlacedArg -ne "") {
+                    return "$interlacedArg --input -"
+                }
+                else { return "--input -" }
             }
-            { $_ -in @('svt-av1', 'svtav1', 'ivf') } {
+            { $_ -in @('svt-av1', 'svtav1', 'ivf') } { # SVT-AV1 natively doesn't support interlaced
                 return "-i -"
             }
         }
         break
     }
-    else {
-        switch ($program) {
-            { $_ -in @('x264', 'h264', 'avc', 'x265', 'h265', 'hevc') } {
+    else { # Export mode
+        switch -Wildcard ($program) {
+            { $_ -in @('x264', 'h264', 'avc') } {
+                return "--output $quotedOutput"
+            }
+            { $_ -in @('x265', 'h265', 'hevc') } {
                 return "--output $quotedOutput"
             }
             { $_ -in @('svt-av1', 'svtav1', 'ivf') } {

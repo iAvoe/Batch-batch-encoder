@@ -186,7 +186,7 @@ function ConvertTo-Fraction {
     throw "ConvertTo-Fraction：无法解析帧率除法字符串：$fraction"
 }
 
-# 生成管道上游程序导入、下游程序导出命令（管道命令已经在先前脚本中写完，目录不存在则自动创建）
+# 生成管道上游程序导入、下游程序导出命令（管道命令已经在先前脚本中写完，自动创建目录）
 function Get-EncodingIOArgument {
     Param (
         [ValidateSet(
@@ -262,9 +262,8 @@ function Get-EncodingIOArgument {
         }
         else { $outputFileName }
     
-    # 路径加引号（$quoteInput 已定义；勿删参数括号，否则 $outputExtension 会丢）
+    # 路径加引号（$quoteInput 已定义；勿删参数括号，否则扩展名会丢）
     $quotedOutput = Get-QuotedPath ($combinedOutputPath+$outputExtension)
-    # 源扩展名拦截
     $sourceExtension = [System.IO.Path]::GetExtension($source)
 
     # 生成管道上游导入与下游导出参数
@@ -276,7 +275,7 @@ function Get-EncodingIOArgument {
             { $_ -in @('svfi', 'one_line_shot_args', 'ols', 'olsa') } { 
                 return "--input $quotedInput"
             }
-            # $sourceCSV.sourcePath 只有 .vpy 或 .avs（一个源），然而先前步骤允许选择多种上游程序
+            # $sourceCSV.sourcePath 只有 .vpy 或 .avs 单个源，而先前步骤允许选择多种上游程序
             # 因此必然会出现 .vpy 脚本输入出现在 AVS 程序，或反过来的情况
             # 尽管“自动生成占位脚本”功能会同时提供 .vpy 和 .avs 脚本，但用户选择输入自定义脚本就不会做这一步
             # 这个问题需要通过修改源的扩展名来缓解，但默认修改文件名后的源一定不存在，此时只警告用户然后继续
@@ -295,7 +294,8 @@ function Get-EncodingIOArgument {
                         Show-Warning "源 $newSource 不存在，vspipe 线路的导入需手动纠正"
                     }
                 }
-                # 返回输入路径和隔行扫描参数（avs2pipemod 线路下自动提供 $interlacedArg）
+                # 返回输入路径和隔行扫描参数
+                #（avs2pipemod 线路下自动提供 $interlacedArg）
                 if ($interlacedArg -ne "") {
                     return "$quotedInput $interlacedArg"
                 }
@@ -313,17 +313,16 @@ function Get-EncodingIOArgument {
                         }
                     }
                     else {
-                        Show-Warning "源 $newSource 不存在，AviSynth 工具线路的导入需手动纠正"
+                        Show-Warning ("源 $newSource 不存在，" + $_ + " 工具线路的导入需手动纠正")
                     }
                 }
-                # 返回输入路径和隔行扫描参数（avs2pipemod 线路下自动提供 $interlacedArg）
+                # 返回输入路径和隔行扫描参数
                 if ($interlacedArg -ne "") {
                     return "$quotedInput $interlacedArg"
                 }
                 else { return "$quotedInput" }
             }
             { $_ -in @('x264', 'h264', 'avc') } {
-                # 测试：x264 在 --output 参数前面添加 --tff/bff？
                 if ($interlacedArg -ne "") {
                     return "- $interlacedArg"
                 }
@@ -335,7 +334,7 @@ function Get-EncodingIOArgument {
                 }
                 else { return "--input -" }
             }
-            { $_ -in @('svt-av1', 'svtav1', 'ivf') } { # SVT-AV1 从标准输入读取，原生不支持隔行
+            { $_ -in @('svt-av1', 'svtav1', 'ivf') } { # SVT-AV1 原生不支持隔行
                 return "-i -"
             }
         }
