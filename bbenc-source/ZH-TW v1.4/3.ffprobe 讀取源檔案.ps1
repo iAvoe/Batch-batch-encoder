@@ -9,7 +9,6 @@
     1.4
 #>
 
-# .mov 格式支持 $ffprobeCSV.A-I + ...；其它格式支持 $ffprobeCSV.A-AA + ...
 # 若同時檢測到 temp_v_info_is_mov.csv 與 temp_v_info.csv，則使用其中創建日期最新的文件
 # $ffprobeCSV.A：stream (or not stream)
 #            .B：width
@@ -23,7 +22,7 @@
 #            .J：interlaced_frame | VOB：nb_frames
 #            .K：top_field_first | VOB：N/A
 #            .AA：NUMBER_OF_FRAMES-eng (only for non-MOV files)
-# $sourceCSV.SourcePath：影片源路徑
+# $sourceCSV.SourcePath：影片源路徑（可以是 .avs/.vpy 源）
 # $sourceCSV.UpstreamCode：指定管道上遊程序
 # $sourceCSV.Avs2PipeModDLLPath：Avs2PipeMod 需要的 avisynth.dll
 # $sourceCSV.SvfiConfigPath：one_line_shot_args（SVFI）的渲染配置 X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini
@@ -191,18 +190,12 @@ function Test-VideoContainerFormat {
     }
 }
 
-# 主程式
+#region Main
 function Main {
     Show-Border
-    Write-Host ("ffprobe 源讀取工具，導出 " + $Global:TempFolder + "temp_v_info(_is_mov).csv 以備用") -ForegroundColor Cyan
+    Show-Info ("ffprobe 源讀取工具，導出 " + $Global:TempFolder + "temp_v_info(_is_mov).csv 以備用")
     Show-Border
     Write-Host ""
-
-    # Show-Info "常用編碼命令範例："
-    # Write-Host "ffmpeg -i [輸入] -an -f yuv4mpegpipe -strict unofficial - | x265.exe --y4m - -o"
-    # Write-Host "vspipe [腳本.vpy] --y4m - | x265.exe --y4m - -o"
-    # Write-Host "avs2pipemod [腳本.avs] -y4mp | x265.exe --y4m - -o"
-    # Write-Host ""
 
     # 根據管道上遊程序選擇源類型
     $sourceTypes = @{
@@ -243,7 +236,7 @@ function Main {
         'avs2yuv'     { $upstreamCode = 'c' }
         'avs2pipemod' {
             $upstreamCode = 'd'
-            Show-Info "請指定 avisynth.dll 的路徑..."
+            Show-Info "指定 AviSynth.dll 的路徑..."
             Write-Host " 在 AviSynth+ 倉庫（https://github.com/AviSynth/AviSynthPlus/releases）中，"
             Write-Host " 下載 AviSynthPlus_x.x.x_yyyymmdd-filesonly.7z，即可獲取 DLL"
             do {
@@ -254,7 +247,7 @@ function Main {
                 }
             }
             while (-not $Avs2PipeModDLL)
-            Show-Success "已記錄 avisynth.dll 路徑：$Avs2PipeModDLL"
+            Show-Success "已記錄 AviSynth.dll 路徑：$Avs2PipeModDLL"
         }
         'SVFI'        {
             $upstreamCode = 'e'
@@ -286,7 +279,7 @@ function Main {
         default       { $upstreamCode = 'a' }
     }
 
-    # 定義變數
+    # 定義 IO 變數
     $videoSource = $null # ffprobe 將分析這個影片檔案
     $scriptSource = $null # 腳本文件路徑，如果有則在導出的 CSV 中覆蓋影片源
     $encodeImportSourcePath = $null
@@ -559,6 +552,7 @@ function Main {
     Show-Success "腳本執行完成！"
     Read-Host "按 Enter 退出"
 }
+#endregion
 
 try { Main }
 catch {

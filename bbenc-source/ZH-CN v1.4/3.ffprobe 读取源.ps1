@@ -9,7 +9,6 @@
     1.4
 #>
 
-# .mov 格式支持 $ffprobeCSV.A-I + ...；其它格式支持 $ffprobeCSV.A-AA + ...
 # 若同时检测到 temp_v_info_is_mov.csv 与 temp_v_info.csv，则使用其中创建日期最新的文件
 # $ffprobeCSV.A：stream (or not stream)
 #            .B：width
@@ -22,8 +21,8 @@
 #            .I：MOV：nb_frames | VOB：avg_frame_rate | first frame count field (others)
 #            .J：interlaced_frame | VOB：nb_frames
 #            .K：top_field_first | VOB：N/A
-#            .AA：NUMBER_OF_FRAMES-eng (only for non-MOV files)
-# $sourceCSV.SourcePath：视频源路径
+#            .AA：NUMBER_OF_FRAMES-eng（仅用于非 MOV 格式）
+# $sourceCSV.SourcePath：视频源路径（可以是 .avs/.vpy 源）
 # $sourceCSV.UpstreamCode：指定管道上游程序
 # $sourceCSV.Avs2PipeModDLLPath：Avs2PipeMod 需要的 avisynth.dll
 # $sourceCSV.SvfiConfigPath：one_line_shot_args（SVFI）的渲染配置 X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini
@@ -191,18 +190,12 @@ function Test-VideoContainerFormat {
     }
 }
 
-# 主程序
+#region Main
 function Main {
     Show-Border
-    Write-Host ("ffprobe 源读取工具，导出 " + $Global:TempFolder + "temp_v_info(_is_mov).csv 以备用") -ForegroundColor Cyan
+    Show-info ("ffprobe 源读取工具，导出 " + $Global:TempFolder + "temp_v_info(_is_mov).csv 以备用")
     Show-Border
     Write-Host ""
-
-    # Show-Info "常用编码命令示例："
-    # Write-Host "ffmpeg -i [输入] -an -f yuv4mpegpipe -strict unofficial - | x265.exe --y4m - -o"
-    # Write-Host "vspipe [脚本.vpy] --y4m - | x265.exe --y4m - -o"
-    # Write-Host "avs2pipemod [脚本.avs] -y4mp | x265.exe --y4m - -o"
-    # Write-Host ""
 
     # 根据管道上游程序选择源类型
     $sourceTypes = @{
@@ -243,7 +236,7 @@ function Main {
         'avs2yuv'     { $upstreamCode = 'c' }
         'avs2pipemod' {
             $upstreamCode = 'd'
-            Show-Info "请指定 avisynth.dll 的路径..."
+            Show-Info "指定 AviSynth.dll 的路径..."
             Write-Host " 在 AviSynth+ 仓库（https://github.com/AviSynth/AviSynthPlus/releases）中，"
             Write-Host " 下载 AviSynthPlus_x.x.x_yyyymmdd-filesonly.7z，即可获取 DLL"
             do {
@@ -254,7 +247,7 @@ function Main {
                 }
             }
             while (-not $Avs2PipeModDLL)
-            Show-Success "已记录 avisynth.dll 路径：$Avs2PipeModDLL"
+            Show-Success "已记录 AviSynth.dll 路径：$Avs2PipeModDLL"
         }
         'SVFI'        {
             $upstreamCode = 'e'
@@ -286,7 +279,7 @@ function Main {
         default       { $upstreamCode = 'a' }
     }
 
-    # 定义变量
+    # 定义 IO 变量
     $videoSource = $null # ffprobe 将分析这个视频文件
     $scriptSource = $null # 脚本文件路径，如果有则在导出的 CSV 中覆盖视频源
     $encodeImportSourcePath = $null
@@ -559,6 +552,7 @@ function Main {
     Show-Success "脚本执行完成！"
     Read-Host "按 Enter 退出"
 }
+#endregion
 
 try { Main }
 catch {
