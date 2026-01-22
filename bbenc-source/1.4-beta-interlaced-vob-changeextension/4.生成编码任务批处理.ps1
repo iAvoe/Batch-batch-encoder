@@ -245,7 +245,7 @@ function Get-EncodingIOArgument {
                         }
                     }
                     else {
-                        Show-Error "源 $newSource 不存在，请手动补充"
+                        Show-Warning "源 $newSource 不存在，vspipe 线路的导入需手动纠正"
                     }
                 }
                 # 返回输入路径和隔行扫描参数（avs2pipemod 线路下自动提供 $interlacedArg）
@@ -266,7 +266,7 @@ function Get-EncodingIOArgument {
                         }
                     }
                     else {
-                        Show-Error "源 $newSource 不存在，请手动补充"
+                        Show-Warning "源 $newSource 不存在，AviSynth 工具线路的导入需手动纠正"
                     }
                 }
                 # 返回输入路径和隔行扫描参数（avs2pipemod 线路下自动提供 $interlacedArg）
@@ -833,7 +833,6 @@ function Get-FrameCount {
         
         # 检查是否为数字且大于 0
         if ($frameCount -match "^\d+$" -and [int]$frameCount -gt 0) {
-            Show-Debug "检测到视频总帧数：$frameCount"
             if ($isSVTAV1) { 
                 return "-n " + $frameCount 
             }
@@ -1210,17 +1209,17 @@ function Set-InterlacedArgs {
                 $script:interlacedArgs.isTFF = $false
             }
             '^unknown$' {
-                Write-Warning "Set-InterlacedArgs: VOB field_order 为 'unknown'，将视为逐行"
+                Show-Warning "Set-InterlacedArgs: VOB field_order 为 'unknown'，将视为逐行"
                 $script:interlacedArgs.isInterlaced = $false
                 $script:interlacedArgs.isTFF = $false
             }
             { [string]::IsNullOrWhiteSpace($fieldOrder) } {
-                Write-Warning "Set-InterlacedArgs: VOB field_order 为空，将视为逐行"
+                Show-Warning "Set-InterlacedArgs: VOB field_order 为空，将视为逐行"
                 $script:interlacedArgs.isInterlaced = $false
                 $script:interlacedArgs.isTFF = $false
             }
             default {
-                Write-Warning "Set-InterlacedArgs: VOB field_order='$fieldOrder' 无法解析，将视为逐行"
+                Show-Warning "Set-InterlacedArgs: VOB field_order='$fieldOrder' 无法解析，将视为逐行"
                 $script:interlacedArgs.isInterlaced = $false
                 $script:interlacedArgs.isTFF = $false
             }
@@ -1230,7 +1229,7 @@ function Set-InterlacedArgs {
         $interlacedFrame = $fieldOrderOrIsInterlacedFrame.Trim()
         
         if ([string]::IsNullOrWhiteSpace($interlacedFrame)) {
-            Write-Warning "Set-InterlacedArgs: interlaced_frame 为空，将视作逐行"
+            Show-Warning "Set-InterlacedArgs: interlaced_frame 为空，将视作逐行"
             $script:interlacedArgs.isInterlaced = $false
         }
         else {
@@ -1239,7 +1238,7 @@ function Set-InterlacedArgs {
                 $script:interlacedArgs.isInterlaced = ($interlacedInt -eq 1)
             }
             catch {
-                Write-Warning "Set-InterlacedArgs: 无法解析 interlaced_frame='$interlacedFrame'，将视作逐行"
+                Show-Warning "Set-InterlacedArgs: 无法解析 interlaced_frame='$interlacedFrame'，将视作逐行"
                 $script:interlacedArgs.isInterlaced = $false
             }
         }
@@ -1249,7 +1248,7 @@ function Set-InterlacedArgs {
         
         if ([string]::IsNullOrWhiteSpace($tff)) {
             if ($script:interlacedArgs.isInterlaced) {
-                Write-Warning "Set-InterlacedArgs: 场序未知且视频为隔行，将视作上场优先"
+                Show-Warning "Set-InterlacedArgs: 场序未知且视频为隔行，将视作上场优先"
                 $script:interlacedArgs.isTFF = $true
             }
             else {
@@ -1265,13 +1264,13 @@ function Set-InterlacedArgs {
                     0 { $script:interlacedArgs.isTFF = $false }
                     -1 { $script:interlacedArgs.isTFF = $true } 
                     default {
-                        Write-Warning "Set-InterlacedArgs: top_field_first 值异常 '$tffInt'，将视作上场优先"
+                        Show-Warning "Set-InterlacedArgs: top_field_first 值异常 '$tffInt'，将视作上场优先"
                         $script:interlacedArgs.isTFF = $true
                     }
                 }
             }
             catch {
-                Write-Warning "Set-InterlacedArgs: 无法解析 top_field_first='$tff'，默认上场优先"
+                Show-Warning "Set-InterlacedArgs: 无法解析 top_field_first='$tff'，默认上场优先"
                 $script:interlacedArgs.isTFF = $true
             }
         }
@@ -1326,7 +1325,7 @@ function Main {
     # x264: --tff, --bff
     # x265: --interlace 0 (progressive), 1 (tff), 2 (bff)
     # SVT-AV1: 原生不支持，报错并退出
-    Show-Info "正在区分隔行扫描格式"
+    Show-Info "正在区分隔行扫描格式..."
     Set-IsVOB -ffprobeCsvPath $ffprobeCsvPath
     Set-InterlacedArgs -fieldOrderOrIsInterlacedFrame $ffprobeCSV.H -topFieldFirst $ffprobeCSV.J
 
@@ -1338,7 +1337,7 @@ function Main {
     $svtav1Params.Resolution = Get-InputResolution -CSVw $ffprobeCSV.B -CSVh $ffprobeCSV.C -isSVTAV1 $true
     $x265Params.MERange = Get-x265MERange -CSVw $ffprobeCSV.B -CSVh $ffprobeCSV.C
 
-    Show-Debug "矩阵格式：$($ffprobeCSV.E)；传输特质：$($ffprobeCSV.F)；三原色：$($ffprobeCSV.G)"
+    # Show-Debug "矩阵格式：$($ffprobeCSV.E)；传输特质：$($ffprobeCSV.F)；三原色：$($ffprobeCSV.G)"
     $svtav1Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -Codec svtav1
     $x265Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -Codec x265
     $x264Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -Codec x264
@@ -1377,26 +1376,20 @@ function Main {
     }
 
     # VOB 的总帧数信息位于 J
-    try {
-        $x265Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $false
-        $x264Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $false
-        $svtav1Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $true
-    }
-    catch [System.Management.Automation.ParameterBindingException] {
-        throw "总帧数参数处理失败" # 错误被触发
-    }
-    
+    $x265Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $false
+    $x264Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $false
+    $svtav1Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $true
+    # x265 线程管理
     $x265Params.PME = Get-x265PME
     $x265Params.Pools = Get-x265ThreadPool
 
-    # 获取色彩空间格式
+    # 获取并配置色彩空间格式
     $avs2yuvVersionCode = 'a'
     if ($sourceCSV.UpstreamCode -eq 'c') {
         Write-Host ""
         Show-Info "选择使用的 avs2yuv(64).exe 类型："
-        $avs2yuvVersionCode = Read-Host " [a/默认 Enter: AviSynth+ (0.30) | b: AviSynth (up to 0.26)]"
+        $avs2yuvVersionCode = Read-Host " [默认 Enter/a: AviSynth+ (0.30) | b: AviSynth (up to 0.26)]"
     }
-
     $ffmpegParams.CSP = Get-ffmpegCSP -CSVpixfmt $ffprobeCSV.D
     $svtav1Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $true
     $x265Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
@@ -1415,12 +1408,10 @@ function Main {
     }
     else { $olsargParams.ConfigInput = "" }
 
-    # 定位导出编码任务批处理文件、编码输出路径
     Write-Host ""
-    Show-Info "配置编码结果导出路径..."
+    Show-Info "配置编码结果导出路径、文件名..."
     $encodeOutputPath = Select-Folder -Description "选择压制结果的导出位置"
-    
-    # 配置编码结果文件名
+
     # 1. 获取默认值（从源复制）
     Show-Debug "CSV SourcePath 原文为：$($sourceCSV.SourcePath)"
     
@@ -1457,7 +1448,6 @@ function Main {
             }
         }
         while (-not $fileForName)
-
         # 提取文件名
         $encodeOutputFileName = [io.path]::GetFileNameWithoutExtension($fileForName)
     }
@@ -1469,7 +1459,6 @@ function Main {
     if (-not $encodeOutputFileName -or $encodeOutputFileName -EQ "") {
         $encodeOutputFileName = $displayName
     }
-
     if (Test-FilenameValid -Filename $encodeOutputFileName) {
         Show-Success "最终文件名：$encodeOutputFileName"
     }
@@ -1485,7 +1474,7 @@ function Main {
         Write-Host ""
     }
 
-    # 生成 IO 参数 (Input/Output)
+    Show-Info "生成管道上下游程序的 IO 参数 (Input/Output)..."
     # 1. 管道上游程序输入
     # 管道连接符由先前脚本生成的批处理控制，这里不写
     $ffmpegParams.Input = Get-EncodingIOArgument -program 'ffmpeg' -isImport $true -source $sourceCSV.SourcePath
@@ -1502,12 +1491,12 @@ function Main {
     $x265Params.Output = Get-EncodingIOArgument -program 'x265' -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $x265Params.OutputExtension
     $svtav1Params.Output = Get-EncodingIOArgument -program 'svtav1' -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $svtav1Params.OutputExtension
 
-    # 构建管道下游程序基础参数
+    Show-Info "构建管道下游（编码器）基础参数.."
     $x264Params.BaseParam = Invoke-BaseParamSelection -CodecName "x264" -GetParamFunc ${function:Get-x264BaseParam} -ExtraParams @{ askUserFGO = $true }
     $x265Params.BaseParam = Invoke-BaseParamSelection -CodecName "x265" -GetParamFunc ${function:Get-x265BaseParam}
     $svtav1Params.BaseParam = Invoke-BaseParamSelection -CodecName "SVT-AV1" -GetParamFunc ${function:Get-svtav1BaseParam} -ExtraParams @{ askUserDLF = $true }
 
-    # 拼接最终参数字符串
+    Show-Info "拼接最终参数字符串..."
     # 这些字符串将直接注入到批处理的 "set 'xxx_params=...'" 中
     # 空参数可能会导致双空格出现，但路径、文件名里也可能有双空格，因此不过滤（-replace "  ", " "）
     # 1. 管道上游工具
