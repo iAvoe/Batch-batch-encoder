@@ -1199,20 +1199,17 @@ function Main {
         ForEach-Object { $_.FullName }
 
     if ($null -eq $ffprobeCsvPath) {
-        Show-Error "未找到 ffprobe 生成的 CSV 文件；請運行步驟 3 腳本以補全"
-        return
+        throw "未找到 ffprobe 生成的 CSV 文件；請運行步驟 3 腳本以補全"
     }
 
     # 2. 尋找源資訊 CSV
     $sourceInfoCsvPath = Join-Path $Global:TempFolder "temp_s_info.csv"
     if (-not (Test-Path $sourceInfoCsvPath)) {
-        Show-Error "未找到專用資訊 CSV 文件；請運行步驟 3 腳本以補全"
-        return
+        throw "未找到專用資訊 CSV 文件；請運行步驟 3 腳本以補全"
     }
 
     Show-Info "正在讀取 ffprobe 資訊：$(Split-Path $ffprobeCsvPath -Leaf)..."
     Show-Info "正在讀取源專用資訊：$(Split-Path $sourceInfoCsvPath -Leaf)..."
-
     $ffprobeCSV =
         Import-Csv $ffprobeCsvPath -Header A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,AA,AB,AC,AD,AE,AF,AG,AH,AI,AJ
     $sourceCSV =
@@ -1220,8 +1217,7 @@ function Main {
 
     # 驗證 CSV 數據
     if (-not $sourceCSV.SourcePath) { # 直接驗證 CSV 項存在，不需要添加引號
-        Show-Error "temp_s_info CSV 數據不完整，請重運行步驟 3 腳本"
-        return
+        throw "temp_s_info CSV 數據不完整，請重運行步驟 3 腳本"
     }
 
     # 隔行掃描源支持

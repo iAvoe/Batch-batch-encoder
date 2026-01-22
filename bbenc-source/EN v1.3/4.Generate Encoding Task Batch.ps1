@@ -363,32 +363,6 @@ function Get-EncodingIOArgument {
     throw "Could not generate IO parameter for: $program"
 }
 
-# Subsequent scripts have implemented encapsulation functionality; 
-# Use the default values, otherwise call this function.
-# function Get-EncodingOutputFormatExtension {
-#     Param (
-#         [ValidateSet(
-#             'x264','h264','avc',
-#             'x265','h265','hevc',
-#             'svt-av1','svtav1','ivf'
-#         )][Parameter(Mandatory=$true)]$program
-#     )
-#     # x264 supports direct encapsulation of MP4 files;
-#     # x265 only exports .hevc files;
-#     # SVT-AV1 only exports .ivf files.
-#     switch ($program) {
-#         { $_ -in @('x264', 'h264', 'avc') } {
-#             return ".mp4"
-#         }
-#         { $_ -in @('x265', 'h265', 'hevc') } {
-#             return ".hevc"
-#         }
-#         { $_ -in @('svt-av1', 'svtav1', 'ivf') } {
-#             return ".ivf"
-#         }
-#     }
-# }
-
 # Retrieve basic x264 parameters
 function Get-x264BaseParam {
     Param (
@@ -1233,20 +1207,17 @@ function Main {
         ForEach-Object { $_.FullName }
 
     if ($null -eq $ffprobeCsvPath) {
-        Show-Error "Missing CSV file created by ffprobe (step 3); Please complete step 3 script"
-        return
+        throw "Missing CSV file created by ffprobe (step 3); Please complete step 3 script"
     }
 
     # 2. Locate source CSV
     $sourceInfoCsvPath = Join-Path $Global:TempFolder "temp_s_info.csv"
     if (-not (Test-Path $sourceInfoCsvPath)) {
-        Show-Error "Missing CSV file about source created by previous script; Please complete step 3 script"
-        return
+        throw "Missing CSV file about source created by previous script; Please complete step 3 script"
     }
 
     Show-Info "Reading ffprobe data: $(Split-Path $ffprobeCsvPath -Leaf)..."
     Show-Info "Reading source data: $(Split-Path $sourceInfoCsvPath -Leaf)..."
-
     $ffprobeCSV =
         Import-Csv $ffprobeCsvPath -Header A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,AA,AB,AC,AD,AE,AF,AG,AH,AI,AJ
     $sourceCSV =
@@ -1254,8 +1225,7 @@ function Main {
 
     # Validate CSV data
     if (-not $sourceCSV.SourcePath) { # Validate CSV field existance, no quote needed
-        Show-Error "temp_s_info CSV data corrupted. Please rerun step 3 script"
-        return
+        throw "temp_s_info CSV data corrupted. Please rerun step 3 script"
     }
 
     # Calculate and assign to object properties
