@@ -544,7 +544,7 @@ function Main {
         # [System.IO.File]::WriteAllLines($ffprobeCSVExportPathDebug, $ffprobeOutputCSVDebug)
 
         Write-TextFile -Path $sourceCSVExportPath -Content $sourceInfoCSV -UseBOM $true
-        Show-Success "CSV file created: $ffprobeCSVExportPath`n$sourceCSVExportPath"
+        Show-Success "CSV file created:`r`n $ffprobeCSVExportPath`r`n $sourceCSVExportPath"
 
         # Check line breaks (must be CRLF)
         Show-Debug "Validating file format..."
@@ -555,7 +555,7 @@ function Main {
             return
         }
     }
-    catch { throw "ffprobe execution failed: $_" }
+    catch { throw ("ffprobe execution failed: " + $_) }
 
     Write-Host ""
     Show-Success "Script Completed!"

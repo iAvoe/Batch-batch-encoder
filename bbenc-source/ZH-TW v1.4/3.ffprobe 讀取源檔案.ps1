@@ -535,7 +535,7 @@ function Main {
         # [System.IO.File]::WriteAllLines($ffprobeCSVExportPathDebug, $ffprobeOutputCSVDebug)
 
         Write-TextFile -Path $sourceCSVExportPath -Content $sourceInfoCSV -UseBOM $true
-        Show-Success "CSV 文件已生成：$ffprobeCSVExportPath`n$sourceCSVExportPath"
+        Show-Success "CSV 文件已生成：`r`n $ffprobeCSVExportPath`r`n $sourceCSVExportPath"
 
         # 驗證換行符
         Show-Debug "驗證 CSV 檔案格式..."
@@ -546,7 +546,7 @@ function Main {
             return
         }
     }
-    catch { throw "ffprobe 執行失敗：$_" }
+    catch { throw ("ffprobe 執行失敗：" + $_) }
 
     Write-Host ""
     Show-Success "腳本執行完成！"
