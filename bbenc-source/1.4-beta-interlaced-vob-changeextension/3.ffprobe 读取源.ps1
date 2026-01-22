@@ -194,7 +194,7 @@ function Test-VideoContainerFormat {
 # 主程序
 function Main {
     Show-Border
-    Write-Host ("ffprobe 源读取工具，导出 " + $Global:TempFolder + "temp_v_info(_is_mov).csv 供后续步骤调用") -ForegroundColor Cyan
+    Write-Host ("ffprobe 源读取工具，导出 " + $Global:TempFolder + "temp_v_info(_is_mov).csv 以备用") -ForegroundColor Cyan
     Show-Border
     Write-Host ""
 

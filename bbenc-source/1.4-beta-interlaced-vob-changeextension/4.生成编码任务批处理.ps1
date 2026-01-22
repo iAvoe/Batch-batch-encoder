@@ -158,14 +158,6 @@ function Get-EncodingIOArgument {
         [string]$outputFileName, # 导出文件名，不用于导入
         [string]$outputExtension
     )
-
-    # 由于默认给所有编码器生成参数，因此仅通知兼容性问题
-    if ($script:interlacedArgs.isInterlaced) {
-        Show-Info "Get-EncodingIOArgument：SVT-AV1 原生不支持隔行扫描、x265 的隔行扫描编码是实验性功能（官方版）"
-        Show-Info ("转逐行与 IVTC 滤镜教程：" + $script:interlacedArgs.toPFilterTutorial)
-        Write-Host ""
-    }
-
     # 隔行扫描相关参数
     $interlacedArg = ""
     if ($script:interlacedArgs.isInterlaced) {
@@ -346,7 +338,13 @@ function Get-x264BaseParam {
     $fgo10 = if ($enableFGO) {" --fgo 10"} else {""}
     $fgo15 = if ($enableFGO) {" --fgo 15"} else {""}
 
-    $default = ("--bframes 14 --b-adapt 2 --me umh --subme 9 --merange 48 --no-fast-pskip --direct auto --weightb --min-keyint 5 --ref 3 --crf 18 --chroma-qp-offset -2 --aq-mode 3 --aq-strength 0.7 --trellis 2 --deblock 0:0 --psy-rd 0.77:0.22" + $fgo10)
+    $default = if ($script:interlacedArgs.isInterlaced) {
+        ("--bframes 14 --b-adapt 2 --me umh --subme 9 --merange 48 --no-fast-pskip --direct auto --weightp 0 --weightb --min-keyint 5 --ref 3 --crf 18 --chroma-qp-offset -2 --aq-mode 3 --aq-strength 0.7 --trellis 2 --deblock 0:0 --psy-rd 0.77:0.22" + $fgo10)
+    }
+    else {
+        ("--bframes 14 --b-adapt 2 --me umh --subme 9 --merange 48 --no-fast-pskip --direct auto --weightb --min-keyint 5 --ref 3 --crf 18 --chroma-qp-offset -2 --aq-mode 3 --aq-strength 0.7 --trellis 2 --deblock 0:0 --psy-rd 0.77:0.22" + $fgo10)
+    }
+    
     switch ($pickOps) {
         # 通用 General Purpose，bframes 14
         a {return $default}
@@ -1477,6 +1475,14 @@ function Main {
     }
     else {
         Show-Error "文件名 $encodeOutputFileName 违反了 Windows 命名规范，请在生成的批处理中手动更改，否则编码会在最后的导出步骤失败"
+    }
+
+    # 由于默认给所有编码器生成参数，因此仅通知兼容性问题，而不是拒绝执行
+    if ($script:interlacedArgs.isInterlaced -and
+        $program -in @('x265', 'h265', 'hevc', 'svt-av1', 'svtav1', 'ivf')) {
+        Show-Info "Get-EncodingIOArgument：SVT-AV1 原生不支持隔行扫描、x265 的隔行扫描编码是实验性功能（官方版）"
+        Show-Info ("转逐行与 IVTC 滤镜教程：" + $script:interlacedArgs.toPFilterTutorial)
+        Write-Host ""
     }
 
     # 生成 IO 参数 (Input/Output)
