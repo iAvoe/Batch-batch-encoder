@@ -539,7 +539,7 @@ function Invoke-BaseParamSelection {
 # Get keyframe interval. Default to 10*fps, which is directly applicable to x264
 function Get-Keyint { 
     Param (
-        [Parameter(Mandatory=$true)]$CSVfps,
+        [Parameter(Mandatory=$true)][string]$fpsString,
         [int]$bframes,
         [int]$second = 10,
         [switch]$askUser,
@@ -553,7 +553,7 @@ function Get-Keyint {
 
     # Note: The value can be a string like "24000/1001",
     # which needs to be parsed (resulting in 23.976d).
-    [double]$fps = ConvertTo-Fraction $CSVfps
+    [double]$fps = ConvertTo-Fraction $fpsString
 
     $userSecond = $null # User specified seconds
     if ($askUser) {
@@ -626,12 +626,12 @@ function Get-Keyint {
 
 function Get-RateControlLookahead { # 1.8*fps
     Param (
-        [Parameter(Mandatory=$true)]$CSVfps,
+        [Parameter(Mandatory=$true)][string]$fpsString,
         [Parameter(Mandatory=$true)][int]$bframes,
         [double]$second = 1.8
     )
     try {
-        $frames = [math]::Round(((ConvertTo-Fraction $CSVfps) * $second))
+        $frames = [math]::Round(((ConvertTo-Fraction $fpsString) * $second))
         # must be greater than --bframes
         $frames = [math]::max($frames, $bframes+1)
         return "--rc-lookahead $frames"

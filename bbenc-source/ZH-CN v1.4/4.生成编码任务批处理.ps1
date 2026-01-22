@@ -619,7 +619,7 @@ function Get-Keyint {
 
 function Get-RateControlLookahead { # 1.8*fps
     Param (
-        [Parameter(Mandatory=$true)]$fpsString,
+        [Parameter(Mandatory=$true)][string]$fpsString,
         [Parameter(Mandatory=$true)][int]$bframes,
         [double]$second = 1.8
     )
