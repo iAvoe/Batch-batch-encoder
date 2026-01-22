@@ -97,6 +97,7 @@ function Test-VideoContainerFormat {
     if (-not (Test-Path $videoSource)) {
         throw "Test-VideoContainerFormat：输入视频不存在（$videoSource）"
     }
+    Show-Info ("Test-VideoContainerFormat：导入视频 $videoSource")
     $quotedVideoSource = Get-QuotedPath $videoSource
 
     try {
@@ -137,46 +138,46 @@ function Test-VideoContainerFormat {
                     return "VOB"
                 }
                 elseif ($hasDVD) {
-                    Show-Warning "Test-VideoContainerFormat：源未使用 MPEG2 编码，但含有 DVD 导航标识，将视作 VOB 格式（DVD 视频）"
+                    Show-Warning "Test-VideoContainerFormat：源非 MPEG2 编码，但含有 DVD 导航标识，将视作 VOB 格式（DVD 视频）"
                     return "VOB"
                 }
                 else {
-                     Show-Warning "Test-VideoContainerFormat：源未使用 MPEG2 编码，且不含 DVD 导航标识，将视作一般封装格式"
+                     Show-Warning "Test-VideoContainerFormat：源非 MPEG2 编码，且无 DVD 导航标识，将视作一般封装格式"
                     return "std"
                 }
             }
             elseif ($formatName -match "mov|mp4|m4a|3gp|3g2|mj2") {
                 if ($formatName -match "qt" -or $ext -eq ".mov") {
-                    Show-Info "检测到 MOV 格式"
+                    Show-Info "Test-VideoContainerFormat：检测到 MOV 格式"
                     return "MOV"
                 }
                 else {
-                    Show-Info "检测到 MP4 格式"
+                    Show-Info "Test-VideoContainerFormat：检测到 MP4 格式"
                     return "MP4"
                 }
             }
             elseif ($formatName -match "matroska") {
-                Show-Info "检测到 MKV 格式"
+                Show-Info "Test-VideoContainerFormat：检测到 MKV 格式"
                 return "MKV"
             }
             elseif ($formatName -match "webm") {
-                Show-Info "检测到 WebM 格式"
+                Show-Info "Test-VideoContainerFormat：检测到 WebM 格式"
                 return "WebM"
             }
             elseif ($formatName -match "avi") {
-                Show-Info "检测到 AVI 格式"
+                Show-Info "Test-VideoContainerFormat：检测到 AVI 格式"
                 return "AVI"
             }
             elseif ($formatName -match "ivf") {
-                Show-Info "检测到 ivf 格式"
+                Show-Info "Test-VideoContainerFormat：检测到 ivf 格式"
                 return "ivf"
             }
             elseif ($formatName -match "hevc") {
-                Show-Info "检测到 hevc 格式"
+                Show-Info "Test-VideoContainerFormat：检测到 hevc 格式"
                 return "hevc"
             }
             elseif ($formatName -match "h264" -or $formatName -match "avc") {
-                Show-Info "检测到 avc 格式"
+                Show-Info "Test-VideoContainerFormat：检测到 avc 格式"
                 return "avc"
             }
             return $formatName
@@ -471,16 +472,9 @@ function Main {
     $realFormatName = Test-VideoContainerFormat -ffprobePath $ffprobePath -videoSource $videoSource
     $isMOV = ($realFormatName -like "MOV")
     $isVOB = ($realFormatName -like "VOB")
-
-    if ($isMOV) {
-        Show-Debug "导入视频 $videoSource 的封装格式为 MOV"
-    }
-    elseif ($isVOB -like "VOB") {
-        Show-Debug "导入视频 $videoSource 的封装格式为 VOB"
-    }
-    else {
-        Show-Debug "导入视频 $videoSource 的封装格式非 MOV、VOB"
-    }
+    # if ($isMOV) { Show-Debug "导入视频 $videoSource 的封装格式为 MOV" }
+    # elseif ($isVOB -like "VOB") { Show-Debug "导入视频 $videoSource 的封装格式为 VOB" }
+    # else { Show-Debug "导入视频 $videoSource 的封装格式非 MOV、VOB" }
 
     # 根据封装文件类型选用 ffprobe 命令、定义文件名
     $ffprobeArgs =

@@ -320,20 +320,27 @@ function Main {
         Show-Error "没有可用的完整工具链组合"
         exit 1
     }
-    
-    # 选择工具链
-    do {
-        Write-Host ""
-        $inputId = Read-Host "请输入工具链编号（数字）"
-
-        if ($inputId -match '^\d+$' -and $presetIdMap.ContainsKey([int]$inputId)) {
-            $selectedPreset = $presetIdMap[[int]$inputId]
-            Show-Success "已选择工具链: [$inputId] $selectedPreset"
-            break
-        }
-        Show-Error "无效编号，请输入上面列表中的数字"
+    elseif ($presetIdMap.Count -eq 1) {
+        # 只有一个工具链则直接选中
+        $selectedPreset = $presetIdMap.Values[0]
+        $selectedId = $presetIdMap.Keys[0]
+        Show-Success "仅有一种工具链可用，已自动选择: [$selectedId] $selectedPreset"
     }
-    while ($true)
+    else {
+        # 选择工具链
+        do {
+            Write-Host ""
+            $inputId = Read-Host "请输入工具链编号（数字）"
+
+            if ($inputId -match '^\d+$' -and $presetIdMap.ContainsKey([int]$inputId)) {
+                $selectedPreset = $presetIdMap[[int]$inputId]
+                Show-Success "已选择工具链: [$inputId] $selectedPreset"
+                break
+            }
+            Show-Error "无效编号，请输入上面列表中的数字"
+        }
+        while ($true)
+    }
     
     # 生成批处理内容，追加管道指定命令
     # 1. 生成当前选定的主命令
