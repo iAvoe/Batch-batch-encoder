@@ -78,6 +78,7 @@ $olsargParams = [PSCustomObject]@{
 
 # 隔行扫描格式支持
 $interlacedArgs = [PSCustomObject]@{
+    toPFilterTutorial = "https://iavoe.github.io/deint-ivtc-web-tutorial/HTML/index.html"
     isInterlaced = $false
     isTFF = $false
     isVOB = $false
@@ -162,6 +163,7 @@ function Get-EncodingIOArgument {
     if ($script:interlacedArgs.isInterlaced -and 
         $program -in @('svt-av1', 'svtav1', 'ivf')) {
         Show-Warning "视频源为隔行扫描视频，SVT-AV1 原生不支持"
+        Write-Host ("转逐行与 IVTC 滤镜教程：" + $script:interlacedArgs.toPFilterTutorial) -BackgroundColor Magenta
     }
 
     # 隔行扫描相关参数
