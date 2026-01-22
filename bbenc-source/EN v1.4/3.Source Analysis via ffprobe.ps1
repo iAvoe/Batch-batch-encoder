@@ -84,7 +84,6 @@ src.set_output()
 }
 
 # Use ffprobe to detect the actual video file container format, ignoring the file extension (the container format is represented by uppercase letters)
-
 function Test-VideoContainerFormat {
     param (
         [Parameter(Mandatory = $true)][string]$ffprobePath,
