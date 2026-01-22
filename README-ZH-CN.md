@@ -83,6 +83,7 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 - 已完成 vspipe 到 x264、x265 测试，等待完成其他测试
 - 修复了因管道上游同时选择了 AVS 类工具以及 vspipe 工具时，只能导入 .avs 或 .vpy 触发兼容检测失败（判断为应终止脚本）的逻辑问题（修改脚本源后缀名并检测文件是否存在，提示但无视错误）
 - 步骤 3 升级为使用 ffmpeg 检测真实封装文件格式的方案，不再用后缀名检测
+- 步骤 2 添加了当只有一种工具链可用时自动选择的功能
 
 **v1.3.9**
 - 提前了批处理的变量清理（endlocal）时机，避免编码后直接关闭 CMD 窗口产生残留

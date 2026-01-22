@@ -160,10 +160,10 @@ function Get-EncodingIOArgument {
     )
 
     # 由于默认给所有编码器生成参数，因此仅通知兼容性问题
-    if ($script:interlacedArgs.isInterlaced -and 
-        $program -in @('svt-av1', 'svtav1', 'ivf')) {
-        Show-Warning "视频源为隔行扫描视频，SVT-AV1 原生不支持"
-        Write-Host ("转逐行与 IVTC 滤镜教程：" + $script:interlacedArgs.toPFilterTutorial) -BackgroundColor Magenta
+    if ($script:interlacedArgs.isInterlaced) {
+        Show-Info "Get-EncodingIOArgument：SVT-AV1 原生不支持隔行扫描、x265 的隔行扫描编码是实验性功能（官方版）"
+        Show-Info ("转逐行与 IVTC 滤镜教程：" + $script:interlacedArgs.toPFilterTutorial)
+        Write-Host ""
     }
 
     # 隔行扫描相关参数
@@ -181,7 +181,7 @@ function Get-EncodingIOArgument {
                 $interlacedArg =
                     if ($script:interlacedArgs.isTFF) { "--tff" }
                     else { "--bff" }
-            } 
+            }
             { $_ -in @('x265', 'h265', 'hevc') } {
                 # x265: --interlace 0 (progressive), 1 (tff), 2 (bff)
                 $interlacedArg =
@@ -284,6 +284,7 @@ function Get-EncodingIOArgument {
                 else { return "$quotedInput" }
             }
             { $_ -in @('x264', 'h264', 'avc') } {
+                # 测试：x264 在 --output 参数前面添加 --tff/bff？
                 if ($interlacedArg -ne "") {
                     return "- $interlacedArg"
                 }
@@ -291,12 +292,11 @@ function Get-EncodingIOArgument {
             }
             { $_ -in @('x265', 'h265', 'hevc') } {
                 if ($interlacedArg -ne "") {
-                    return "--input - $interlacedArg"
+                    return "$interlacedArg --input -"
                 }
                 else { return "--input -" }
             }
-            { $_ -in @('svt-av1', 'svtav1', 'ivf') } {
-                # SVT-AV1 从标准输入读取，原生不支持隔行
+            { $_ -in @('svt-av1', 'svtav1', 'ivf') } { # SVT-AV1 从标准输入读取，原生不支持隔行
                 return "-i -"
             }
         }
@@ -320,29 +320,6 @@ function Get-EncodingIOArgument {
     }
     throw "无法为程序 $program 生成 IO 参数"
 }
-
-# 后续脚本已实现封装功能，直接使用默认值即可，否则调用此函数
-# function Get-EncodingOutputFormatExtension {
-#     Param (
-#         [ValidateSet(
-#             'x264','h264','avc',
-#             'x265','h265','hevc',
-#             'svt-av1','svtav1','ivf'
-#         )][Parameter(Mandatory=$true)]$program
-#     )
-#     # x264 支持直接封装 MP4、x265 仅导出 .hevc、SVT-AV1 仅导出 .ivf
-#     switch ($program) {
-#         { $_ -in @('x264', 'h264', 'avc') } {
-#             return ".mp4"
-#         }
-#         { $_ -in @('x265', 'h265', 'hevc') } {
-#             return ".hevc"
-#         }
-#         { $_ -in @('svt-av1', 'svtav1', 'ivf') } {
-#             return ".ivf"
-#         }
-#     }
-# }
 
 # 获取基础参数，注意输入的“ - ”必须放在最后，需要确保不和 --output 参数构建冲突
 function Get-x264BaseParam {
@@ -385,7 +362,10 @@ function Get-x264BaseParam {
             Write-Host " Select a custom preset for x264——[a: general purpose | b: stock footage]" -ForegroundColor Yellow
             return
         }
-        default {return $default}
+        default {
+            Show-Info "Get-x264BaseParam：使用编码器默认参数"
+            return $default
+        }
     }
 }
 
@@ -417,7 +397,10 @@ function Get-x265BaseParam {
             Write-Host " Select a custom preset for x265——[a: general purpose | b: film | c: stock footage | d: anime | e: exhausive]" -ForegroundColor Yellow
             return
         }
-        default {return $default}
+        default {
+            Show-Info "Get-x265BaseParam：使用编码器默认参数"
+            return $default
+        }
     }
 }
 
@@ -432,7 +415,7 @@ function Get-svtav1BaseParam {
     $enableDLF2 = $false
     Write-Host ""
     if ($askUserDLF -and (-not $isHelp) -and ($pickOps -ne 'b')) {
-        Write-Host " 少数修改版 SVT-AV1 编码器（如 SVT-AV1-Essential）支持高精度去块滤镜 --enable-dlf 2"  -ForegroundColor Cyan
+        Write-Host " Get-svtav1BaseParam：少数修改版 SVT-AV1 编码器（如 SVT-AV1-Essential）支持高精度去块滤镜 --enable-dlf 2"  -ForegroundColor Cyan
         Write-Host " 用 SvtAv1EncApp.exe --help | findstr enable-dlf 即可检测`'2`'是否受支持" -ForegroundColor DarkGray
         if ((Read-Host " 输入 'y' 以启用 --enable-dlf 2（提高画质），或 Enter 使用常规去块滤镜（不支持或无法确定则禁）") -match '^[Yy]$') {
             $enableDLF2 = $true
@@ -463,7 +446,10 @@ function Get-svtav1BaseParam {
             Write-Host " Select a custom preset for SVT-AV1——[a: HQ | b: High compression | c: High speed]" -ForegroundColor Yellow
             return
         }
-        default {return $default}
+        default {
+            Show-Info "Get-svtav1BaseParam：使用编码器默认参数"
+            return $default
+        }
     }
 }
 
@@ -1501,10 +1487,10 @@ function Main {
     $avsyuvParams.Input = Get-EncodingIOArgument -program 'avs2yuv' -isImport $true -source $sourceCSV.SourcePath
     $avsmodParams.Input = Get-EncodingIOArgument -program 'avs2pipemod' -isImport $true -source $sourceCSV.SourcePath
     $olsargParams.Input = Get-EncodingIOArgument -program 'svfi' -isImport $true -source $sourceCSV.SourcePath
-    # 2. 管道下游程序（编码器）输入（由于默认值已经提供，因此不需要再调用 Get-EncodingIOArgument）
-    # $x264Params.Input = Get-EncodingIOArgument -program 'x264' -isImport $true
-    # $x265Params.Input = Get-EncodingIOArgument -program 'x265' -isImport $true
-    # $svtav1Params.Input = Get-EncodingIOArgument -program 'svtav1' -isImport $true
+    # 2. 管道下游程序（编码器）输入——需要根据隔行扫描判断参数，因此必用 Get-EncodingIOArgument
+    $x264Params.Input = Get-EncodingIOArgument -program 'x264' -isImport $true -source $sourceCSV.SourcePath
+    $x265Params.Input = Get-EncodingIOArgument -program 'x265' -isImport $true -source $sourceCSV.SourcePath
+    $svtav1Params.Input = Get-EncodingIOArgument -program 'svtav1' -isImport $true -source $sourceCSV.SourcePath
     # 3. 管道下游程序输出
     $x264Params.Output = Get-EncodingIOArgument -program 'x264' -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $x264Params.OutputExtension
     $x265Params.Output = Get-EncodingIOArgument -program 'x265' -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $x265Params.OutputExtension
@@ -1641,7 +1627,7 @@ REM svtav1_appendix=$svtav1RawPipeApdx
         }
     
         Show-Success "任务生成成功！直接运行该批处理文件以开始编码。"
-        Show-Warning "若批处理运行后立即退出，则打开 CMD，运行导出错误到文本的命令，如：`r`n X:\encode_task_final.bat 2>Y:\error.txt"
+        Show-Info "若批处理运行后立即退出，则打开 CMD，运行导出错误到文本的命令，如：`r`n X:\encode_task_final.bat 2>Y:\error.txt"
     }
     catch {
         Show-Error "写入文件失败：$_"
