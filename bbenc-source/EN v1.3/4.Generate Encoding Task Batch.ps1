@@ -6,7 +6,7 @@
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
-    1.3
+    1.4
 #>
 
 # Load globals
@@ -45,7 +45,7 @@ $x265Params = [PSCustomObject]@{
     OutputExtension = ".hevc"
 }
 $svtav1Params = [PSCustomObject]@{
-    FPS = "" # Best practice: use --fps-num --fps-denom for fractional frame rate, not --fps
+    FPS = "" # Best practice: use --fps-num --fps-denom for fractional rate, not --fps
     RAWCSP = "" # --color-format --input-depth
     Keyint = ""
     Resolution = ""
@@ -75,6 +75,14 @@ $avsmodParams = [PSCustomObject]@{
 $olsargParams = [PSCustomObject]@{
     Input = ""
     ConfigInput = ""
+}
+
+# Interlaced format support
+$interlacedArgs = [PSCustomObject]@{
+    toPFilterTutorial = "https://iavoe.github.io/deint-ivtc-web-tutorial/HTML/index.html"
+    isInterlaced = $false
+    isTFF = $false
+    isVOB = $false
 }
 
 function Get-EncodeOutputName {

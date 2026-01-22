@@ -44,7 +44,7 @@ $x265Params = [PSCustomObject]@{
     OutputExtension = ".hevc"
 }
 $svtav1Params = [PSCustomObject]@{
-    FPS = "" # 丟幀幀率用 --fps-num --fps-denom 而不是 --fps
+    FPS = "" # 最優實踐：丟幀幀率用 --fps-num --fps-denom 而不是 --fps
     RAWCSP = "" # --color-format --input-depth
     Keyint = ""
     Resolution = ""
@@ -84,47 +84,100 @@ $interlacedArgs = [PSCustomObject]@{
     isVOB = $false
 }
 
-function Get-EncodeOutputName {
-    Param([Parameter(Mandatory=$true)][string]$pickOps)
-    $encodeOutputFileName = $null
 
-    switch ($pickOps) {
-        a {
-            Show-Info "選擇文件以拷貝檔案名..."
-            do {
-                $selection = Select-File -Title "選擇文件以拷貝檔案名"
-                if (-not $selection) {
-                    if ((Read-Host "未選中文件，按 Enter 重試，輸入 'q' 強制退出") -eq 'q') {
-                        exit 1
-                    }
+function Get-EncodeOutputName {
+    Param(
+        [string]$SourcePath,
+        [bool]$IsPlaceholder = $false
+    )
+
+    # 1. 計算默認檔案名（DefaultName）
+    $defaultNameBase = [System.IO.Path]::GetFileNameWithoutExtension($SourcePath)
+    $finalDefaultName = $null
+    
+    if (-not $IsPlaceholder -and -not [string]::IsNullOrWhiteSpace($defaultNameBase)) {
+        $finalDefaultName = $defaultNameBase
+    }
+    else {
+        # 如果是占位符源（自動腳本）或源路徑為空，使用時間戳作為默認名
+        # 注意：檔案名中不能包含冒號，因此用 HH-mm
+        $finalDefaultName = "Encode " + (Get-Date -Format 'yyyy-MM-dd HH-mm')
+    }
+
+    # 2. 生成用於顯示的顯示檔案名（DisplayName），過長則截斷
+    $displayPrompt = if ($finalDefaultName.Length -gt 18) { 
+        $finalDefaultName.Substring(0, 18) + "..." 
+    }
+    else {  $finalDefaultName  }
+
+    # 3. 交互循環
+    while ($true) {
+        Write-Host ""
+        $inputOp = Read-Host " 指定壓制結果的檔案名——[a：從文件拷貝 | b：手寫 | Enter：$displayPrompt]"
+
+        # 3-1: 直接 Enter（默認行為）
+        if ([string]::IsNullOrWhiteSpace($inputOp)) {
+            if (Test-FilenameValid -Filename $finalDefaultName) {
+                Show-Success "使用默認檔案名：$finalDefaultName"
+                return $finalDefaultName
+            }
+            else {
+                Show-Error "默認檔案名包含非法字元，請選擇其他方式。"
+            }
+        }
+        
+        # 3-2: 選項 a（從文件拷貝）
+        elseif ($inputOp -eq 'a') {
+            Show-Info "選擇一個文件以拷貝檔案名..."
+            $selectedFile = $null
+            
+            # 內層循環：直到選到文件或強制退出
+            while (-not $selectedFile) {
+                $selectedFile = Select-File -Title "選擇一個文件以拷貝檔案名"
+                if (-not $selectedFile) {
+                    $retry = Read-Host " 未選擇文件，按 Enter 重試，輸入 'q' 返回上一級"
+                    if ($retry -eq 'q') { break } # 跳出 do-while，回到 while 主循環
                 }
             }
-            while (-not $selection)
-            $fileNameTestResult = Test-FilenameValid($selection)
-            return [io.path]::GetFileNameWithoutExtension($selection)
+
+            if ($selectedFile) {
+                $extractedName = [System.IO.Path]::GetFileNameWithoutExtension($selectedFile)
+                # 既然是系統裡已存在的檔案名，通常是合法的，但為了保險依然驗證
+                if (Test-FilenameValid -Filename $extractedName) {
+                    Show-Success "提取檔案名：$extractedName"
+                    return $extractedName
+                }
+            }
         }
-        b {
+
+        # 3-3: 選項 b（手動輸入）
+        elseif ($inputOp -eq 'b') {
             Show-Info "填寫除後綴外的檔案名..."
-            Show-Warning " 兩個方括號間必須用字元隔開"
-            Show-Warning " 不要輸入包括貨幣符、換行符的特殊符號"
-            do {
-                $encodeOutputFileName = Read-Host "填寫除後綴外的檔案名"
-                $fileNameTestResult = Test-FilenameValid($encodeOutputFileName)
-                if ((-not $fileNameTestResult) -or [string]::IsNullOrWhiteSpace($encodeOutputFileName)) {
-                    if ((Read-Host "檔案名含特殊字元或只有空值，按 Enter 重試，輸入 'q' 強制退出") -eq 'q') {
-                        exit 1
-                    }
+            Show-Warning " 兩個方括號間必須用字元隔開，不要輸入特殊符號"
+            
+            $manualName = $null
+            while ($true) {
+                $manualName = Read-Host "填寫除後綴外的檔案名（輸入 'q' 返回上一級）"
+                if ($manualName -eq 'q') { break } # 跳出 do-while
+
+                if ([string]::IsNullOrWhiteSpace($manualName)) {
+                    Show-Warning "檔案名不能為空"
+                    continue
+                }
+                if (Test-FilenameValid -Filename $manualName) {
+                    Show-Success "設定檔案名：$manualName"
+                    return $manualName
+                }
+                else {
+                    Show-Error "檔案名包含非法字元，請重試。"
                 }
             }
-            while ((-not $fileNameTestResult) -or [string]::IsNullOrWhiteSpace($encodeOutputFileName))
         }
-        default {
-            Show-Warning "未選擇有效選項，返回空檔案名"
-            return ""
+        # 3-4
+        else {
+            Show-Warning "選項無效，請輸入 a、b 或按 Enter"
         }
     }
-    Show-Success "導出檔案名：$encodeOutputFileName"
-    return $encodeOutputFileName
 }
 
 # 解析分數字串並進行除法計算，用例：ConvertTo-Fraction -fraction "1/2"
@@ -1279,6 +1332,7 @@ function Set-InterlacedArgs {
     Show-Debug "Set-InterlacedArgs：隔行掃描：$($script:interlacedArgs.isInterlaced), 上場優先：$($script:interlacedArgs.isTFF)"
 }
 
+#region Main
 function Main {
     Show-Border
     Write-Host "參數計算與批處理注入工具" -ForegroundColor Cyan
@@ -1410,62 +1464,16 @@ function Main {
     Write-Host ""
     Show-Info "配置編碼結果導出路徑、檔案名..."
     $encodeOutputPath = Select-Folder -Description "選擇壓制結果的導出位置"
+    # 1. 獲取源檔案名（用於傳遞給函數）
+    $sourcePathRaw = $sourceCSV.SourcePath
+    $defaultNameBase = [System.IO.Path]::GetFileNameWithoutExtension($sourcePathRaw)
+    # 2. 判斷是否為占位符源
+    $isPlaceholder = Get-IsPlaceHolderSource -defaultName $defaultNameBase
+    # 3. 調用新函數獲取最終檔案名（所有交互、驗證、重試都在函數內完成）
+    $encodeOutputFileName = Get-EncodeOutputName -SourcePath $sourcePathRaw -IsPlaceholder $isPlaceholder
 
-    # 1. 獲取預設值（從源複製）
-    Show-Debug "CSV SourcePath 原文為：$($sourceCSV.SourcePath)"
-    
-    $defaultName = [io.path]::GetFileNameWithoutExtension($sourceCSV.SourcePath)
-    # 由於自動生成的腳本源存在，因此檔案名會變成 "blank_vs_script/blank_avs_script" 而非影片檔案名
-    # 若匹配到這種檔案名則消除默認（Enter）選項
-    $isPlaceholderSource = Get-IsPlaceHolderSource -defaultName $defaultName
-    $encodeOutputFileName = ""
-    
-    # 使用相容 PowerShell 5.1 的寫法算 displayName
-    if (-not $isPlaceholderSource) {
-        $encodeOutputFileName = $defaultName
-        $displayName =
-            if ($defaultName.Length -gt 17) {
-                $defaultName.Substring(0, 18) + "..."
-            }
-            else { $defaultName }
-    }
-    else { # 警告：檔案名裡不寫冒號
-        $displayName = "Encode " + (Get-Date -Format 'yyyy-MM-dd HH-mm')
-    }
 
-    $encodeOutputNameCode =
-        Read-Host " 指定壓制結果的檔案名——[a：從文件拷貝 | b：手寫 | Enter：$displayName]"
-    # 確保 if 關鍵字前後無特殊不可見字元
-    if ($encodeOutputNameCode -eq 'a') { # 選擇影片源文件
-        Show-Info "選擇一個文件以拷貝檔案名..."
-        do {
-            $fileForName = Select-File -Title "選擇一個文件以拷貝檔案名"
-            if (-not $fileForName) {
-                if ((Read-Host " 未選擇文件，按 Enter 重試，輸入 'q' 強制退出") -eq 'q') {
-                    return
-                }
-            }
-        }
-        while (-not $fileForName)
-        # 提取檔案名
-        $encodeOutputFileName = [io.path]::GetFileNameWithoutExtension($fileForName)
-    }
-    elseif ($encodeOutputNameCode -eq 'b') { # 手動輸入
-        $encodeOutputFileName = Read-Host " 請輸入檔案名（不含後綴）"
-    }
-    # 默認檔案名
-    # $displayName = "Encode " + (Get-Date -Format 'yyyy-MM-dd HH:mm' 時 $encodeOutputFileName 仍然為空
-    if (-not $encodeOutputFileName -or $encodeOutputFileName -EQ "") {
-        $encodeOutputFileName = $displayName
-    }
-    if (Test-FilenameValid -Filename $encodeOutputFileName) {
-        Show-Success "最終檔案名：$encodeOutputFileName"
-    }
-    else {
-        Show-Error "檔案名 $encodeOutputFileName 違反了 Windows 命名規範，請在生成的批處理中手動更改，否則編碼會在最後的導出步驟失敗"
-    }
-
-    # 由於默認給所有編碼器生成參數，因此僅通知相容性問題，而不是拒絕執行
+    # 由於默認給所有編碼器生成參數，因此僅通知相容性問題，而非報錯退出
     if ($script:interlacedArgs.isInterlaced -and
         $program -in @('x265', 'h265', 'hevc', 'svt-av1', 'svtav1', 'ivf')) {
         Show-Info "Get-EncodingIOArgument：SVT-AV1 原生不支持隔行掃描、x265 的隔行掃描編碼是實驗性功能（官方版）"
@@ -1628,6 +1636,7 @@ REM svtav1_appendix=$svtav1RawPipeApdx
     }
     pause
 }
+#endregion
 
 try { Main }
 catch {
