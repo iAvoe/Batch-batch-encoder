@@ -1109,12 +1109,12 @@ function Get-IsRAWSource ([string]$validateUpstreamCode) {
     return $validateUpstreamCode -eq 'e'
 }
 
-# 尽快判断文件为 VOB 格式（格式判断已被先前脚本确定），影响后续大量参数的 $ffprobeCSV 变量读法
+# Determine if file is VOB format ASAP (determined by the previous script, and written to filename)
+# this redefines the $ffprobeCSV variable structure, which affects numerous subsequent parameters
 function Set-IsVOB {
-    [Parameter(Mandatory=$true)]
-    [string]$ffprobeCsvPath # 用于检查文件名是否含 _vob
+    [Parameter(Mandatory=$true)][string]$ffprobeCsvPath
     if ([string]::IsNullOrWhiteSpace($ffprobeCsvPath)) {
-        throw "Set-IsVOB：ffprobeCsvPath 参数为空，无法判断"
+        throw "Set-IsVOB: parameter ffprobeCsvPath empty, cannot detect"
     }
     $script:interlacedArgs.isVOB = $ffprobeCsvPath -like "*_vob*"
 }
@@ -1122,15 +1122,15 @@ function Set-IsVOB {
 function Set-InterlacedArgs {
     Param(
         [Parameter(Mandatory=$true)]
-        [string]$fieldOrderOrIsInterlacedFrame, # VOB：$ffprobe.H；其它：$ffprobeCsv.J
+        [string]$fieldOrderOrIsInterlacedFrame, # VOB: $ffprobe.H；Other: $ffprobeCsv.J
         [Parameter(Mandatory=$true)]
         [string]$topFieldFirst # $ffprobeCsv.K
     )
-    # 初始化
+    # Initialize
     $script:interlacedArgs.isInterlaced = $false
     $script:interlacedArgs.isTFF = $false
 
-    # 处理 VOB 格式
+    # Process VOB fromat
     if ($script:interlacedArgs.isVOB) {
         $fieldOrder = $fieldOrderOrIsInterlacedFrame.ToLower().Trim()
         
@@ -1139,36 +1139,36 @@ function Set-InterlacedArgs {
                 $script:interlacedArgs.isInterlaced = $false
                 $script:interlacedArgs.isTFF = $false
             }
-            '^(tt|bt)$' { # tt：上场优先显示、bt：下编上播
+            '^(tt|bt)$' { # tt: Top field first display, bt: Bottom encoding top displaying
                 $script:interlacedArgs.isInterlaced = $true
                 $script:interlacedArgs.isTFF = $true
             }
-            '^(bb|tb)$' { # bb：下场优先显示、tb：上编下播
+            '^(bb|tb)$' { # bb: Bottom field first display, tb: Top encoding bottom displaying
                 $script:interlacedArgs.isInterlaced = $true
                 $script:interlacedArgs.isTFF = $false
             }
             '^unknown$' {
-                Show-Warning "Set-InterlacedArgs: VOB field_order 为 'unknown'，将视为逐行"
+                Show-Warning "Set-InterlacedArgs: VOB field_order is 'unknown', taking as progressive"
                 $script:interlacedArgs.isInterlaced = $false
                 $script:interlacedArgs.isTFF = $false
             }
             { [string]::IsNullOrWhiteSpace($fieldOrder) } {
-                Show-Warning "Set-InterlacedArgs: VOB field_order 为空，将视为逐行"
+                Show-Warning "Set-InterlacedArgs: VOB field_order is empty, taking as progressive"
                 $script:interlacedArgs.isInterlaced = $false
                 $script:interlacedArgs.isTFF = $false
             }
             default {
-                Show-Warning "Set-InterlacedArgs: VOB field_order='$fieldOrder' 无法解析，将视为逐行"
+                Show-Warning "Set-InterlacedArgs: Unusual VOB field_order='$fieldOrder', taking as progressive"
                 $script:interlacedArgs.isInterlaced = $false
                 $script:interlacedArgs.isTFF = $false
             }
         }
     }
-    else {  # 非 VOB 格式，解析 interlaced_frame (0/1)
+    else { # Non-VOB format, analyze interlaced_frame (0/1)
         $interlacedFrame = $fieldOrderOrIsInterlacedFrame.Trim()
         
         if ([string]::IsNullOrWhiteSpace($interlacedFrame)) {
-            Show-Warning "Set-InterlacedArgs: interlaced_frame 为空，将视作逐行"
+            Show-Warning "Set-InterlacedArgs: Empty interlaced_frame field, taking as progressive"
             $script:interlacedArgs.isInterlaced = $false
         }
         else {
@@ -1177,17 +1177,17 @@ function Set-InterlacedArgs {
                 $script:interlacedArgs.isInterlaced = ($interlacedInt -eq 1)
             }
             catch {
-                Show-Warning "Set-InterlacedArgs: 无法解析 interlaced_frame='$interlacedFrame'，将视作逐行"
+                Show-Warning "Set-InterlacedArgs: Unusual interlaced_frame value '$interlacedFrame', taking as progressive"
                 $script:interlacedArgs.isInterlaced = $false
             }
         }
         
-        # 解析 top_field_first (-1/0/1)
+        # Analyze top_field_first (-1/0/1)
         $tff = $topFieldFirst.Trim()
         
         if ([string]::IsNullOrWhiteSpace($tff)) {
             if ($script:interlacedArgs.isInterlaced) {
-                Show-Warning "Set-InterlacedArgs: 场序未知且视频为隔行，将视作上场优先"
+                Show-Warning "Set-InterlacedArgs: Unknown field order and video is interlaced, taking as top field first"
                 $script:interlacedArgs.isTFF = $true
             }
             else {
@@ -1203,20 +1203,19 @@ function Set-InterlacedArgs {
                     0 { $script:interlacedArgs.isTFF = $false }
                     -1 { $script:interlacedArgs.isTFF = $true } 
                     default {
-                        Show-Warning "Set-InterlacedArgs: top_field_first 值异常 '$tffInt'，将视作上场优先"
+                        Show-Warning "Set-InterlacedArgs: Unusual top_field_first value '$tffInt', taking as top field first"
                         $script:interlacedArgs.isTFF = $true
                     }
                 }
             }
             catch {
-                Show-Warning "Set-InterlacedArgs: 无法解析 top_field_first='$tff'，默认上场优先"
+                Show-Warning "Set-InterlacedArgs: Unknown top_field_first='$tff', taking as top field first"
                 $script:interlacedArgs.isTFF = $true
             }
         }
     }
     
-    # 调试输出
-    Show-Debug "Set-InterlacedArgs：隔行扫描：$($script:interlacedArgs.isInterlaced), 上场优先：$($script:interlacedArgs.isTFF)"
+    Show-Debug "Set-InterlacedArgs: Interlaced=$($script:interlacedArgs.isInterlaced), Top-field-first=$($script:interlacedArgs.isTFF)"
 }
 
 #region Main
@@ -1271,7 +1270,7 @@ function Main {
     $x265Params.FPS = Get-FPSParam -CSVfps $ffprobeCSV.H -Target x265
     $x264Params.FPS = Get-FPSParam -CSVfps $ffprobeCSV.H -Target x264
 
-    Show-Debug "Color matrix：$($ffprobeCSV.E); Transfer: $($ffprobeCSV.F); Primaries: $($ffprobeCSV.G)"
+    Show-Debug "Color matrix: $($ffprobeCSV.E); Transfer: $($ffprobeCSV.F); Primaries: $($ffprobeCSV.G)"
     $svtav1Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -Codec svtav1
     $x265Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -Codec x265
     $x264Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -Codec x264
@@ -1281,7 +1280,7 @@ function Main {
     $x264Params.Keyint = Get-Keyint -CSVfps $ffprobeCSV.H -bframes 250 -askUser -isx264
     $x265Params.Keyint = Get-Keyint -CSVfps $ffprobeCSV.H -bframes $x265SubmeInt -askUser -isx265
     $svtav1Params.Keyint = Get-Keyint -CSVfps $ffprobeCSV.H -bframes 999 -askUser -isSVTAV1
-    $x264Params.RCLookahead = Get-RateControlLookahead -CSVfps $ffprobeCSV.H -bframes 250 # hack：implement suggested maximum value in x264 using fake bframes
+    $x264Params.RCLookahead = Get-RateControlLookahead -CSVfps $ffprobeCSV.H -bframes 250 # hack: implement suggested maximum value in x264 using fake bframes
     $x265Params.RCLookahead = Get-RateControlLookahead -CSVfps $ffprobeCSV.H -bframes $x265SubmeInt
 
     $x265Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $false
@@ -1374,7 +1373,7 @@ function Main {
     }
 
     if (Test-FilenameValid -Filename $encodeOutputFileName) {
-        Show-Success "Final file name：$encodeOutputFileName"
+        Show-Success "Final file name: $encodeOutputFileName"
     }
     else {
         Show-Error "Filename $encodeOutputFileName failed to conform to Windows naming conventions."

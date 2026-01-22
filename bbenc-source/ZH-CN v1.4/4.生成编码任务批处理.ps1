@@ -1076,10 +1076,9 @@ function Get-IsRAWSource ([string]$validateUpstreamCode) {
     return $validateUpstreamCode -eq 'e'
 }
 
-# 尽快判断文件为 VOB 格式（格式判断已被先前脚本确定），影响后续大量参数的 $ffprobeCSV 变量读法
+# 尽快判断文件是否为 VOB 格式（格式判断已被先前脚本确定），影响后续大量参数的 $ffprobeCSV 变量读法
 function Set-IsVOB {
-    [Parameter(Mandatory=$true)]
-    [string]$ffprobeCsvPath # 用于检查文件名是否含 _vob
+    [Parameter(Mandatory=$true)][string]$ffprobeCsvPath
     if ([string]::IsNullOrWhiteSpace($ffprobeCsvPath)) {
         throw "Set-IsVOB：ffprobeCsvPath 参数为空，无法判断"
     }
@@ -1131,7 +1130,7 @@ function Set-InterlacedArgs {
             }
         }
     }
-    else {  # 非 VOB 格式，解析 interlaced_frame (0/1)
+    else { # 非 VOB 格式，解析 interlaced_frame (0/1)
         $interlacedFrame = $fieldOrderOrIsInterlacedFrame.Trim()
         
         if ([string]::IsNullOrWhiteSpace($interlacedFrame)) {
@@ -1182,7 +1181,6 @@ function Set-InterlacedArgs {
         }
     }
     
-    # 调试输出
     Show-Debug "Set-InterlacedArgs：隔行扫描：$($script:interlacedArgs.isInterlaced), 上场优先：$($script:interlacedArgs.isTFF)"
 }
 
