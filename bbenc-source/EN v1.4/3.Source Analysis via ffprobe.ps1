@@ -108,10 +108,20 @@ function Get-NonSquarePixelWarning {
 
             if ($sampleAspectRatio -notlike "1:1") {
                 Show-Warning "$videoSource has a $sampleAspectRatio sample aspect ratio (non-square pixel)"
-                Write-Host " This program DOES NOT support SAR handling currently" -ForegroundColor Yellow
-                Write-Host " (results encoding to SAR 1:1 square pixel, width shrinks)" -ForegroundColor Yellow
-                Write-Host " please manually specify decoding/playing SAR," -ForegroundColor Yellow
-                Write-Host " or specify correction render filtering to generated batch files and scripts" -ForegroundColor Yellow
+                Write-Host " This program DOES NOT support SAR handling" -ForegroundColor Yellow
+                Write-Host " (encodes to SAR 1:1 square pixel, width shrinks)" -ForegroundColor Yellow
+                Write-Host " Manually attach correcting metadata examples:" -ForegroundColor Magenta
+                $e = @(
+                    " 1. ffmpeg -i input.mp4 -c copy -aspect $sampleAspectRatio output.mp4",
+                    " 2. MP4Box -par 1=$sampleAspectRatio input.mp4 -out output.mp4",
+                    " 3. moviepy:",
+                    "    from moviepy.editor import VideoFileClip",
+                    "    clip = VideoFileClip('input.mp4')",
+                    "    clip.aspect_ratio = $sampleAspectRatio",
+                    "    clip.write_videofile('output.mp4')"
+                )
+                $e | ForEach-Object { Write-Host $_ -ForegroundColor Magenta }
+                Write-Host " or specify VS/AVS script correction filters in regarding toolchain routes" -ForegroundColor Yellow
             }
         }
         else { # ffprobe failed
@@ -140,7 +150,7 @@ function Test-VideoContainerFormat {
 
     try {
         # Use JSON input for analysis
-        $ffprobeJson = &$ffprobePath -hide_banner -v quiet -show_format -print_format json $quotedVideoSource 2>null
+        $ffprobeJson = &$ffprobePath -hide_banner -v quiet -show_format -print_format json $quotedVideoSource 2>$null
 
         if ($LASTEXITCODE -eq 0) {
             # ffprobe exits normally, analysis results exist
@@ -511,6 +521,7 @@ function Main {
 
     # Detect source container format
     $realFormatName = Test-VideoContainerFormat -ffprobePath $ffprobePath -videoSource $videoSource
+
     $isMOV = ($realFormatName -like "MOV")
     $isVOB = ($realFormatName -like "VOB")
     # if ($isMOV) { Show-Debug "The imported video $videoSource is in MOV format" }

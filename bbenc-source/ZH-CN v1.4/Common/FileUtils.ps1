@@ -107,7 +107,15 @@ function Write-TextFile { # 需在 Core.ps1 写入全局变量后运行
         [Parameter(Mandatory=$true)][string]$Content,
         [bool]$UseBOM = $true
     )
-    
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        Write-Error "Write-TextFile - 文件写入失败：空路径"
+        return
+    }
+    if ([string]::IsNullOrWhiteSpace($Content)) {
+        Write-Error "Write-TextFile - 文件写入失败：空内容"
+        return
+    }
+
     # 必须使用 CRLF 换行符，否则 CMD 无法读取（乱码）
     $normalizedContent = $Content -replace "`r?`n", "`r`n"
     

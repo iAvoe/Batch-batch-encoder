@@ -77,7 +77,9 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 
 ## 更新信息
 **v1.4.7**
-- 添加了寬高比（SAR）檢測與警告
+- 新增了變寬比（SAR）偵測與警告
+  - 添加了寫入 SAR 元數據的 ffmpeg 等工具範例
+- 修復了步驟 3 運行後在運行目錄產生 null 空文件的故障
 
 **v1.4.6**
 - 在 1.4.5 基礎上進行了代碼清理和美化

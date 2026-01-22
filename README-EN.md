@@ -72,7 +72,9 @@ Developing these tools wasn't easy. If this tool improve your efficiency, consid
 
 ## Update Information
 **v1.4.7**
-- Added SAR detection and warnings
+- Added sample aspect ratio (SAR) detection and warnings
+  - Added examples of tools such as ffmpeg for writing SAR metadata
+- Fixed a bug where a null file was generated in the running directory after step 3 was executed.
 
 **v1.4.6**
 - Performed major code cleanup and prettifying on top of 1.4.5

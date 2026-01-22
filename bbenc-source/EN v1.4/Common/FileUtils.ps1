@@ -108,7 +108,15 @@ function Write-TextFile { # Call only after the global variable are defined in C
         [Parameter(Mandatory=$true)][string]$Content,
         [bool]$UseBOM = $true
     )
-    
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        Write-Error "Write-TextFile - Failed: Empty path"
+        return
+    }
+    if ([string]::IsNullOrWhiteSpace($Content)) {
+        Write-Error "Write-TextFile - Failed: No content"
+        return
+    }
+
     # CRLF newline characters must be used;
     # Otherwise, CMD will not be able to read it (garbled characters)
     $normalizedContent = $Content -replace "`r?`n", "`r`n"

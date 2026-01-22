@@ -106,9 +106,20 @@ function Get-NonSquarePixelWarning {
             $sampleAspectRatio = $streamInfo.streams[0].sample_aspect_ratio.Trim()
 
             if ($sampleAspectRatio -notlike "1:1") {
-                Show-Warning "源 $videoSource 的寬高比（SAR）非 1:1（$sampleAspectRatio 的長方形象素）"
-                Write-Host " 本軟體暫無處理（編碼為方形象素，致畫面縮寬），" -ForegroundColor Yellow
-                Write-Host " 請手動為生成的批處理命令指定播放 SAR 或添加矯正濾鏡組" -ForegroundColor Yellow
+                Show-Warning "源 $videoSource 的變寬比（SAR）非 1:1（$sampleAspectRatio 的長方形象素）"
+                Write-Host " 本軟體暫無對策（編碼為方形象素，致畫面縮寬），" -ForegroundColor Yellow
+                Write-Host " 手動指定元數據的矯正方法：" -ForegroundColor Magenta
+                $e = @(
+                    " 1. ffmpeg -i input.mp4 -c copy -aspect $sampleAspectRatio output.mp4",
+                    " 2. MP4Box -par 1=$sampleAspectRatio input.mp4 -out output.mp4",
+                    " 3. moviepy:",
+                    "    from moviepy.editor import VideoFileClip",
+                    "    clip = VideoFileClip('input.mp4')",
+                    "    clip.aspect_ratio = $sampleAspectRatio",
+                    "    clip.write_videofile('output.mp4')"
+                )
+                $e | ForEach-Object { Write-Host $_ -ForegroundColor Magenta }
+                Write-Host " 或在對應線路添加 VS/AVS 濾鏡組矯正" -ForegroundColor Yellow
             }
         }
         else { # ffprobe 失敗
@@ -136,7 +147,7 @@ function Test-VideoContainerFormat {
     $quotedVideoSource = Get-QuotedPath $videoSource
 
     try { # 使用 JSON 輸入分析
-        $ffprobeJson = & $ffprobePath -hide_banner -v quiet -show_format -print_format json $quotedVideoSource 2>null
+        $ffprobeJson = &$ffprobePath -hide_banner -v quiet -show_format -print_format json $quotedVideoSource 2>$null
 
         if ($LASTEXITCODE -eq 0) { # ffprobe 正常退出，分析結果存在
             $formatInfo = $ffprobeJson | ConvertFrom-Json
