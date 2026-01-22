@@ -664,8 +664,11 @@ function Get-x265MERange {
 }
 
 function Get-x265Subme { # 24fps=3, 48fps=4, 60fps=5, ++=6
-    Param ([Parameter(Mandatory=$true)]$CSVfps, [bool]$getInteger=$false)
-    $encoderFPS = ConvertTo-Fraction $CSVfps
+    Param (
+        [Parameter(Mandatory=$true)][string]$fpsString,
+        [bool]$getInteger=$false
+    )
+    $encoderFPS = ConvertTo-Fraction $fpsString
     $subme = 6
     if ($encoderFPS -lt 25) {$subme = 3}
     elseif ($encoderFPS -lt 49) {$subme = 4}
