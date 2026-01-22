@@ -390,7 +390,6 @@ function Get-EncodingIOArgument {
 # }
 
 # Retrieve basic x264 parameters
-# Note: the input "-" must be placed last to be correct
 function Get-x264BaseParam {
     Param (
         [Parameter(Mandatory=$true)]$pickOps,
@@ -401,7 +400,7 @@ function Get-x264BaseParam {
     $enableFGO = $false
     if ($askUserFGO -and -not $isHelp) {
         Write-Host ""
-        Write-Host " A few modified/unofficial x264 support high-frequency information rate-distortion optimization (Film Grain Optimization)." -ForegroundColor Cyan
+        Write-Host " Some modified/unofficial x264 support high-frequency information rate-distortion optimization (Film Grain Optimization)." -ForegroundColor Cyan
         Write-Host " Test with 'x264.exe --fullhelp | findstr fgo' to verify if its supported (shows up)" -ForegroundColor DarkGray
         if ((Read-Host " Input 'y' to add '--fgo' for better image, or Enter to disable (disable if unsure / can't confim)") -match '^[Yy]$') {
             $enableFGO = $true
@@ -415,7 +414,13 @@ function Get-x264BaseParam {
     $fgo10 = if ($enableFGO) {" --fgo 10"} else {""}
     $fgo15 = if ($enableFGO) {" --fgo 15"} else {""}
 
-    $default = ("--bframes 14 --b-adapt 2 --me umh --subme 9 --merange 48 --no-fast-pskip --direct auto --weightb --min-keyint 5 --ref 3 --crf 18 --chroma-qp-offset -2 --aq-mode 3 --aq-strength 0.7 --trellis 2 --deblock 0:0 --psy-rd 0.77:0.22" + $fgo10)
+    $default = if ($script:interlacedArgs.isInterlaced) {
+        ("--bframes 14 --b-adapt 2 --me umh --subme 9 --merange 48 --no-fast-pskip --direct auto --weightp 0 --weightb --min-keyint 5 --ref 3 --crf 18 --chroma-qp-offset -2 --aq-mode 3 --aq-strength 0.7 --trellis 2 --deblock 0:0 --psy-rd 0.77:0.22" + $fgo10)
+    }
+    else {
+        ("--bframes 14 --b-adapt 2 --me umh --subme 9 --merange 48 --no-fast-pskip --direct auto --weightb --min-keyint 5 --ref 3 --crf 18 --chroma-qp-offset -2 --aq-mode 3 --aq-strength 0.7 --trellis 2 --deblock 0:0 --psy-rd 0.77:0.22" + $fgo10)
+    }
+
     switch ($pickOps) {
         # General Purpose，bframes 14
         a {return $default}
@@ -431,11 +436,14 @@ function Get-x264BaseParam {
             Write-Host " Select a custom preset for x264——[a: general purpose | b: stock footage]" -ForegroundColor Yellow
             return
         }
-        default {return $default}
+        default {
+            Show-Info "Get-x264BaseParam: Using default encoder parameter"
+            return $default
+        }
     }
 }
 
-# Retrieve basic x265 parameters
+# Retrieve basic x265 parametersffmpeg.exe -y -i ".\in.mp4" -an -f yuv4mpegpipe -strict -1 - | x265.exe [Get-...] [Get-x265BaseParam] --y4m --input - --output ".\out.hevc"
 function Get-x265BaseParam {
     Param ([Parameter(Mandatory=$true)]$pickOps)
     # TODO：Add DJATOM? Mod's fully customizable AQ
@@ -461,11 +469,14 @@ function Get-x265BaseParam {
             Write-Host " Select a custom preset for x265——[a: general purpose | b: film | c: stock footage | d: anime | e: exhausive]" -ForegroundColor Yellow
             return
         }
-        default {return $default}
+        default {
+            Show-Info "Get-x265BaseParam: Using default encoder parameter"
+            return $default
+        }
     }
 }
 
-# Retrieve basic SVT-AV1 parameters
+# Retrieve basic SVT-AV1 parameters：ffmpeg.exe -y -i ".\in.mp4" -an -f yuv4mpegpipe -strict -1 - | SvtAv1EncApp.exe -i - [Get-svtav1BaseParam] -b ".\out.ivf"
 function Get-svtav1BaseParam {
     Param (
         [Parameter(Mandatory=$true)]$pickOps,
@@ -476,7 +487,7 @@ function Get-svtav1BaseParam {
     $enableDLF2 = $false
     Write-Host ""
     if ($askUserDLF -and (-not $isHelp) -and ($pickOps -ne 'b')) {
-        Write-Host " A few modified/unofficial SVT-AV1 encoder (i.e., SVT-AV1-Essential) supports precise deblocking filter --enable-dlf 2"  -ForegroundColor Cyan
+        Write-Host " Some modified/unofficial SVT-AV1 encoder (i.e., SVT-AV1-Essential) supports precise deblocking filter --enable-dlf 2"  -ForegroundColor Cyan
         Write-Host " Test with 'SvtAv1EncApp.exe --help | findstr enable-dlf' to verify if its supported (shows up)" -ForegroundColor DarkGray
         if ((Read-Host " Input 'y' to add '--enable-dlf 2' for better image, or Enter to disable (disable if unsure / can't confim)") -match '^[Yy]$') {
             $enableDLF2 = $true
@@ -507,7 +518,10 @@ function Get-svtav1BaseParam {
             Write-Host " Select a custom preset for SVT-AV1——[a: HQ | b: High compression | c: High speed]" -ForegroundColor Yellow
             return
         }
-        default {return $default}
+        default {
+            Show-Info "Get-svtav1BaseParam: Using default encoder parameter"
+            return $default
+        }
     }
 }
 
@@ -543,144 +557,9 @@ function Invoke-BaseParamSelection {
     if ($selectedParam) {
         Show-Success "Defined base parameter for $($CodecName): $($selectedParam)"
     }
-    else { Show-Info "$CodecName will use encoder default parameters" }
+    else { Show-Info "$CodecName will use default parameters" }
 
     return $selectedParam
-}
-
-# When using a Y4M pipeline, 'profiles' can be obtained automatically
-# For a RAW pipeline, parameters such as CSP and resolution needs to be specified directly
-# The profile should only be specified when hardware compatibility is required
-function Get-x265SVTAV1Profile {
-    # Note: Since HEVC inherently supports a limited number of CSP values, all other CSP values ​​are else.
-    # Note: NV12: 8-bit 2-plane YUV420; NV16: 8-bit 2-plane YUV422
-    # Warning: Interlaced video is not currently supported.
-    Param (
-        [Parameter(Mandatory=$true)]$CSVpixfmt, # i.e., yuv444p12le, yuv422p, nv12
-        [bool]$isIntraOnly=$false,
-        [bool]$isSVTAV1=$false
-    )
-    # Remove any possible "-pix_fmt" prefixes (although unlikely to encounter)
-    $pixfmt = $CSVpixfmt -replace '^-pix_fmt\s+', ''
-
-    # Parse chroma sampling format and bit depth
-    $chromaFormat = $null
-    $depth = 8  # Defualt to 8bit
-    
-    # Parse bit depth
-    if ($pixfmt -match '(\d+)(le|be)$') {
-        $depth = [int]$matches[1]
-    }
-    # elseif ($pixfmt -eq 'nv12' -or $pixfmt -eq 'nv16') {
-    #     $depth = 8 # Commented out as same as default
-    # }
-    
-    # Parse HEVC chroma subsampling
-    if ($pixfmt -match '^yuv420' -or $pixfmt -eq 'nv12') {
-        $chromaFormat = 'i420'
-    }
-    elseif ($pixfmt -match '^yuv422' -or $pixfmt -eq 'nv16') {
-        $chromaFormat = 'i422'
-    }
-    elseif ($pixfmt -match '^yuv444') {
-        $chromaFormat = 'i444'
-    }
-    elseif ($pixfmt -match '^(gray|yuv400)') {
-        $chromaFormat = 'gray'
-    }
-    else { # Default to 4:2:0
-        $chromaFormat = 'i420'
-        Show-Warning "Unknown pixel format: $pixfmt, using the default value instead (4:2:0 8bit)."
-    }
-
-    # Parse SVT-AV1 chroma sampling
-    # - Main: 4:0:0 (gray) - 4:2:0, maximum 10-bit full sampling
-    # - High: Additional support for 4:4:4 sampling
-    # - Professional: Additional support for 4:2:2 sampling, maximum 12-bit full sampling
-    $svtav1Profile = 0 # Default as main
-    switch ($chromaFormat) {
-        'i444' {
-            if ($depth -eq 12) { $svtav1Profile = 2 } # Professional
-            else { $svtav1Profile = 1 } # High
-        }
-        'i422' { $svtav1Profile = 2 } # Professional only
-        'gray' {
-            if ($depth -eq 12) { $svtav1Profile = 2 }
-            else { $svtav1Profile = 0 } # Main (conservative)
-        }
-        default { # i420
-            if ($depth -eq 12) { $svtav1Profile = 2 }
-            else { $svtav1Profile = 0 }
-        }
-    }
-
-    # Parse bit depth
-    if ($depth -notin @(8, 10, 12)) {
-        Show-Warning "Video encoder is not likely to support $depth bit." # $depth = 8
-    }
-
-    # Check the range of profiles actually supported by x265:
-    # 8bit：main, main-intra，main444-8, main444-intra
-    # 10bit：main10, main10-intra，main422-10, main422-10-intra，main444-10, main444-10-intra
-    # 12 bit：main12, main12-intra，main422-12, main422-12-intra，main444-12, main444-12-intra
-    $profileBase = ""
-    $inputCsp = ""
-
-    # Return the corresponding profile based on the chroma format and bit depth.
-    if ($isSVTAV1) {
-        return ("--profile " + $svtav1Profile)
-    }
-
-    switch ($chromaFormat) {
-        'i422' {
-            if ($depth -eq 8) {
-                Write-Warning "x265 does not support main422-8, downgrading to main (4:2:0)."
-                $profileBase = "main"
-            }
-            else {
-                $profileBase = "main422-$depth"
-            }
-        }
-        'i444' { # Special case: 8-bit 4:4:4 intra profile is main444-intra, not main444-8-intra
-            if ($depth -eq 8) {
-                $profileBase = "main444-8"
-            }
-            else {
-                $profileBase = "main444-$depth"
-            }
-        }
-        'gray' { # Grayscale also uses main/main10/main12
-            $inputCsp = "--input-csp i400"
-            switch ($depth) {
-                8  { $profileBase = "main" }
-                10 { $profileBase = "main10" }
-                12 { $profileBase = "main12" }
-                default { $profileBase = "main" }
-            }
-        }
-        default { # i420 and others
-            switch ($depth) {
-                8  { $profileBase = "main" }
-                10 { $profileBase = "main10" }
-                12 { $profileBase = "main12" }
-                default { $profileBase = "main" }
-            }
-        }
-    }
-
-   # Add -intra suffix for intra-only encoding
-    if ($isIntraOnly) {
-        if ($profileBase -eq "main444-8") {
-            $profileBase = "main444-intra"
-        }
-        else {
-            $profileBase = "$profileBase-intra"
-        }
-    }
-
-    $result = "--profile $profileBase"
-    if ($inputCsp) { $result += " $inputCsp" }
-    return $result
 }
 
 # Get keyframe interval. Default to 10*fps, which is directly applicable to x264
@@ -721,10 +600,9 @@ function Get-Keyint {
         }
         
         $userSecond = $null
-        do {
-            # The default keyframe interval for multitrack editing is equivalent to the sum of the keyframe intervals of N video tracks,
-            # but the actual decoding process uses non-linear scaling,
-            # so it is set to twice the default interval.
+        do { # Decoding usage for video editing is the sum of the keyframe interval of all video tracks
+            # However, the real-world decoding capability depends mostly on the # of hardware decoders,
+            # so only setting to 2x default
             Write-Host " 1. For resolutions higher than 2560x1440, pick from 1 section to left"
             Write-Host " 2. For simple & flat video content, pick from 1 section to right"
             $userSecond =
@@ -831,8 +709,7 @@ function Get-x265PME {
     return ""
 }
 
-# Specifies which NUMA node to run on (starting from 0)
-# Example output: --pools -,+ (uses node 2 in a dual-pool setup)
+# Specify a NUMA node to run on (starting from 0). i.e.: --pools -,+ (Use node 2 in dual-pool workstation)
 function Get-x265ThreadPool {
     Param ([int]$atNthNUMA=0) # Direct input, usually not needed
 
@@ -874,7 +751,7 @@ function Get-x265ThreadPool {
         return $poolParam.TrimEnd(',')
     }
     else {
-        Show-Info "One processor was detected. Ignoring x265 parameter --pools."
+        Show-Info "Detected 1 CPU node. Ignoring x265 parameter --pools."
         return ""
     }
 }
@@ -887,13 +764,22 @@ function Get-FrameCount {
         [bool]$isSVTAV1
     )
     
-    # All columns which can have total frame count (Range in I, AA-AJ)
-    $frameCountColumns =
-        @('I') + (65..74 | ForEach-Object { [char]$_ } | ForEach-Object { "A$_" }) # I, AA, AB, AC, AD, AE, AF, AG, AH, AI, AJ
+    # All columns which can have total frame count（I, AA, AB, AC, AD, AE, AF, AG, AH, AI, AJ）
+    $frameCountColumns = @();
+    # VOB format only has J, with unrelated large integer around AA, never look there
+    if ($script:interlacedArgs.isVOB) {
+        $frameCountColumns = @('J');
+    }
+    else {
+        $frameCountColumns =
+            @('I') + (65..74 | ForEach-Object { [char]$_ } | ForEach-Object { "A$_" })
+    }
     
     # Check each column, use the 1st non-zero value
     foreach ($column in $frameCountColumns) {
         $frameCount = $ffprobeCSV.$column
+
+        # Find a number greater than 0
         if ($frameCount -match "^\d+$" -and [int]$frameCount -gt 0) {
             if ($isSVTAV1) { 
                 return "-n " + $frameCount 
@@ -901,9 +787,7 @@ function Get-FrameCount {
             return "--frames " + $frameCount
         }
     }
-    
-    # Return empty string if not found
-    return ""
+    return "" # Not found
 }
 
 function Get-InputResolution {
