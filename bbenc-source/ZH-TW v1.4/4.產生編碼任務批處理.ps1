@@ -132,7 +132,7 @@ function Get-EncodeOutputName {
             while (-not $selectedFile) {
                 $selectedFile = Select-File -Title "選擇一個文件以拷貝檔案名"
                 if (-not $selectedFile) {
-                    $retry = Read-Host " 未選擇文件，按 Enter 重試，輸入 'q' 返回上一級"
+                    $retry = Read-Host " 未選擇文件，按 Enter 重試，輸入 'q' 返回上級"
                     if ($retry -eq 'q') { break }
                 }
             }
@@ -152,7 +152,7 @@ function Get-EncodeOutputName {
             
             $manualName = $null
             while ($true) {
-                $manualName = Read-Host " 填寫或黏貼除後綴外的檔案名（輸入 'q' 返回上一級）"
+                $manualName = Read-Host " 填寫或黏貼除後綴外的檔案名（輸入 'q' 返回上級）"
                 if ($manualName -eq 'q') { break }
 
                 if ([string]::IsNullOrWhiteSpace($manualName)) {
@@ -1225,7 +1225,7 @@ function Main {
     # avs2pipemod: y4mp, y4mt, y4mb (progressive, tff, bff)
     # x264: --tff, --bff
     # x265: --interlace 0 (progressive), 1 (tff), 2 (bff)
-    # SVT-AV1: 原生不支持，報錯並退出
+    # SVT-AV1：原生不支持，報錯並退出
     Show-Info "正在區分隔行掃描格式..."
     Set-IsVOB -ffprobeCsvPath $ffprobeCsvPath
     Set-InterlacedArgs -fieldOrderOrIsInterlacedFrame $ffprobeCSV.H -topFieldFirst $ffprobeCSV.J
@@ -1280,6 +1280,7 @@ function Main {
     $x265Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $false
     $x264Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $false
     $svtav1Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $true
+
     # x265 執行緒管理
     $x265Params.PME = Get-x265PME
     $x265Params.Pools = Get-x265ThreadPool
@@ -1315,11 +1316,10 @@ function Main {
     # 1. 獲取源檔案名（用於傳遞給函數）
     $sourcePathRaw = $sourceCSV.SourcePath
     $defaultNameBase = [System.IO.Path]::GetFileNameWithoutExtension($sourcePathRaw)
-    # 2. 判斷是否為占位符源
+    # 2. 判斷是否為佔位符腳本源
     $isPlaceholder = Get-IsPlaceHolderSource -defaultName $defaultNameBase
-    # 3. 調用新函數獲取最終檔案名（所有交互、驗證、重試都在函數內完成）
+    # 3. 獲取最終檔案名（所有交互、驗證、重試都在函數內完成）
     $encodeOutputFileName = Get-EncodeOutputName -SourcePath $sourcePathRaw -IsPlaceholder $isPlaceholder
-
 
     # 由於默認給所有編碼器生成參數，因此僅通知相容性問題，而非報錯退出
     if ($script:interlacedArgs.isInterlaced -and
@@ -1346,7 +1346,7 @@ function Main {
     $x265Params.Output = Get-EncodingIOArgument -program 'x265' -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $x265Params.OutputExtension
     $svtav1Params.Output = Get-EncodingIOArgument -program 'svtav1' -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $svtav1Params.OutputExtension
 
-    Show-Info "構建管道下游（編碼器）基礎參數.."
+    Show-Info "構建管道下游（編碼器）基礎參數..."
     $x264Params.BaseParam = Invoke-BaseParamSelection -CodecName "x264" -GetParamFunc ${function:Get-x264BaseParam} -ExtraParams @{ askUserFGO = $true }
     $x265Params.BaseParam = Invoke-BaseParamSelection -CodecName "x265" -GetParamFunc ${function:Get-x265BaseParam}
     $svtav1Params.BaseParam = Invoke-BaseParamSelection -CodecName "SVT-AV1" -GetParamFunc ${function:Get-svtav1BaseParam} -ExtraParams @{ askUserDLF = $true }

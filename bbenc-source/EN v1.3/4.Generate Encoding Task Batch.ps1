@@ -420,7 +420,7 @@ function Get-x264BaseParam {
 # Retrieve basic x265 parametersffmpeg.exe -y -i ".\in.mp4" -an -f yuv4mpegpipe -strict -1 - | x265.exe [Get-...] [Get-x265BaseParam] --y4m --input - --output ".\out.hevc"
 function Get-x265BaseParam {
     Param ([Parameter(Mandatory=$true)]$pickOps)
-    # TODO：Add DJATOM? Mod's fully customizable AQ
+    # TODO: Add DJATOM? Mod's fully customizable AQ
     $default = "--high-tier --preset slow --me umh --subme 5 --weightb --aq-mode 4 --bframes 5 --ref 3"
     switch ($pickOps) {
         # General Purpose，bframes 5
@@ -450,7 +450,7 @@ function Get-x265BaseParam {
     }
 }
 
-# Retrieve basic SVT-AV1 parameters：ffmpeg.exe -y -i ".\in.mp4" -an -f yuv4mpegpipe -strict -1 - | SvtAv1EncApp.exe -i - [Get-svtav1BaseParam] -b ".\out.ivf"
+# Retrieve basic SVT-AV1 parameters: ffmpeg.exe -y -i ".\in.mp4" -an -f yuv4mpegpipe -strict -1 - | SvtAv1EncApp.exe -i - [Get-svtav1BaseParam] -b ".\out.ivf"
 function Get-svtav1BaseParam {
     Param (
         [Parameter(Mandatory=$true)]$pickOps,
@@ -858,7 +858,7 @@ function Get-ColorSpaceSEI {
             "chroma-cl"  { 13 }
             ictcp        { 14 }
             default { 
-                Show-Warning "Could not match color matrix：$CSVColorMatrix, using default (bt709)"
+                Show-Warning "Could not match color matrix: $CSVColorMatrix, using default (bt709)"
                 1
             }
         }
@@ -897,7 +897,7 @@ function Get-ColorSpaceSEI {
             smpte428        { 17 }
             hlg             { 18 }
             default { 
-                Show-Warning "Could not match transfer characteristics：$CSVTransfer, using default (bt709)"
+                Show-Warning "Could not match transfer characteristics: $CSVTransfer, using default (bt709)"
                 1
             }
         }
@@ -940,7 +940,7 @@ function Get-ColorSpaceSEI {
             smpte432   { 12 }
             ebu3213    { 22 }
             default {
-                Show-Warning "Could not match color primaries：$CSVPrimaries, using default (bt709)"
+                Show-Warning "Could not match color primaries: $CSVPrimaries, using default (bt709)"
                 1
             }
         }
@@ -1228,6 +1228,16 @@ function Main {
         throw "temp_s_info CSV data corrupted. Please rerun step 3 script"
     }
 
+    # Interlaced source support
+    # ffmpeg, vspipe, avs2yuv, svfi: Ignore
+    # avs2pipemod: y4mp, y4mt, y4mb (progressive, tff, bff)
+    # x264: --tff, --bff
+    # x265: --interlace 0 (progressive), 1 (tff), 2 (bff)
+    # SVT-AV1: Natively unsupported, show error and exit
+    Show-Info "Detecting interlaced formats..."
+    Set-IsVOB -ffprobeCsvPath $ffprobeCsvPath
+    Set-InterlacedArgs -fieldOrderOrIsInterlacedFrame $ffprobeCSV.H -topFieldFirst $ffprobeCSV.J
+
     # Calculate and assign to object properties
     Show-Info "Optimizing encoding parameters (Profile, resolution, dynamic search range, etc.)..."
     # $x265Params.Profile = Get-x265SVTAV1Profile -CSVpixfmt $ffprobeCSV.D -isIntraOnly $false -isSVTAV1 $false
@@ -1235,27 +1245,51 @@ function Main {
     $x265Params.Resolution = Get-InputResolution -CSVw $ffprobeCSV.B -CSVh $ffprobeCSV.C
     $svtav1Params.Resolution = Get-InputResolution -CSVw $ffprobeCSV.B -CSVh $ffprobeCSV.C -isSVTAV1 $true
     $x265Params.MERange = Get-x265MERange -CSVw $ffprobeCSV.B -CSVh $ffprobeCSV.C
-    $ffmpegParams.FPS = Get-FPSParam -CSVfps $ffprobeCSV.H -Target ffmpeg
-    $svtav1Params.FPS = Get-FPSParam -CSVfps $ffprobeCSV.H -Target svtav1
-    $x265Params.FPS = Get-FPSParam -CSVfps $ffprobeCSV.H -Target x265
-    $x264Params.FPS = Get-FPSParam -CSVfps $ffprobeCSV.H -Target x264
 
-    Show-Debug "Color matrix: $($ffprobeCSV.E); Transfer: $($ffprobeCSV.F); Primaries: $($ffprobeCSV.G)"
+    # Show-Debug "Color matrix: $($ffprobeCSV.E); Transfer: $($ffprobeCSV.F); Primaries: $($ffprobeCSV.G)"
     $svtav1Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -Codec svtav1
     $x265Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -Codec x265
     $x264Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -Codec x264
-    $x265Params.Subme = Get-x265Subme -CSVfps $ffprobeCSV.H
-    [int]$x265SubmeInt = Get-x265Subme -CSVfps $ffprobeCSV.H -getInteger $true
-    Show-Debug "Source framerate: $(ConvertTo-Fraction $ffprobeCSV.H)"
-    $x264Params.Keyint = Get-Keyint -CSVfps $ffprobeCSV.H -bframes 250 -askUser -isx264
-    $x265Params.Keyint = Get-Keyint -CSVfps $ffprobeCSV.H -bframes $x265SubmeInt -askUser -isx265
-    $svtav1Params.Keyint = Get-Keyint -CSVfps $ffprobeCSV.H -bframes 999 -askUser -isSVTAV1
-    $x264Params.RCLookahead = Get-RateControlLookahead -CSVfps $ffprobeCSV.H -bframes 250 # hack: implement suggested maximum value in x264 using fake bframes
-    $x265Params.RCLookahead = Get-RateControlLookahead -CSVfps $ffprobeCSV.H -bframes $x265SubmeInt
 
+    # VOB formats' framerate data is in I
+    if ($script:interlacedArgs.isVOB) {
+        $ffmpegParams.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target ffmpeg
+        $svtav1Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target svtav1
+        $x265Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target x265
+        $x264Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target x264
+
+        $x265Params.Subme = Get-x265Subme -fpsString $ffprobeCSV.I
+        [int]$x265SubmeInt = Get-x265Subme -fpsString $ffprobeCSV.I -getInteger $true
+        Show-Debug "VOB source framerate: $(ConvertTo-Fraction $ffprobeCSV.I)"
+        $x264Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.I -bframes 250 -askUser -isx264
+        $x265Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.I -bframes $x265SubmeInt -askUser -isx265
+        $svtav1Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.I -bframes 999 -askUser -isSVTAV1
+        
+        $x264Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.I -bframes 250 # hack: implement suggested maximum value in x264 using fake bframes
+        $x265Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.I -bframes $x265SubmeInt
+    }
+    else {
+        $ffmpegParams.FPS = Get-FPSParam -fpsString $ffprobeCSV.H -Target ffmpeg
+        $svtav1Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.H -Target svtav1
+        $x265Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.H -Target x265
+        $x264Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.H -Target x264
+
+        $x265Params.Subme = Get-x265Subme -fpsString $ffprobeCSV.H
+        [int]$x265SubmeInt = Get-x265Subme -fpsString $ffprobeCSV.H -getInteger $true
+        Show-Debug "Source video framerate: $(ConvertTo-Fraction $ffprobeCSV.H)"
+        $x264Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.H -bframes 250 -askUser -isx264
+        $x265Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.H -bframes $x265SubmeInt -askUser -isx265
+        $svtav1Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.H -bframes 999 -askUser -isSVTAV1
+        $x264Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.H -bframes 250
+        $x265Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.H -bframes $x265SubmeInt
+    }
+    
+    # VOB formats' frame count data is in J
     $x265Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $false
     $x264Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $false
     $svtav1Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $true
+
+    # x265 Threading
     $x265Params.PME = Get-x265PME
     $x265Params.Pools = Get-x265ThreadPool
 
@@ -1264,9 +1298,8 @@ function Main {
     if ($sourceCSV.UpstreamCode -eq 'c') {
         Write-Host ""
         Show-Info "Select the correct version of avs2yuv(64).exe used:"
-        $avs2yuvVersionCode = Read-Host " [a/Default Enter: AviSynth+ (0.30) | b: AviSynth (up to 0.26)]"
+        $avs2yuvVersionCode = Read-Host " [Default Enter/a: AviSynth+ (0.30) | b: AviSynth (up to 0.26)]"
     }
-
     $ffmpegParams.CSP = Get-ffmpegCSP -CSVpixfmt $ffprobeCSV.D
     $svtav1Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $true
     $x265Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
@@ -1285,73 +1318,26 @@ function Main {
     }
     else { $olsargParams.ConfigInput = "" }
 
-    # Locate the batch file for exporting the encoding task and the encoding output path.
     Write-Host ""
-    Show-Info "Configure the export path for encoding result output..."
-    $encodeOutputPath = Select-Folder -Description "Select path for encoding export"
+    Show-Info "Configure output path, filename..."
+    $encodeOutputPath = Select-Folder -Description "Select output path for encoder file output"
+    # 1. Get source filename (pass to selection function as an option)
+    $sourcePathRaw = $sourceCSV.SourcePath
+    $defaultNameBase = [System.IO.Path]::GetFileNameWithoutExtension($sourcePathRaw)
+    # 2. Check if is a placeholder script source
+    $isPlaceholder = Get-IsPlaceHolderSource -defaultName $defaultNameBase
+    # 3. Get the final filename (all interactions, validations, and retries are done within the function).
+    $encodeOutputFileName = Get-EncodeOutputName -SourcePath $sourcePathRaw -IsPlaceholder $isPlaceholder
 
-    # Configure the filename of the encoded result
-    # 1. Get the default value (copy from the source)
-    Show-Debug "CSV SourcePath Original text: $($sourceCSV.SourcePath)"
-    
-    $defaultName = [io.path]::GetFileNameWithoutExtension($sourceCSV.SourcePath)
-    # Auto-generated script source makes the filename to become "blank_vs_script/blank_avs_script" instead of the video filename.
-    # If this filename is matched, eliminate the default (Enter) option.
-    $isPlaceholderSource = Get-IsPlaceHolderSource -defaultName $defaultName
-    $encodeOutputFileName = ""
-    
-    # Calculate displayName using PowerShell 5.1 compatible syntax.
-    if (-not $isPlaceholderSource) {
-        $encodeOutputFileName = $defaultName
-        if ($defaultName.Length -gt 17) {
-            $displayName = $defaultName.Substring(0, 18) + "..."
-        }
-        else {
-            $displayName = $defaultName
-        }
-    }
-    else { # Do not put ":" into path!
-        $displayName = "Encode " + (Get-Date -Format 'yyyy-MM-dd HH-mm')
+    # All encoders are getting parameters, therefore warn compatibility issues not don't quit
+    if ($script:interlacedArgs.isInterlaced -and
+        $program -in @('x265', 'h265', 'hevc', 'svt-av1', 'svtav1', 'ivf')) {
+        Show-Info "Get-EncodingIOArgument: SVT-AV1 natively reject interlaced source; x265 interlaced support is experimental (official version)"
+        Show-Info ("Deinterlacing & IVTC filtering tutorial: " + $script:interlacedArgs.toPFilterTutorial)
+        Write-Host ""
     }
 
-    $encodeOutputNameCode =
-        Read-Host " Specify filename for the encoded video——[a: copy from file | b: input | Enter: $displayName]"
-    # Ensure there are no special/invisible characters
-    if ($encodeOutputNameCode -eq 'a') { # Select source video file
-        Show-Info "Select a file to copy filename..."
-        do {
-            $fileForName = Select-File -Title "Select a file to copy filename"
-            if (-not $fileForName) {
-                if ((Read-Host " No file selected. Press Enter to try again, type 'q' to force exit") -eq 'q') {
-                    return
-                }
-            }
-        }
-        while (-not $fileForName)
-
-        # Get file name
-        $encodeOutputFileName = [io.path]::GetFileNameWithoutExtension($fileForName)
-    }
-    elseif ($encodeOutputNameCode -eq 'b') { # Type input
-        $encodeOutputFileName = Read-Host " Input a filename (without extension)"
-    }
-    # Default file name
-    # (if final file name is stll empty, set to $displayName)
-    # When $displayName = "Encode " + (Get-Date...), $encodeOutputFileName is still unset
-    if (-not $encodeOutputFileName -or $encodeOutputFileName -eq "") {
-        $encodeOutputFileName = $displayName
-    }
-
-    if (Test-FilenameValid -Filename $encodeOutputFileName) {
-        Show-Success "Final file name: $encodeOutputFileName"
-    }
-    else {
-        Show-Error "Filename $encodeOutputFileName failed to conform to Windows naming conventions."
-        Write-Host " Please manually change it in the generated batch file,"
-        Write-Host " otherwise expect encoding to fail in the file save step"
-    }
-
-    # Generate IO Parameters (Input/Output)
+    Show-Info "Generate IO Parameters (Input/Output)..."
     # 1. Upstream Program Input of the Pipe
     # The pipe connector is controlled by the batch generated by the previous script,
     # and is not specified here.
@@ -1360,21 +1346,22 @@ function Main {
     $avsyuvParams.Input = Get-EncodingIOArgument -program 'avs2yuv' -isImport $true -source $sourceCSV.SourcePath
     $avsmodParams.Input = Get-EncodingIOArgument -program 'avs2pipemod' -isImport $true -source $sourceCSV.SourcePath
     $olsargParams.Input = Get-EncodingIOArgument -program 'svfi' -isImport $true -source $sourceCSV.SourcePath
-    # 2. Downstream program (encoder) input (no need to call Get-EncodingIOArgument since the default value is already provided)
-    # $x264Params.Input = Get-EncodingIOArgument -program 'x264' -isImport $true
-    # $x265Params.Input = Get-EncodingIOArgument -program 'x265' -isImport $true
-    # $svtav1Params.Input = Get-EncodingIOArgument -program 'svtav1' -isImport $true
+    # 2. Downstream program (encoder) input
+    # requires interlaced specifier parameters, using Get-EncodingIOArgument is mandatory
+    $x264Params.Input = Get-EncodingIOArgument -program 'x264' -isImport $true -source $sourceCSV.SourcePath
+    $x265Params.Input = Get-EncodingIOArgument -program 'x265' -isImport $true -source $sourceCSV.SourcePath
+    $svtav1Params.Input = Get-EncodingIOArgument -program 'svtav1' -isImport $true -source $sourceCSV.SourcePath
     # 3. Pipe downstream program output
     $x264Params.Output = Get-EncodingIOArgument -program 'x264' -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $x264Params.OutputExtension
     $x265Params.Output = Get-EncodingIOArgument -program 'x265' -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $x265Params.OutputExtension
     $svtav1Params.Output = Get-EncodingIOArgument -program 'svtav1' -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $svtav1Params.OutputExtension
 
-    # Constructing base parameters of the pipe downstream programs
+    Show-Info "Constructing base parameters of the pipe downstream programs..."
     $x264Params.BaseParam = Invoke-BaseParamSelection -CodecName "x264" -GetParamFunc ${function:Get-x264BaseParam} -ExtraParams @{ askUserFGO = $true }
     $x265Params.BaseParam = Invoke-BaseParamSelection -CodecName "x265" -GetParamFunc ${function:Get-x265BaseParam}
     $svtav1Params.BaseParam = Invoke-BaseParamSelection -CodecName "SVT-AV1" -GetParamFunc ${function:Get-svtav1BaseParam} -ExtraParams @{ askUserDLF = $true }
 
-    # Concatenate final parameter string
+    Show-Info "Concatenating final parameter string..."
     # These strings will be directly injected into the batch file "set 'xxx_params=...'"
     # Empty parameters may result in double spaces, but paths and filenames may also contain double spaces, so they are not filtered (-replace " ", " ")
     # 1. Pipeline upstream tool
