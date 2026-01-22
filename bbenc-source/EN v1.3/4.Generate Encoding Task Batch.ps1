@@ -580,7 +580,7 @@ function Get-Keyint {
             Write-Host " 1. For resolutions higher than 2560x1440, pick from 1 section to left"
             Write-Host " 2. For simple & flat video content, pick from 1 section to right"
             $userSecond =
-                Read-Host " General Range to specify (second): [Low Power/Multitrack Editing: 6-7 | Normal: 8-10 | High: 11-13+ ]"
+                Read-Host " General Range to specify (second): [Low Power/Multitrack Editing: 6-7 | 8-10 | High: 11-13+ ]"
             if ($userSecond -notmatch "^\d+$") {
                 if ((Read-Host " Not receiving positive integer. Press Enter to retry, input 'q' to force exit") -eq 'q') {
                     exit 1
@@ -813,8 +813,8 @@ function Get-FPSParam {
     
     # x264、x265、ffmpeg supports direct string fps value
     switch ($Target) {
-        "ffmpeg" { return "-r $fpsValue" }
-        default  { return "--fps $fpsValue" }
+        "ffmpeg" { return "-r $fpsString" }
+        default  { return "--fps $fpsString" }
     }
 }
 
