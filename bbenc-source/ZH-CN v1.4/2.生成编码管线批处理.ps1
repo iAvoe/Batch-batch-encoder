@@ -153,7 +153,7 @@ function Main {
     do {
         $outputPath = Select-Folder -Description "选择批处理文件保存位置"
         if (-not $outputPath -or -not (Test-Path $outputPath)) {
-            if ((Read-Host "未选择导出路径，请重试。输入 'q' 强制退出") -eq 'q') {
+            if ((Read-Host "未选择导出路径，请重试输入 'q' 强制退出") -eq 'q') {
                 return
             }
         }

@@ -84,10 +84,9 @@ $interlacedArgs = [PSCustomObject]@{
     isVOB = $false
 }
 
-
 function Get-EncodeOutputName {
     Param(
-        [string]$SourcePath,
+        [Parameter(Mandatory=$true)][string]$SourcePath,
         [bool]$IsPlaceholder = $false
     )
 
@@ -115,7 +114,7 @@ function Get-EncodeOutputName {
         Write-Host ""
         $inputOp = Read-Host " 指定壓制結果的檔案名——[a：從文件拷貝 | b：手寫 | Enter：$displayPrompt]"
 
-        # 3-1: 直接 Enter（默認行為）
+        # 3-1：直接 Enter（默認行為）
         if ([string]::IsNullOrWhiteSpace($inputOp)) {
             if (Test-FilenameValid -Filename $finalDefaultName) {
                 Show-Success "使用默認檔案名：$finalDefaultName"
@@ -125,10 +124,8 @@ function Get-EncodeOutputName {
                 Show-Error "默認檔案名包含非法字元，請選擇其他方式。"
             }
         }
-        
-        # 3-2: 選項 a（從文件拷貝）
-        elseif ($inputOp -eq 'a') {
-            Show-Info "選擇一個文件以拷貝檔案名..."
+        elseif ($inputOp -eq 'a') { # 3-2：選項 a
+            Show-Info "拷貝檔案名..."
             $selectedFile = $null
             
             # 內層循環：直到選到文件或強制退出
@@ -136,7 +133,7 @@ function Get-EncodeOutputName {
                 $selectedFile = Select-File -Title "選擇一個文件以拷貝檔案名"
                 if (-not $selectedFile) {
                     $retry = Read-Host " 未選擇文件，按 Enter 重試，輸入 'q' 返回上一級"
-                    if ($retry -eq 'q') { break } # 跳出 do-while，回到 while 主循環
+                    if ($retry -eq 'q') { break }
                 }
             }
 
@@ -149,16 +146,14 @@ function Get-EncodeOutputName {
                 }
             }
         }
-
-        # 3-3: 選項 b（手動輸入）
-        elseif ($inputOp -eq 'b') {
-            Show-Info "填寫除後綴外的檔案名..."
-            Show-Warning " 兩個方括號間必須用字元隔開，不要輸入特殊符號"
+        elseif ($inputOp -eq 'b') { # 3-3：選項 b
+            Show-Info "手動輸入..."
+            Show-Warning "兩個方括號間必須要有字元隔開，不要輸入特殊符號"
             
             $manualName = $null
             while ($true) {
-                $manualName = Read-Host "填寫除後綴外的檔案名（輸入 'q' 返回上一級）"
-                if ($manualName -eq 'q') { break } # 跳出 do-while
+                $manualName = Read-Host " 填寫或黏貼除後綴外的檔案名（輸入 'q' 返回上一級）"
+                if ($manualName -eq 'q') { break }
 
                 if ([string]::IsNullOrWhiteSpace($manualName)) {
                     Show-Warning "檔案名不能為空"
@@ -173,8 +168,7 @@ function Get-EncodeOutputName {
                 }
             }
         }
-        # 3-4
-        else {
+        else { # 3-4
             Show-Warning "選項無效，請輸入 a、b 或按 Enter"
         }
     }

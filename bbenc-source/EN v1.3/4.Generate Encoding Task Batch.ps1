@@ -86,46 +86,93 @@ $interlacedArgs = [PSCustomObject]@{
 }
 
 function Get-EncodeOutputName {
-    Param([Parameter(Mandatory=$true)][string]$pickOps)
-    $encodeOutputFileName = $null
+    Param(
+        [Parameter(Mandatory=$true)][string]$SourcePath,
+        [bool]$IsPlaceholder = $false
+    )
 
-    switch ($pickOps) {
-        a {
-            Show-Info "Select file to copy file name..."
-            do {
-                $selection = Select-File -Title "Select a file to copy file name"
-                if (-not $selection) {
-                    if ((Read-Host "No file selected. Press Enter to retry, input 'q' to force exit") -eq 'q') {
-                        exit 1
-                    }
+    # 1. Calculate default filename
+    $defaultNameBase = [System.IO.Path]::GetFileNameWithoutExtension($SourcePath)
+    $finalDefaultName = $null
+    
+    if (-not $IsPlaceholder -and -not [string]::IsNullOrWhiteSpace($defaultNameBase)) {
+        $finalDefaultName = $defaultNameBase
+    }
+    else {
+        # If it's a placeholder source (automatic script) or the source path is empty, use the timestamp as the default name.
+        # Note: Filenames cannot contain colons, therefore use HH-mm.
+        $finalDefaultName = "Encode " + (Get-Date -Format 'yyyy-MM-dd HH-mm')
+    }
+
+    # 2. Generate the display file name; truncate if too long
+    $displayPrompt = if ($finalDefaultName.Length -gt 18) { 
+        $finalDefaultName.Substring(0, 18) + "..." 
+    }
+    else {  $finalDefaultName  }
+
+    # 3. UI loop
+    while ($true) {
+        Write-Host ""
+        $inputOp = Read-Host " Specify the output filename——[a: Copy from file | b: Input | Enter: $displayPrompt]"
+
+        # 3-1: Enter (default behavior)
+        if ([string]::IsNullOrWhiteSpace($inputOp)) {
+            if (Test-FilenameValid -Filename $finalDefaultName) {
+                Show-Success "Using default filename: $finalDefaultName"
+                return $finalDefaultName
+            }
+            else {
+                Show-Error "Default filename has illegal character, please try other methods"
+            }
+        }
+        elseif ($inputOp -eq 'a') { # 3-2: Option a
+            Show-Info "Copy filename..."
+            $selectedFile = $null
+            
+            # Inner loop: until file selected or break triggered
+            while (-not $selectedFile) {
+                $selectedFile = Select-File -Title "Select a file to copy its filename"
+                if (-not $selectedFile) {
+                    $retry = Read-Host "File not selected, press Enter to retry. Enter 'q' to return to previous menu"
+                    if ($retry -eq 'q') { break }
                 }
             }
-            while (-not $selection)
-            $fileNameTestResult = Test-FilenameValid($selection)
-            return [io.path]::GetFileNameWithoutExtension($selection)
-        }
-        b {
-            Show-Info "Input file name expect file extension..."
-            Show-Warning " Two square brackets MUST be separated by character"
-            Show-Warning " Avoid special characters including currency symbols AND newline characters"
-            do {
-                $encodeOutputFileName = Read-Host "Input a file name"
-                $fileNameTestResult = Test-FilenameValid($encodeOutputFileName)
-                if ((-not $fileNameTestResult) -or [string]::IsNullOrWhiteSpace($encodeOutputFileName)) {
-                    if ((Read-Host "File name is empty or contains special characters. Press Enter to retry, input 'q' to force exit") -eq 'q') {
-                        exit 1
-                    }
+
+            if ($selectedFile) {
+                $extractedName = [System.IO.Path]::GetFileNameWithoutExtension($selectedFile)
+                # Since the filename already exists in the system, it is usually valid, verifying anyways as a precaution
+                if (Test-FilenameValid -Filename $extractedName) {
+                    Show-Success "Extracted filename: $extractedName"
+                    return $extractedName
                 }
             }
-            while ((-not $fileNameTestResult) -or [string]::IsNullOrWhiteSpace($encodeOutputFileName))
         }
-        default {
-            Show-Warning "No option selected, returning empty file name"
-            return ""
+        elseif ($inputOp -eq 'b') { # 3-3: Option b (manual)
+            Show-Info "Input filename..."
+            Show-Warning "There must be a character separating both square brackets; avoid special characters"
+            
+            $manualName = $null
+            while ($true) {
+                $manualName = Read-Host " Enter filename without extension. Enter 'q' to return to previous menu"
+                if ($manualName -eq 'q') { break }
+
+                if ([string]::IsNullOrWhiteSpace($manualName)) {
+                    Show-Warning "Filename cannot be empty"
+                    continue
+                }
+                if (Test-FilenameValid -Filename $manualName) {
+                    Show-Success "Filename set: $manualName"
+                    return $manualName
+                }
+                else {
+                    Show-Error "Illegal character found in file name, please retry"
+                }
+            }
+        }
+        else { # 3-4
+            Show-Warning "Invalid option. Please enter a, b or press Enter"
         }
     }
-    Show-Success "Output file name: $encodeOutputFileName"
-    return $encodeOutputFileName
 }
 
 # Parse the fraction string and perform division, i.e., ConvertTo-Fraction -fraction "1/2"
