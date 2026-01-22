@@ -776,8 +776,7 @@ function Get-FPSParam {
         [ValidateSet("ffmpeg","x264","avc","x265","hevc","svtav1","SVT-AV1")]
         [string]$Target
     )
-
-    # SVT-AV1 需要特殊处理：使用 --fps-num 和 --fps-denom 分开写
+    # SVT-AV1 特殊处理：使用 --fps-num 和 --fps-denom 分开写
     if ($Target -in @("svtav1", "SVT-AV1")) {
         if ($fpsString -match '^(\d+)/(\d+)$') {
             # 若是分数格式（如 24000/1001）
@@ -788,13 +787,12 @@ function Get-FPSParam {
                 "23.976" { return "--fps-num 24000 --fps-denom 1001" }
                 "29.97"  { return "--fps-num 30000 --fps-denom 1001" }
                 "59.94"  { return "--fps-num 60000 --fps-denom 1001" }
-                default  { 
-                    # 对于其他值，使用整数
+                default  { # 其他值使用整数
                     try {
                         $intFps = [Math]::Round([double]$fpsString)
                     }
                     catch [System.Management.Automation.RuntimeException] {
-                        throw "Get-FPSParam：输入了无法被转换为数字的帧率参数 fpsString"
+                        throw "Get-FPSParam：帧率参数 fpsString 无法被转换为数字：$fpsString"
                     }
                     return "--fps $intFps" 
                 }

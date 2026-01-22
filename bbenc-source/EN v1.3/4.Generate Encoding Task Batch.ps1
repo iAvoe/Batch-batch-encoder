@@ -779,27 +779,29 @@ function Get-InputResolution {
 # Added support for fractional fps value in SVT-AV1 (directly preserved fraction strings)
 function Get-FPSParam {
     Param (
-        [Parameter(Mandatory=$true)]$CSVfps,
+        [Parameter(Mandatory=$true)]$fpsString,
         [Parameter(Mandatory=$true)]
         [ValidateSet("ffmpeg","x264","avc","x265","hevc","svtav1","SVT-AV1")]
         [string]$Target
     )
-    $fpsValue = $CSVfps
-    
     # SVT-AV1's case: use --fps-num & --fps-denom instead
     if ($Target -in @("svtav1", "SVT-AV1")) {
-        if ($fpsValue -match '^(\d+)/(\d+)$') {
+        if ($fpsString -match '^(\d+)/(\d+)$') {
             # Fractional fps, i.e., 24000/1001
             return "--fps-num $($matches[1]) --fps-denom $($matches[2])"
         }
         else { # Direct input in float, restore to fraction
-            switch ($fpsValue) {
+            switch ($fpsString) {
                 "23.976" { return "--fps-num 24000 --fps-denom 1001" }
                 "29.97"  { return "--fps-num 30000 --fps-denom 1001" }
                 "59.94"  { return "--fps-num 60000 --fps-denom 1001" }
-                default  { 
-                    # Use integer for whole fps value
-                    $intFps = [Math]::Round([double]$fpsValue)
+                default  { # Use integer for other values
+                    try {
+                        $intFps = [Math]::Round([double]$fpsString)
+                    }
+                    catch [System.Management.Automation.RuntimeException] {
+                        throw "Get-FPSParam: Unable to convert fpsString: '$fpsString' to number"
+                    }
                     return "--fps $intFps" 
                 }
             }
