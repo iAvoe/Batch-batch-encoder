@@ -76,6 +76,15 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 <p align="center"><img src="bmc_qr.png" alt="支持一下 -_-"><br><img src="pp_tip_qr.png" alt="支持一下 =_="></p>
 
 ## 更新信息
+**v1.4.5**
+- 實現了 VOB 格式的元數據讀取支持
+- 實現了 VOB 與非 VOB 的逐行與隔行掃描識別功能
+- 添加了自動指定 avs2pipemod、x264、x265 隔行掃描參數的功能（SVT-AV1 則提示原生不支持）
+- 已完成 vspipe 到 x264、x265 測試，等待完成其他測試
+- 修復了因管道上游同時選擇了 AVS 類工具以及 vspipe 工具時，只能導入 .avs 或 .vpy 觸發相容檢測失敗（判斷為應終止腳本）的邏輯問題（修改腳本源後綴名並檢測文件是否存在，提示但無視錯誤）
+- 步驟 3 升級為使用 ffmpeg 檢測真實封裝檔案格式的方案，不再用後綴名檢測
+- 步驟 2 添加了當只有一種工具鏈可用時自動選擇的功能
+
 **v1.3.9**
 - 提前了批處理的變數清理（endlocal）時機，避免編碼後直接關閉 CMD 視窗產生殘留
 - 新增了無法實現從 .vs，.avs 腳本讀取視訊來源或驗證視訊存在功能原因的說明
