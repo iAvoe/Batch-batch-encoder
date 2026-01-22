@@ -1109,6 +1109,117 @@ function Get-IsRAWSource ([string]$validateUpstreamCode) {
     return $validateUpstreamCode -eq 'e'
 }
 
+# 尽快判断文件为 VOB 格式（格式判断已被先前脚本确定），影响后续大量参数的 $ffprobeCSV 变量读法
+function Set-IsVOB {
+    [Parameter(Mandatory=$true)]
+    [string]$ffprobeCsvPath # 用于检查文件名是否含 _vob
+    if ([string]::IsNullOrWhiteSpace($ffprobeCsvPath)) {
+        throw "Set-IsVOB：ffprobeCsvPath 参数为空，无法判断"
+    }
+    $script:interlacedArgs.isVOB = $ffprobeCsvPath -like "*_vob*"
+}
+
+function Set-InterlacedArgs {
+    Param(
+        [Parameter(Mandatory=$true)]
+        [string]$fieldOrderOrIsInterlacedFrame, # VOB：$ffprobe.H；其它：$ffprobeCsv.J
+        [Parameter(Mandatory=$true)]
+        [string]$topFieldFirst # $ffprobeCsv.K
+    )
+    # 初始化
+    $script:interlacedArgs.isInterlaced = $false
+    $script:interlacedArgs.isTFF = $false
+
+    # 处理 VOB 格式
+    if ($script:interlacedArgs.isVOB) {
+        $fieldOrder = $fieldOrderOrIsInterlacedFrame.ToLower().Trim()
+        
+        switch -Regex ($fieldOrder) {
+            '^progressive$' {
+                $script:interlacedArgs.isInterlaced = $false
+                $script:interlacedArgs.isTFF = $false
+            }
+            '^(tt|bt)$' { # tt：上场优先显示、bt：下编上播
+                $script:interlacedArgs.isInterlaced = $true
+                $script:interlacedArgs.isTFF = $true
+            }
+            '^(bb|tb)$' { # bb：下场优先显示、tb：上编下播
+                $script:interlacedArgs.isInterlaced = $true
+                $script:interlacedArgs.isTFF = $false
+            }
+            '^unknown$' {
+                Show-Warning "Set-InterlacedArgs: VOB field_order 为 'unknown'，将视为逐行"
+                $script:interlacedArgs.isInterlaced = $false
+                $script:interlacedArgs.isTFF = $false
+            }
+            { [string]::IsNullOrWhiteSpace($fieldOrder) } {
+                Show-Warning "Set-InterlacedArgs: VOB field_order 为空，将视为逐行"
+                $script:interlacedArgs.isInterlaced = $false
+                $script:interlacedArgs.isTFF = $false
+            }
+            default {
+                Show-Warning "Set-InterlacedArgs: VOB field_order='$fieldOrder' 无法解析，将视为逐行"
+                $script:interlacedArgs.isInterlaced = $false
+                $script:interlacedArgs.isTFF = $false
+            }
+        }
+    }
+    else {  # 非 VOB 格式，解析 interlaced_frame (0/1)
+        $interlacedFrame = $fieldOrderOrIsInterlacedFrame.Trim()
+        
+        if ([string]::IsNullOrWhiteSpace($interlacedFrame)) {
+            Show-Warning "Set-InterlacedArgs: interlaced_frame 为空，将视作逐行"
+            $script:interlacedArgs.isInterlaced = $false
+        }
+        else {
+            try {
+                $interlacedInt = [int]::Parse($interlacedFrame)
+                $script:interlacedArgs.isInterlaced = ($interlacedInt -eq 1)
+            }
+            catch {
+                Show-Warning "Set-InterlacedArgs: 无法解析 interlaced_frame='$interlacedFrame'，将视作逐行"
+                $script:interlacedArgs.isInterlaced = $false
+            }
+        }
+        
+        # 解析 top_field_first (-1/0/1)
+        $tff = $topFieldFirst.Trim()
+        
+        if ([string]::IsNullOrWhiteSpace($tff)) {
+            if ($script:interlacedArgs.isInterlaced) {
+                Show-Warning "Set-InterlacedArgs: 场序未知且视频为隔行，将视作上场优先"
+                $script:interlacedArgs.isTFF = $true
+            }
+            else {
+                $script:interlacedArgs.isTFF = $false
+            }
+        }
+        else {
+            try {
+                $tffInt = [int]::Parse($tff)
+                # 1 = top-first, 0/-1 = bottom-first
+                switch ($tffInt) {
+                    1 { $script:interlacedArgs.isTFF = $true }
+                    0 { $script:interlacedArgs.isTFF = $false }
+                    -1 { $script:interlacedArgs.isTFF = $true } 
+                    default {
+                        Show-Warning "Set-InterlacedArgs: top_field_first 值异常 '$tffInt'，将视作上场优先"
+                        $script:interlacedArgs.isTFF = $true
+                    }
+                }
+            }
+            catch {
+                Show-Warning "Set-InterlacedArgs: 无法解析 top_field_first='$tff'，默认上场优先"
+                $script:interlacedArgs.isTFF = $true
+            }
+        }
+    }
+    
+    # 调试输出
+    Show-Debug "Set-InterlacedArgs：隔行扫描：$($script:interlacedArgs.isInterlaced), 上场优先：$($script:interlacedArgs.isTFF)"
+}
+
+#region Main
 function Main {
     Show-Border
     Write-Host "Video encoding task gnerator" -ForegroundColor Cyan
@@ -1437,6 +1548,7 @@ REM svtav1_appendix=$svtav1RawPipeApdx
     }
     pause
 }
+#endregion
 
 try { Main }
 catch {
