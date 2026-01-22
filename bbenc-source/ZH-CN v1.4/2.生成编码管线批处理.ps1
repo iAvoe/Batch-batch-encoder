@@ -12,7 +12,7 @@
 # 下游工具（编码器）必须支持 Y4M 管道，否则需要添加强制覆盖上游程序的逻辑
 # 选用 Y4M/RAW 由上游决定；one_line_shot_args（SVFI）只支持 RAW YUV 管道，强制覆盖下游工具
 
-# 加载共用代码，工具链组合全局变量
+# 加载共用代码
 . "$PSScriptRoot\Common\Core.ps1"
 
 $Script:DownstreamPipeParams = @{
@@ -124,7 +124,6 @@ function Get-CommandFromPreset([string]$presetName, $tools, $vspipeInfo) {
     if (-not $Script:DownstreamPipeParams[$pType].ContainsKey($down)) {
         throw "下游编码器 $down 不支持 $pType 管道"
     }
-
     if ($up -eq 'vspipe') {
         return $template -f $tools[$up], $tools[$down], $down, $vspipeInfo.Args, $pArg
     }
@@ -133,7 +132,7 @@ function Get-CommandFromPreset([string]$presetName, $tools, $vspipeInfo) {
     }
 }
 
-# 主程序
+#region Main
 function Main {
     # 显示标题
     Show-Border
@@ -167,7 +166,7 @@ function Main {
 
     Show-Info "开始导入上游编码工具..."
     Write-Host " 提示：Select-File 支持 -InitialDirectory 参数，在此脚本中添加即可优化导入操作步骤" -ForegroundColor DarkGray
-    Write-Host " 如果难以实现脚本修好，你还可以创建文件夹快捷方式"
+    Write-Host " 或者，可以通过创建文件夹快捷方式来减少点击次数"
     
     # 存储 vspipe 版本与其 API 版本
     $vspipeInfo = $null
@@ -234,9 +233,7 @@ function Main {
     }
     
     Show-Info "开始导入下游编码工具..."
-
-    # 下游工具
-    $i = 0
+    $i=0
     foreach ($tool in @($downstreamTools.Keys)) {
         $i++
         $choice = Read-Host "`r`n [下游] ($i/$($downstreamTools.Count)) 导入 $tool？（y=是，Enter 跳过）"
@@ -255,8 +252,8 @@ function Main {
     # 复制下游工具
     foreach ($k in $downstreamTools.Keys) {
         if ($k -eq 'svtav1') {
-            Write-Host " 由于性能差距大且编译好的 EXE 不易获取，因此建议自行编译 SVT-AV1 编码器"
-            Write-Host " 编译教程可在 AV1 教程完整版（iavoe.github.io）或 SVT-AV1 教程急用版中查看"
+            Write-Host " 建议自行编译 SVT-AV1 编码器（大幅提高性能）"
+            Write-Host " 编译教程：https://iavoe.github.io/av1-web-tutorial/HTML/index.html"
         }
         $tools[$k] = $downstreamTools[$k]
     }
@@ -326,8 +323,7 @@ function Main {
         $selectedId = $presetIdMap.Keys[0]
         Show-Success "仅有一种工具链可用，已自动选择: [$selectedId] $selectedPreset"
     }
-    else {
-        # 选择工具链
+    else { # 选择工具链
         do {
             Write-Host ""
             $inputId = Read-Host "请输入工具链编号（数字）"
@@ -445,6 +441,7 @@ cmd /k
     Show-Success "脚本执行完成！"
     Read-Host "按 Enter 退出"
 }
+#endregion
 
 try { Main }
 catch {

@@ -6,7 +6,7 @@
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
-    1.3
+    1.4
 #>
 
 # Downstream pipe (video encoders) must support Y4M pipe, otherwise upstream-overrides should be added
@@ -67,7 +67,7 @@ function Get-VSPipeY4MArgument {
     )
 
     foreach ($testArgs in $tests) {
-        Write-Host (" Testing: {0} {1}" -f $VSpipePath, ($testArgs -join " "))
+        Write-Host (" 测试：{0} {1}" -f $VSpipePath, ($testArgs -join " "))
         
         # Use Start-Process to execute on a different process,
         # so it doesn't break the character code page used in current console
@@ -105,7 +105,7 @@ function Get-VSPipeY4MArgument {
 function Get-CommandFromPreset([string]$presetName, $tools, $vspipeInfo) {
     $preset = $Global:PipePresets[$presetName]
     if (-not $preset) {
-        throw "Unknown PipePreset: $presetName"
+        throw "Unknown PipePreset：$presetName"
     }
 
     $up   = $preset.Upstream
@@ -116,8 +116,8 @@ function Get-CommandFromPreset([string]$presetName, $tools, $vspipeInfo) {
         'ffmpeg'      { '"{0}" %ffmpeg_params% -f yuv4mpegpipe -an -strict unofficial - | "{1}" {3} %{2}_params%' }
         'vspipe'      { '"{0}" %vspipe_params% {3} - | "{1}" {4} %{2}_params%' }
         'avs2yuv'     { '"{0}" %avs2yuv_params% - | "{1}" {3} %{2}_params%' }
-        'avs2pipemod' { '"{0}" %avs2pipemod_params% -y4mp | "{1}" {3} %{2}_params%' } # No dash upstream formatting
-        'svfi'        { '"{0}" %svfi_params% --pipe-out | "{1}" {3} %{2}_params%' } # No dash upstream formatting
+        'avs2pipemod' { '"{0}" %avs2pipemod_params% -y4mp | "{1}" {3} %{2}_params%' } # No “-” in upstream
+        'svfi'        { '"{0}" %svfi_params% --pipe-out | "{1}" {3} %{2}_params%' } # No “-” in upstream
     }
 
     # Check pipe format
@@ -127,7 +127,6 @@ function Get-CommandFromPreset([string]$presetName, $tools, $vspipeInfo) {
     if (-not $Script:DownstreamPipeParams[$pType].ContainsKey($down)) {
         throw "Downstream (Video Encoder) $down does not support $pType pipe"
     }
-
     if ($up -eq 'vspipe') {
         return $template -f $tools[$up], $tools[$down], $down, $vspipeInfo.Args, $pArg
     }
@@ -166,12 +165,11 @@ function Main {
     Show-Success "Output file defined: $batchFullPath"
 
     Show-Info "Start importing upstream tools..."
-    Write-Host " Hint: You may use add -InitialDirectory parameter to customize the import statements" -ForegroundColor DarkGray
+    Write-Host " Hint: Use add -InitialDirectory parameter to customize the import statements" -ForegroundColor DarkGray
     Write-Host " or create shortcut paths" -ForegroundColor DarkGray
     
     # Store vspipe version, API version
     $vspipeInfo = $null
-
 
     # Upstream tools import
     $i=0
@@ -255,11 +253,8 @@ function Main {
     # Copy downstream tools
     foreach ($k in $downstreamTools.Keys) {
         if ($k -eq 'svtav1') {
-            Write-Host " It is recommended to compile the SVT-AV1 encoder yourself"
-            Write-Host " (large performance gap, harder to obtain compiled executable)"
-            Write-Host " The compilation tutorial can be viewed in the full version of the AV1 tutorial (iavoe.github.io)"
-            Write-Host " or the emergency version of the SVT-AV1 tutorial"
-            Write-Host " You may need webpage translation to view the compiling tutorial"
+            Write-Host " It is recommended to compile the SVT-AV1 encoder yourself (Major performance gain)"
+            Write-Host " Compiling tutorial: https://iavoe.github.io/av1-web-tutorial/HTML/index.html"
         }
         $tools[$k] = $downstreamTools[$k]
     }
@@ -323,21 +318,27 @@ function Main {
         Show-Error "No complete toolchain combination available"
         exit 1
     }
-    
-    # Select a toolchain
-    do {
-        Write-Host ""
-        $inputId = Read-Host "Please enter toolchain number (integer)"
-
-        if ($inputId -match '^\d+$' -and $presetIdMap.ContainsKey([int]$inputId)) {
-            $selectedPreset = $presetIdMap[[int]$inputId]
-            Show-Success "Toolchain selected: [$inputId] $selectedPreset"
-            break
-        }
-        Show-Error "Invalid number, please enter a number from the list above"
+    elseif ($presetIdMap.Count -eq 1) {
+        # Select automatically if there's only one toolchain
+        $selectedPreset = $presetIdMap.Values[0]
+        $selectedId = $presetIdMap.Keys[0]
+        Show-Success "Only one toolchain available, selecting: [$selectedId] $selectedPreset"
     }
-    while ($true)
-    
+    else { # Select a toolchain
+        do {
+            Write-Host ""
+            $inputId = Read-Host "Please enter toolchain number (integer)"
+
+            if ($inputId -match '^\d+$' -and $presetIdMap.ContainsKey([int]$inputId)) {
+                $selectedPreset = $presetIdMap[[int]$inputId]
+                Show-Success "Toolchain selected: [$inputId] $selectedPreset"
+                break
+            }
+            Show-Error "Invalid number, please enter a number from the list above"
+        }
+        while ($true)
+    } 
+
     # Generate batch processing content and append pipeline specifying commands
     # 1. Generate the currently selected main command
     # Show-Debug "S $selectedPreset"; Show-Debug "T $tools"; Show-Debug "V $vspipeInfo"
@@ -347,6 +348,7 @@ function Main {
     # 2. Generate alternate commands for other imported lines (REM write)
     $otherCommands = @()
     foreach ($p in $availablePresets) {
+        Show-Debug "Generating based on preset: $($p.Key)"
         # Note: calling the Key property, not $p
         $presetName = $p.Key
 
@@ -359,8 +361,6 @@ function Main {
     $remCommands = $otherCommands -join "`r`n"
 
     # Build batch file (needs double line break at the beginning of the file)
-    
-    # !TODO: Alter Script 4 so it matches English batch title!
     $batchContent = @'
 
 @echo off

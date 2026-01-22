@@ -12,7 +12,7 @@
 # 下游工具（編碼器）必須支持 Y4M 管道，否則需要添加強制覆蓋上遊程序的邏輯
 # 選用 Y4M/RAW 由上游決定；one_line_shot_args（SVFI）只支持 RAW YUV 管道，強制覆蓋下游工具
 
-# 載入共用代碼，工具鏈組合全局變數
+# 載入共用代碼
 . "$PSScriptRoot\Common\Core.ps1"
 
 $Script:DownstreamPipeParams = @{
@@ -124,7 +124,6 @@ function Get-CommandFromPreset([string]$presetName, $tools, $vspipeInfo) {
     if (-not $Script:DownstreamPipeParams[$pType].ContainsKey($down)) {
         throw "下游編碼器 $down 不支持 $pType 管道"
     }
-
     if ($up -eq 'vspipe') {
         return $template -f $tools[$up], $tools[$down], $down, $vspipeInfo.Args, $pArg
     }
@@ -133,7 +132,7 @@ function Get-CommandFromPreset([string]$presetName, $tools, $vspipeInfo) {
     }
 }
 
-# 主程式
+#region Main
 function Main {
     # 顯示標題
     Show-Border
@@ -167,7 +166,7 @@ function Main {
 
     Show-Info "開始導入上游編碼工具..."
     Write-Host " 提示：Select-File 支持 -InitialDirectory 參數，在此腳本中添加即可最佳化導入操作步驟" -ForegroundColor DarkGray
-    Write-Host " 如果難以實現腳本修好，你還可以創建文件夾捷徑"
+    Write-Host " 或者，可以透過創建文件夾捷徑來減少點擊次數"
     
     # 儲存 vspipe 版本與其 API 版本
     $vspipeInfo = $null
@@ -234,9 +233,7 @@ function Main {
     }
     
     Show-Info "開始導入下游編碼工具..."
-
-    # 下游工具
-    $i = 0
+    $i=0
     foreach ($tool in @($downstreamTools.Keys)) {
         $i++
         $choice = Read-Host "`r`n [下游] ($i/$($downstreamTools.Count)) 導入 $tool？（y=是，Enter 跳過）"
@@ -326,8 +323,7 @@ function Main {
         $selectedId = $presetIdMap.Keys[0]
         Show-Success "僅有一種工具鏈可用，已自動選擇: [$selectedId] $selectedPreset"
     }
-    else {
-        # 選擇工具鏈
+    else { # 選擇工具鏈
         do {
             Write-Host ""
             $inputId = Read-Host "請輸入工具鏈編號（數字）"
@@ -445,6 +441,7 @@ cmd /k
     Show-Success "腳本執行完成！"
     Read-Host "按 Enter 退出"
 }
+#endregion
 
 try { Main }
 catch {
