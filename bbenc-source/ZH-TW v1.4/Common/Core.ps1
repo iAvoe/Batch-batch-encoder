@@ -1,13 +1,13 @@
-﻿# 由于测试时容易丢失 :PipePresets 变量，因此允许重载
+﻿# 由於測試時容易遺失 :PipePresets 變數，因此允許重載
 # if ($script:__CORE_LOADED) { return }
 # $script:__CORE_LOADED = $true
 
 # UTF-8 No BOM
 $Global:utf8NoBOM = New-Object System.Text.UTF8Encoding($false)
-# UTF-8 带 BOM，以便 CMD 正确识别
+# UTF-8 帶 BOM，以便 CMD 正確識別
 $Global:utf8BOM = New-Object System.Text.UTF8Encoding($true)
 
-# 定义工具链组合（必须与导入时的 Key 一致）
+# 定義工具鏈組合（必須與導入時的 Key 一致）
 $Global:PipePresets = @{
     'ffmpeg_x264'        = @{ ID=1;  Upstream='ffmpeg';      Downstream='x264' }
     'ffmpeg_x265'        = @{ ID=2;  Upstream='ffmpeg';      Downstream='x265' }
@@ -26,14 +26,14 @@ $Global:PipePresets = @{
     'svfi_svtav1'        = @{ ID=15; Upstream='svfi';        Downstream='svtav1' }
 }
 
-# 定义缓存文件夹，如果不存在就创建
+# 定義快取文件夾，如果不存在就創建
 $Global:TempFolder = $env:USERPROFILE + "\bbenc\"
 if (-not (Test-Path -PathType Container $Global:TempFolder)) {
     New-Item -ItemType Directory -Force -Path $Global:TempFolder
 }
 Clear-Host
 
-# 加载子模块
+# 載入子模組
 $base = $PSScriptRoot
 . "$base\Console.ps1"
 . "$base\UI.ps1"

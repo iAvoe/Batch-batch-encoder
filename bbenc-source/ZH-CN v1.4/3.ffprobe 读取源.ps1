@@ -2,25 +2,27 @@
 .SYNOPSIS
     ffprobe 视频源分析脚本
 .DESCRIPTION
-    分析源视频并导出到 %USERPROFILE%\temp_v_info(_is_mov).csv: 总帧数，宽，高，色彩空间，传输特定等
+    分析源视频并导出到 %USERPROFILE%\temp_v_info(_is_mov).csv: 总帧数，宽，高，色彩空间，传输特定等。繁体本地化由繁化姬实现：https://zhconvert.org
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
-    1.3
+    1.4
 #>
 
 # .mov 格式支持 $ffprobeCSV.A-I + ...；其它格式支持 $ffprobeCSV.A-AA + ...
 # 若同时检测到 temp_v_info_is_mov.csv 与 temp_v_info.csv，则使用其中创建日期最新的文件
 # $ffprobeCSV.A：stream (or not stream)
-# $ffprobeCSV.B：width
-# $ffprobeCSV.C：height  
-# $ffprobeCSV.D：pixel format (pix_fmt)
-# $ffprobeCSV.E：color_space
-# $ffprobeCSV.F：color_transfer
-# $ffprobeCSV.G：color_primaries
-# $ffprobeCSV.H：avg_frame_rate
-# $ffprobeCSV.I：nb_frames (for MOV) or first frame count field (for others)
-# $ffprobeCSV.AA：NUMBER_OF_FRAMES-eng (only for non-MOV files)
+#            .B：width
+#            .C：height  
+#            .D：pixel format (pix_fmt)
+#            .E：color_space
+#            .F：color_transfer
+#            .G：color_primaries
+#            .H：avg_frame_rate | VOB：field_order
+#            .I：MOV：nb_frames | VOB：avg_frame_rate | first frame count field (others)
+#            .J：interlaced_frame | VOB：nb_frames
+#            .K：top_field_first | VOB：N/A
+#            .AA：NUMBER_OF_FRAMES-eng (only for non-MOV files)
 # $sourceCSV.SourcePath：视频源路径
 # $sourceCSV.UpstreamCode：指定管道上游程序
 # $sourceCSV.Avs2PipeModDLLPath：Avs2PipeMod 需要的 avisynth.dll
@@ -77,15 +79,122 @@ src.set_output()
         }
     }
     catch {
-        Show-Error "生成无滤镜脚本失败：$_"
+        Show-Error ("生成无滤镜脚本失败：" + $_)
         return $null
+    }
+}
+
+# 利用 ffprobe 检测真实的视频文件封装格式，无视后缀名（封装格式用大写字母表示）
+function Test-VideoContainerFormat {
+    param (
+        [Parameter(Mandatory=$true)][string]$ffprobePath,
+        [Parameter(Mandatory=$true)][string]$videoSource
+    )
+
+    if (-not (Test-Path $ffprobePath)) {
+        throw "Test-VideoContainerFormat：ffprobe.exe 不存在（$ffprobePath）"
+    }
+    if (-not (Test-Path $videoSource)) {
+        throw "Test-VideoContainerFormat：输入视频不存在（$videoSource）"
+    }
+    Show-Info ("Test-VideoContainerFormat：导入视频 $videoSource")
+    $quotedVideoSource = Get-QuotedPath $videoSource
+
+    try {
+        # 使用 JSON 输入分析
+        $ffprobeJson = & $ffprobePath -hide_banner -v quiet -show_format -print_format json $quotedVideoSource 2>null
+
+        if ($LASTEXITCODE -eq 0) { # ffprobe 正常退出，分析结果存在
+            $formatInfo = $ffprobeJson | ConvertFrom-Json
+            $formatName = $formatInfo.format.format_name
+
+            # VOB 格式检测
+            if ($formatName -match "mpeg") {
+                # 进一步检测
+                $ffprobeText = & $ffprobePath -hide_banner $quotedVideoSource 2>&1
+                # 文件名含 VTS_ 字样（不确定是否全是大写，因此不用 cmatch）
+                # $hasVTSFileName = $filename -match "^VTS_"
+                # 元数据含 dvd_nav 字样（大概率是 VOB）
+                $hasDVD = $false
+                # 元数据含 mpeg2video 字样（大概率是 VOB）
+                $hasMPEG2 = $false
+
+                foreach ($line in $ffprobeText) {
+                    if ($line -match "mpeg2video") {
+                        $hasMPEG2 = $true
+                    }
+                    if ($line -match "dvd_nav") {
+                        $hasDVD = $true
+                    }
+                }
+
+                # VOB 通常包含 DVD 导航包或特定的流结构
+                if ($hasDVD -or $hasMPEG2) {
+                    Show-Info "Test-VideoContainerFormat：检测到 VOB 格式（DVD 视频）"
+                    return "VOB"
+                }
+                elseif ($hasMPEG2) {
+                    Show-Warning "Test-VideoContainerFormat：源使用 MPEG2 编码，将视作 VOB 格式（DVD 视频）"
+                    return "VOB"
+                }
+                elseif ($hasDVD) {
+                    Show-Warning "Test-VideoContainerFormat：源非 MPEG2 编码，但含有 DVD 导航标识，将视作 VOB 格式（DVD 视频）"
+                    return "VOB"
+                }
+                else {
+                     Show-Warning "Test-VideoContainerFormat：源非 MPEG2 编码，且无 DVD 导航标识，将视作一般封装格式"
+                    return "std"
+                }
+            }
+            elseif ($formatName -match "mov|mp4|m4a|3gp|3g2|mj2") {
+                if ($formatName -match "qt" -or $ext -eq ".mov") {
+                    Show-Info "Test-VideoContainerFormat：检测到 MOV 格式"
+                    return "MOV"
+                }
+                else {
+                    Show-Info "Test-VideoContainerFormat：检测到 MP4 格式"
+                    return "MP4"
+                }
+            }
+            elseif ($formatName -match "matroska") {
+                Show-Info "Test-VideoContainerFormat：检测到 MKV 格式"
+                return "MKV"
+            }
+            elseif ($formatName -match "webm") {
+                Show-Info "Test-VideoContainerFormat：检测到 WebM 格式"
+                return "WebM"
+            }
+            elseif ($formatName -match "avi") {
+                Show-Info "Test-VideoContainerFormat：检测到 AVI 格式"
+                return "AVI"
+            }
+            elseif ($formatName -match "ivf") {
+                Show-Info "Test-VideoContainerFormat：检测到 ivf 格式"
+                return "ivf"
+            }
+            elseif ($formatName -match "hevc") {
+                Show-Info "Test-VideoContainerFormat：检测到 hevc 格式"
+                return "hevc"
+            }
+            elseif ($formatName -match "h264" -or $formatName -match "avc") {
+                Show-Info "Test-VideoContainerFormat：检测到 avc 格式"
+                return "avc"
+            }
+            return $formatName
+        }
+        else { # ffprobe 失败
+            throw "Test-VideoContainerFormat：ffprobe 执行或 JSON 解析失败"
+        }
+    }
+    catch {
+        throw ("Test-VideoContainerFormat：检测失败" + $_)
     }
 }
 
 # 主程序
 function Main {
     Show-Border
-    Write-Host ("ffprobe 源读取工具，导出 " + $Global:TempFolder + "temp_v_info(_is_mov).csv 供后续步骤调用") -ForegroundColor Cyan
+    Write-Host ("ffprobe 源读取工具，导出 " + $Global:TempFolder + "temp_v_info(_is_mov).csv 以备用") -ForegroundColor Cyan
     Show-Border
     Write-Host ""
 
@@ -225,7 +334,7 @@ function Main {
             elseif ([string]::IsNullOrWhiteSpace($mode) -or $mode -eq 'n') {
                 Show-Warning "AviSynth(+) 默认不自带 LSMASHSource.dll（视频导入滤镜）请保证该文件存在，"
                 Write-Host " AVS 安装路径为：C:\Program Files (x86)\AviSynth+\plugins64+\" -ForegroundColor Yellow
-                Write-Host " 下载并解压 64bit 版：https://github.com/HomeOfAviSynthPlusEvolution/L-SMASH-Works/releases" -ForegroundColor Yellow
+                Write-Host " 下载并解压 64bit 版：https://github.com/HomeOfAviSynthPlusEvolution/L-SMASH-Works/releases`r`n" -ForegroundColor Magenta
                 $placeholderScript = Get-BlankAVSVSScript -videoSource $videoSource
                 if (-not $placeholderScript) { 
                     Show-Error "生成无滤镜脚本失败，请重试"
@@ -340,7 +449,6 @@ function Main {
                 Show-Error "未选择文件" 
                 continue
             }
-            
             Show-Success "已选择视频源文件：$videoSource"
             break
         }
@@ -349,24 +457,38 @@ function Main {
         $encodeImportSourcePath = $videoSource
     }
 
+    # 定位 ffprobe 程序
+    Show-Info "定位 ffprobe.exe..."
+    do {
+        $ffprobePath =
+            Select-File -Title "定位 ffprobe.exe" -InitialDirectory ([Environment]::GetFolderPath('ProgramFiles')) -ExeOnly
+        if (-not (Test-Path -LiteralPath $ffprobePath)) {
+            Show-Warning "找不到 ffprobe 可执行文件，请重试"
+        }
+    }
+    while (-not (Test-Path -LiteralPath $ffprobePath))
+
     # 检测封装文件类型
-    $isMOV = ([IO.Path]::GetExtension($videoSource).ToLower() -eq '.mov')
-    if ($isMOV) {
-        Show-Debug "`r`n导入视频 $videoSource 的封装格式为 MOV`r`n"
-    }
-    else {
-        Show-Debug "`r`n导入视频 $videoSource 的封装格式非 MOV`r`n"
-    }
+    $realFormatName = Test-VideoContainerFormat -ffprobePath $ffprobePath -videoSource $videoSource
+    $isMOV = ($realFormatName -like "MOV")
+    $isVOB = ($realFormatName -like "VOB")
+    # if ($isMOV) { Show-Debug "导入视频 $videoSource 的封装格式为 MOV" }
+    # elseif ($isVOB -like "VOB") { Show-Debug "导入视频 $videoSource 的封装格式为 VOB" }
+    # else { Show-Debug "导入视频 $videoSource 的封装格式非 MOV、VOB" }
 
     # 根据封装文件类型选用 ffprobe 命令、定义文件名
     $ffprobeArgs =
         if ($isMOV) {@(
             '-i', $videoSource, '-select_streams', 'v:0', '-v', 'error', '-hide_banner', '-show_streams', '-show_entries',
-            'stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries', '-of', 'csv'
+            'stream=width,height,pix_fmt,color_space,color_transfer,color_primaries,avg_frame_rate,nb_frames,interlaced_frame,top_field_first', '-of', 'csv'
+        )}
+        elseif ($isVOB) {@(
+            '-i', $videoSource, '-select_streams', 'v:0', '-v', 'error', '-hide_banner', '-show_streams', '-show_entries',
+            'stream=width,height,pix_fmt,color_space,color_transfer,color_primaries,avg_frame_rate,nb_frames,field_order', '-of', 'csv'
         )}
         else {@(
             '-i', $videoSource, '-select_streams', 'v:0', '-v', 'error', '-hide_banner', '-show_streams', '-show_entries',
-            'stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng',
+            'stream=width,height,pix_fmt,color_space,color_transfer,color_primaries,avg_frame_rate,nb_frames,interlaced_frame,top_field_first:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng',
             '-of', 'csv'
         )}
     # $ffprobeArgsDebug =
@@ -386,6 +508,9 @@ function Main {
         if ($isMOV) {
             Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_mov.csv"
         }
+        elseif ($isVOB) {
+            Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_vob.csv"
+        }
         else {
             Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info.csv"
         }
@@ -399,19 +524,9 @@ function Main {
 
     # 若 CSV 已存在，要求手动确认后清理，避免覆盖
     Confirm-FileDelete (Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_mov.csv")
+    Confirm-FileDelete (Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_vob.csv")
     Confirm-FileDelete (Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info.csv")
     Confirm-FileDelete $sourceCSVExportPath
-
-    # 定位 ffprobe 程序
-    Show-Info "定位 ffprobe.exe..."
-    do {
-        $ffprobePath =
-            Select-File -Title "定位 ffprobe.exe" -InitialDirectory ([Environment]::GetFolderPath('ProgramFiles')) -ExeOnly
-        if (-not (Test-Path -LiteralPath $ffprobePath)) {
-            Show-Warning "找不到 ffprobe 可执行文件，请重试"
-        }
-    }
-    while (-not (Test-Path -LiteralPath $ffprobePath))
 
     # 执行 ffprobe 并插入视频源路径
     try {
@@ -442,7 +557,7 @@ function Main {
 
     Write-Host ""
     Show-Success "脚本执行完成！"
-    Read-Host "按回车键退出"
+    Read-Host "按 Enter 退出"
 }
 
 try { Main }
@@ -450,5 +565,5 @@ catch {
     Show-Error "脚本执行出错：$_"
     Write-Host "错误详情：" -ForegroundColor Red
     Write-Host $_.Exception.ToString()
-    Read-Host "按回车键退出"
+    Read-Host "按 Enter 退出"
 }

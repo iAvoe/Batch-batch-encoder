@@ -2,11 +2,11 @@
 .SYNOPSIS
     脚本运行环境检测工具
 .DESCRIPTION
-    检查系统是否支持运行 PowerShell 和批处理脚本
+    检查系统是否支持运行 PowerShell 和批处理脚本。繁体本地化由繁化姬实现：https://zhconvert.org
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
-    1.3
+    1.4
 #>
 
 # 加载共用代码

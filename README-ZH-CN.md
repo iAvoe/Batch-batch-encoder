@@ -76,7 +76,7 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 <p align="center"><img src="bmc_qr.png" alt="支持一下 -_-"><br><img src="pp_tip_qr.png" alt="支持一下 =_="></p>
 
 ## 更新信息
-**v1.4.0（Beta）**
+**v1.4.5**
 - 实现了 VOB 格式的元数据读取支持
 - 实现了 VOB 与非 VOB 的逐行与隔行扫描识别功能
 - 添加了自动指定 avs2pipemod、x264、x265 隔行扫描参数的功能（SVT-AV1 则提示原生不支持）

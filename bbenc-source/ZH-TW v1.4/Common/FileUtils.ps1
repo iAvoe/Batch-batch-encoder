@@ -1,4 +1,4 @@
-﻿# 檢測文件名是否符合 Windows 命名規則
+﻿# 檢測檔案名是否符合 Windows 命名規則
 function Test-FilenameValid {
     param([string]$Filename)
     $invalid = [IO.Path]::GetInvalidFileNameChars()
@@ -101,7 +101,7 @@ function Select-Folder([string]$Description = "選擇文件夾", [string]$Initia
 }
 
 # 生成使用 Windows（CRLF 換行）、UTF-8 BOM 文本編碼的批處理
-function Write-TextFile { # 需在 Core.ps1 寫入全局變量後運行
+function Write-TextFile { # 需在 Core.ps1 寫入全局變數後運行
     param(
         [Parameter(Mandatory=$true)][string]$Path,
         [Parameter(Mandatory=$true)][string]$Content,
@@ -114,13 +114,13 @@ function Write-TextFile { # 需在 Core.ps1 寫入全局變量後運行
     # 選擇編碼
     $encoding = if ($UseBOM) { $Global:utf8BOM } else { $Global:utf8NoBOM }
     
-    # 寫入文件
+    # 寫入檔案
     [System.IO.File]::WriteAllText($Path, $normalizedContent, $encoding)
     Show-Debug "編碼：$($encoding.EncodingName), 換行符：CRLF"
     Show-Success "文件已寫入：$Path"
 }
 
-# 驗證批處理文件格式
+# 驗證批處理檔案格式
 function Test-TextFileFormat {
     param([Parameter(Mandatory=$true)][string]$Path)
     
@@ -152,10 +152,10 @@ function Test-TextFileFormat {
         $isValid = (-not $hasUnixLF) -and (-not $hasMacCR) -and ($crCount -eq $lfCount)
         
         if ($isValid) {
-            Show-Success "文件格式正確 (CRLF：$crCount)" -ForegroundColor Green
+            Show-Success "檔案格式正確 (CRLF：$crCount)" -ForegroundColor Green
         }
         else {
-            Show-Warning "文件格式有問題" -ForegroundColor Red
+            Show-Warning "檔案格式有問題" -ForegroundColor Red
         }
         return $isValid
     }
@@ -173,7 +173,7 @@ function Get-StreamMetadata {
         [Parameter(Mandatory = $true)][string]$StreamType
     )
     
-    # 驗證流文件/ffprobe存在
+    # 驗證流檔案/ffprobe存在
     if (-not (Test-Path -LiteralPath $FilePath)) {
         Show-Error "文件不存在：$FilePath"
         return $null
@@ -185,8 +185,8 @@ function Get-StreamMetadata {
     
     try { # 構建 ffprobe 命令參數
         $streamSelector = switch ($StreamType.ToLower()) {
-            "v" { "v" }  # 視頻
-            "a" { "a" }  # 音頻
+            "v" { "v" }  # 影片
+            "a" { "a" }  # 音訊
             "s" { "s" }  # 字幕
             "t" { "t" }  # 字體
             default { $StreamType }
@@ -221,7 +221,7 @@ function Get-StreamMetadata {
             return $null
         }
         
-        # 返回第一個匹配的流信息（根據上下文，通常只需要第一個）
+        # 返回第一個匹配的流資訊（根據上下文，通常只需要第一個）
         $stream = $metadata.streams[0]
         
         # 構建返回對象
@@ -231,7 +231,7 @@ function Get-StreamMetadata {
             CodecTag   = if ($stream.codec_tag_string) { $stream.codec_tag_string } else { $null }
             CodecType  = if ($stream.codec_type) { $stream.codec_type } else { $null }
             FrameRate  = if ($stream.r_frame_rate) { 
-                # 將分數格式化為字符串（如 24000/1001）
+                # 將分數格式化為字串（如 24000/1001）
                 $frameRateStr = $stream.r_frame_rate.ToString()
                 # 如果是整數（如 24/1），簡化為整數
                 if ($frameRateStr -match '^(\d+)/1$') {
@@ -250,7 +250,7 @@ function Get-StreamMetadata {
             RawData    = $stream  # 保留原始數據以備用
         }
         
-        Show-Debug "獲取到流信息：$($streamInfo.CodecType) - $($streamInfo.CodecName)"
+        Show-Debug "獲取到流資訊：$($streamInfo.CodecType) - $($streamInfo.CodecName)"
         if ($streamInfo.FrameRate) {
             Show-Debug "幀率：$($streamInfo.FrameRate)"
         }
@@ -275,7 +275,7 @@ function Convert-IniPath {
     # 移除可能存在的雙引號
     $path = $path.Trim('"')
     
-    # 雙反換單反斜槓
+    # 雙反換單眼斜槓
     $path = $path -replace '\\\\', '\'
     return $path
 }
