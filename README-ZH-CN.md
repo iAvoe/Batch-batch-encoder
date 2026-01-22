@@ -80,7 +80,7 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 - 实现了 VOB 格式的元数据读取支持
 - 实现了 VOB 与非 VOB 的逐行与隔行扫描识别功能
 - 添加了自动指定 avs2pipemod、x264、x265 隔行扫描参数的功能（SVT-AV1 则提示原生不支持）
-- 已完成 vspipe 到 x264、x265 测试，等待完成其他测试
+- 已完成对 VOB 和普通格式以及隔行扫描源的 vspipe 到 x264 和 x265、avs2yuv 到 x264 和 x265、avs2pipemod 到 x264 和 x265 的测试
 - 修复了因管道上游同时选择了 AVS 类工具以及 vspipe 工具时，只能导入 .avs 或 .vpy 触发兼容检测失败（判断为应终止脚本）的逻辑问题（修改脚本源后缀名并检测文件是否存在，提示但无视错误）
 - 步骤 3 升级为使用 ffprobe 检测真实封装文件格式的方案，不再用后缀名检测
 - 步骤 2 添加了当只有一种工具链可用时自动选择的功能

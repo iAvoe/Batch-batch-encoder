@@ -71,6 +71,16 @@ Developing these tools wasn't easy. If this tool improve your efficiency, consid
 <p align="center"><img src="bmc_qr.png" alt="Support me -_-"><br><img src="pp_tip_qr.png" alt="Support me =_="></p>
 
 ## Update Information
+**v1.4.5**
+- Implemented VOB format metadata processing
+- Implemented progressive and interlaced format processing for VOB and non-VOB formats
+- Implemented encoding and IO parameters for avs2pipemod, x264, and x265 on interlaced sources
+  - (SVT-AV1 will indicate incompatibility).
+- Completed testing of vspipe to x264 & x265, avs2yuv to x264 & x265, avs2pipemod to x264 & x265 on VOB and normal formats, as well as interlaced sources
+- Fixed a logic issue where only .avs or .vpy files could be imported when both AVS-like tools and vspipe were selected upstream, triggering a compatibility check failure (determining the script should be terminated). (Modifying the script source file extension and checking file existence resulted in an error message, but the error was ignored.)
+- Step 3 has been upgraded to use ffprobe to detect the actual package file format, no longer relying on file extension detection.
+- Step 2 has added the ability to automatically select the toolchain when only one is available
+
 **v1.3.9**
 - Brought variable cleanup (endlocal) forward, so CMD window can be closed cleanly right after encoding session
 - Added explanations for why not implementing reading video sources, or verifying video existence from .vs and .avs scripts
