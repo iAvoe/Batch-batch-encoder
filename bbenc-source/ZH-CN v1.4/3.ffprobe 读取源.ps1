@@ -83,6 +83,43 @@ src.set_output()
     }
 }
 
+function Get-NonSquarePixelWarning {
+    param (
+        [Parameter(Mandatory=$true)][string]$ffprobePath,
+        [Parameter(Mandatory=$true)][string]$videoSource
+    )
+
+    if (-not (Test-Path $ffprobePath)) {
+        throw "Test-VideoContainerFormat：ffprobe.exe 不存在（$ffprobePath）"
+    }
+    if (-not (Test-Path $videoSource)) {
+        throw "Test-VideoContainerFormat：输入视频不存在（$videoSource）"
+    }
+    $quotedVideoSource = Get-QuotedPath $videoSource
+
+    try { # 使用 JSON 输入分析
+        $ffprobeJson = & $ffprobePath -v quiet -hide_banner -select_streams v:0 -show_entries stream=sample_aspect_ratio -print_format json $quotedVideoSource 2>$null
+        
+        if ($LASTEXITCODE -eq 0) { # ffprobe 正常退出，分析结果存在
+            $streamInfo = $ffprobeJson | ConvertFrom-Json
+            # 只获取第一个视频流的 SAR
+            $sampleAspectRatio = $streamInfo.streams[0].sample_aspect_ratio.Trim()
+
+            if ($sampleAspectRatio -notlike "1:1") {
+                Show-Warning "源 $videoSource 的宽高比（SAR）非 1:1（$sampleAspectRatio 的长方形像素）"
+                Write-Host " 本软件暂无处理（编码为方形像素，致画面缩宽），" -ForegroundColor Yellow
+                Write-Host " 请手动为生成的批处理命令指定播放 SAR 或添加矫正滤镜组" -ForegroundColor Yellow
+            }
+        }
+        else { # ffprobe 失败
+            throw "Get-NonSquarePixelWarning：ffprobe 执行或 JSON 解析失败"
+        }
+    }
+    catch {
+        throw ("Get-NonSquarePixelWarning - 检测失败：" + $_)
+    }
+}
+
 # 利用 ffprobe 检测真实的视频文件封装格式，无视后缀名（封装格式用大写字母表示）
 function Test-VideoContainerFormat {
     param (
@@ -96,11 +133,9 @@ function Test-VideoContainerFormat {
     if (-not (Test-Path $videoSource)) {
         throw "Test-VideoContainerFormat：输入视频不存在（$videoSource）"
     }
-    Show-Info ("Test-VideoContainerFormat：导入视频 $videoSource")
     $quotedVideoSource = Get-QuotedPath $videoSource
 
-    try {
-        # 使用 JSON 输入分析
+    try { # 使用 JSON 输入分析
         $ffprobeJson = & $ffprobePath -hide_banner -v quiet -show_format -print_format json $quotedVideoSource 2>null
 
         if ($LASTEXITCODE -eq 0) { # ffprobe 正常退出，分析结果存在
@@ -460,6 +495,9 @@ function Main {
         }
     }
     while (-not (Test-Path -LiteralPath $ffprobePath))
+
+    # 检测非方形像素源
+    Get-NonSquarePixelWarning -ffprobePath $ffprobePath -videoSource $videoSource
 
     # 检测封装文件类型
     $realFormatName = Test-VideoContainerFormat -ffprobePath $ffprobePath -videoSource $videoSource

@@ -78,8 +78,48 @@ src.set_output()
         }
     }
     catch {
-        Show-Error "Failed to create filter-less script: $_"
+        Show-Error ("Failed to create filter-less script: " + $_)
         return $null
+    }
+}
+
+
+function Get-NonSquarePixelWarning {
+    param (
+        [Parameter(Mandatory=$true)][string]$ffprobePath,
+        [Parameter(Mandatory=$true)][string]$videoSource
+    )
+
+    if (-not (Test-Path $ffprobePath)) {
+        throw "Test-VideoContainerFormat: ffprobe.exe does not exist ($ffprobePath)"
+    }
+    if (-not (Test-Path $videoSource)) {
+        throw "Test-VideoContainerFormat: Input video does not exist ($videoSource)"
+    }
+    $quotedVideoSource = Get-QuotedPath $videoSource
+
+    try { # Use JSON input for analysis
+        $ffprobeJson = & $ffprobePath -v quiet -hide_banner -select_streams v:0 -show_entries stream=sample_aspect_ratio -print_format json $quotedVideoSource 2>$null
+        
+        if ($LASTEXITCODE -eq 0) { # ffprobe exits normally, analysis results exist
+            $streamInfo = $ffprobeJson | ConvertFrom-Json
+            # Only get SAR from the first video in array
+            $sampleAspectRatio = $streamInfo.streams[0].sample_aspect_ratio.Trim()
+
+            if ($sampleAspectRatio -notlike "1:1") {
+                Show-Warning "$videoSource has a $sampleAspectRatio sample aspect ratio (non-square pixel)"
+                Write-Host " This program DOES NOT support SAR handling currently" -ForegroundColor Yellow
+                Write-Host " (results encoding to SAR 1:1 square pixel, width shrinks)" -ForegroundColor Yellow
+                Write-Host " please manually specify decoding/playing SAR," -ForegroundColor Yellow
+                Write-Host " or specify correction render filtering to generated batch files and scripts" -ForegroundColor Yellow
+            }
+        }
+        else { # ffprobe failed
+            throw "Get-NonSquarePixelWarning: ffprobe execution or JSON parsing failed"
+        }
+    }
+    catch {
+        throw ("Get-NonSquarePixelWarning - Detection failed：" + $_)
     }
 }
 
@@ -96,7 +136,6 @@ function Test-VideoContainerFormat {
     if (-not (Test-Path $videoSource)) {
         throw "Test-VideoContainerFormat: Input video does not exist ($videoSource)"
     }
-    Show-Info ("Test-VideoContainerFormat: Imported video $videoSource")
     $quotedVideoSource = Get-QuotedPath $videoSource
 
     try {
@@ -466,6 +505,9 @@ function Main {
         }
     }
     while (-not (Test-Path -LiteralPath $ffprobePath))
+
+    # Detect non-square pixel source
+    Get-NonSquarePixelWarning -ffprobePath $ffprobePath -videoSource $videoSource
 
     # Detect source container format
     $realFormatName = Test-VideoContainerFormat -ffprobePath $ffprobePath -videoSource $videoSource
