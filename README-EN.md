@@ -71,6 +71,9 @@ Developing these tools wasn't easy. If this tool improve your efficiency, consid
 <p align="center"><img src="bmc_qr.png" alt="Support me -_-"><br><img src="pp_tip_qr.png" alt="Support me =_="></p>
 
 ## Update Information
+**v1.4.6**
+- Performed code cleanup and prettifying on top of 1.4.5
+
 **v1.4.5**
 - Implemented VOB format metadata processing
 - Implemented progressive and interlaced format processing for VOB and non-VOB formats

@@ -76,6 +76,9 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 <p align="center"><img src="bmc_qr.png" alt="支持一下 -_-"><br><img src="pp_tip_qr.png" alt="支持一下 =_="></p>
 
 ## 更新信息
+**v1.4.6**
+- 在 1.4.5 基础上进行了代码清理和美化
+
 **v1.4.5**
 - 实现了 VOB 格式的元数据读取支持
 - 实现了 VOB 与非 VOB 的逐行与隔行扫描识别功能
