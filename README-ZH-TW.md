@@ -76,8 +76,12 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 <p align="center"><img src="bmc_qr.png" alt="支持一下 -_-"><br><img src="pp_tip_qr.png" alt="支持一下 =_="></p>
 
 ## 更新信息
+**v1.5.0**
+- 步驟 3 添加了相對可靠的可變幀率（VFR）檢測與警告
+  - 添加了 ffmpeg 處理範例
+
 **v1.4.7**
-- 新增了變寬比（SAR）偵測與警告
+- 步驟 3 添加了變寬比（SAR）檢測與警告
   - 添加了寫入 SAR 元數據的 ffmpeg 等工具範例
 - 修復了步驟 3 運行後在運行目錄產生 null 空文件的故障
 

@@ -71,8 +71,12 @@ Developing these tools wasn't easy. If this tool improve your efficiency, consid
 <p align="center"><img src="bmc_qr.png" alt="Support me -_-"><br><img src="pp_tip_qr.png" alt="Support me =_="></p>
 
 ## Update Information
+**v1.5.0**
+- Step 3 added relatively reliable variable frame rate (VFR) detection, and warnings
+  - Added ffmpeg processing examples
+
 **v1.4.7**
-- Added sample aspect ratio (SAR) detection and warnings
+- Step 3 added variable aspect ratio (SAR) detection and warnings
   - Added examples of tools such as ffmpeg for writing SAR metadata
 - Fixed a bug where a null file was generated in the running directory after step 3 was executed.
 
