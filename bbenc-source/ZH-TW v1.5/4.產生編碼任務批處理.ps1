@@ -6,7 +6,7 @@
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
-    1.4
+    1.5
 #>
 
 # 載入共用代碼

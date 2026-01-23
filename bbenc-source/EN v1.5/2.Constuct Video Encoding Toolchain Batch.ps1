@@ -6,7 +6,7 @@
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
-    1.4
+    1.5
 #>
 
 # Downstream pipe (video encoders) must support Y4M pipe, otherwise upstream-overrides should be added
