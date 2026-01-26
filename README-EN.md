@@ -1,6 +1,7 @@
-# Batch Batch Encoder
+# PowerShell-Batch Smart Video Encoder
 
-This tool analyzes source video to perform actual customized video encoding solutions. It automates tedious format alignment, simplifies operations, and starts your encoding ASAP.
+Automating video encoding with intelligent, spec-based configuration. This script-suite program eliminates the tedious work of manual encoding——no more typing paths, memorizing parameters, or wrestling with GUI settings.
+Simply make some selections, pressing Enters, and the tool generates optimized encoding commands (and builds you a batch) based on your video's properties and desired use-case. Zero learning curve guaranteed, give it a try!
 
 ## Environment
 
