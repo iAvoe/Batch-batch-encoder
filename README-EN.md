@@ -1,7 +1,6 @@
 # PowerShell-Batch Smart Video Encoder
 
-Automating video encoding with intelligent, spec-based configuration. This script-suite program eliminates the tedious work of manual encoding——no more typing paths, memorizing parameters, or wrestling with GUI settings.
-Simply make some selections, pressing Enters, and the tool generates optimized encoding commands (and builds you a batch) based on your video's properties and desired use-case. Zero learning curve guaranteed, give it a try!
+You eventually will need to handle video files, and you will need customized, prooven settings that matches with your PC's specs, your use-case and your video file's properties. This script-suite program handles this——no more typing paths, memorizing parameters, or wrestling with GUI settings. Simply make selections, and the tool will provide optimized encoding commandlines and batch file. Learning curves flattened, give it a try!
 
 ## Environment
 
@@ -24,9 +23,9 @@ Only one upstream and one downstream program are needed on the system.
 - [x] Graphical + Command-line Interactive Interface:
     - High-DPI WinForm selection window when selecting files or paths
     - Color-coded hints + pure selection interaction logic (prompt) on basic command-line options
-- [x] Automatic generation of filter-free VS/AVS scripts: Accelerates script building or directly launches upstream tools such as vspipe, avs2yuv, and avs2pipemod
-- [x] Independently packaged command scripts: Import video streams, audio streams, subtitle tracks, and fonts
-- [x] Deeply customized encoding parameters: Automatic calculation + user-defined encoder configuration to meet your needs as much as possible
+- [x] Generates filterless VS/AVS scripts w/ import commandlines: Jumpstart vspipe (API v3 & v4 auto-detect), avs2yuv (both AviSynth & AviSynth+), and avs2pipemod
+- [x] Separated scripts by processing order: Reuse what has been done and never redo everything from start
+- [x] Customized encoding parameters: Computer hardware, video file and user-defined encoding configuration
 - [x] Quick command-line changes: In the generated batch, you can directly replace previously imported upstream and downstream tools by copying and pasting; easily generate multiple processing sources and video formats.
 
 -----
