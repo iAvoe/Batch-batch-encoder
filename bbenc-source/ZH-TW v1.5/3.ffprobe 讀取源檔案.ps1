@@ -10,22 +10,6 @@
 #>
 
 # 若同時檢測到 temp_v_info_is_mov.csv 與 temp_v_info.csv，則使用其中創建日期最新的文件
-# $ffprobeCSV.A：stream (or not stream)
-#            .B：width
-#            .C：height  
-#            .D：pixel format (pix_fmt)
-#            .E：color_space
-#            .F：color_transfer
-#            .G：color_primaries
-#            .H：avg_frame_rate | VOB：field_order
-#            .I：MOV：nb_frames | VOB：avg_frame_rate | first frame count field (others)
-#            .J：interlaced_frame | VOB：nb_frames
-#            .K：top_field_first | VOB：N/A
-#            .AA：NUMBER_OF_FRAMES-eng（僅用於非 MOV 格式）
-# $sourceCSV.SourcePath：影片源路徑（可以是 .avs/.vpy 源）
-# $sourceCSV.UpstreamCode：指定管道上遊程序
-# $sourceCSV.Avs2PipeModDLLPath：Avs2PipeMod 需要的 avisynth.dll
-# $sourceCSV.SvfiConfigPath：one_line_shot_args（SVFI）的渲染配置 X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini
 
 # 載入共用代碼，包括 $utf8NoBOM、Get-QuotedPath、Select-File、Select-Folder...
 . "$PSScriptRoot\Common\Core.ps1"
@@ -798,17 +782,17 @@ function Main {
     $ffprobeArgs =
         if ($isMOV) {@(
             '-i', $videoSource, '-select_streams', 'v:0', '-v', 'error', '-hide_banner', '-show_streams', '-show_entries',
-            'stream=width,height,pix_fmt,color_space,color_transfer,color_primaries,avg_frame_rate,nb_frames,interlaced_frame,top_field_first', '-of', 'csv'
-        )}
+            'stream=width,height,pix_fmt,color_space,color_transfer,color_primaries,field_order,avg_frame_rate,nb_frames', '-of', 'csv'
+        )} # A      B     C      D       E           F              G               H           I              J
         elseif ($isVOB) {@(
             '-i', $videoSource, '-select_streams', 'v:0', '-v', 'error', '-hide_banner', '-show_streams', '-show_entries',
-            'stream=width,height,pix_fmt,color_space,color_transfer,color_primaries,avg_frame_rate,nb_frames,field_order', '-of', 'csv'
-        )}
+            'stream=width,height,pix_fmt,color_space,color_transfer,color_primaries,field_order,avg_frame_rate,nb_frames', '-of', 'csv'
+        )} # A      B     C      D       E           F              G               H           I              J
         else {@(
             '-i', $videoSource, '-select_streams', 'v:0', '-v', 'error', '-hide_banner', '-show_streams', '-show_entries',
             'stream=width,height,pix_fmt,color_space,color_transfer,color_primaries,avg_frame_rate,nb_frames,interlaced_frame,top_field_first:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng',
             '-of', 'csv'
-        )}
+        )} # A      B     C      D       E           F              G               H              I         J                K
     # $ffprobeArgsDebug =
     #    if ($isMOV) {@(
     #        '-i', $videoSource, '-select_streams', 'v:0', '-v', 'error', '-hide_banner', '-show_streams', '-show_entries',

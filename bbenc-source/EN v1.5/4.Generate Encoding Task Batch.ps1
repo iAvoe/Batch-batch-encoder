@@ -83,6 +83,7 @@ $interlacedArgs = [PSCustomObject]@{
     isInterlaced = $false
     isTFF = $false
     isVOB = $false
+    isMOV = $false
 }
 
 function Get-EncodeOutputName {
@@ -421,7 +422,7 @@ function Get-x264BaseParam {
 function Get-x265BaseParam {
     Param ([Parameter(Mandatory=$true)]$pickOps)
     # TODO: Add DJATOM? Mod's fully customizable AQ
-    $default = "--high-tier --preset slow --me umh --subme 5 --weightb --aq-mode 4 --bframes 5 --ref 3"
+    $default = "--high-tier --preset slow --me umh --weightb --aq-mode 4 --bframes 5 --ref 3"
     switch ($pickOps) {
         # General Purpose，bframes 5
         a {return $default}
@@ -663,18 +664,19 @@ function Get-x265MERange {
     else { return "--merange 36" }
 }
 
-function Get-x265Subme { # 24fps=3, 48fps=4, 60fps=5, ++=6
+# Get submotion estimation parameter value based on video frame rate
+function Get-x265SubmotionEstimation { # 24fps=3, 48fps=4, 60fps=5, ++=6
     Param (
         [Parameter(Mandatory=$true)][string]$fpsString,
-        [bool]$getInteger=$false
+        [switch]$stripParameterName
     )
-    $encoderFPS = ConvertTo-Fraction $fpsString
+    $fps = ConvertTo-Fraction $fpsString
     $subme = 6
-    if ($encoderFPS -lt 25) {$subme = 3}
-    elseif ($encoderFPS -lt 49) {$subme = 4}
-    elseif ($encoderFPS -lt 61) {$subme = 5}
+    if ($fps -lt 25) {$subme = 3}
+    elseif ($fps -lt 49) {$subme = 4}
+    elseif ($fps -lt 61) {$subme = 5}
 
-    if ($getInteger) { return $subme }
+    if ($stripParameterName) { return $subme }
     return ("--subme " + $subme)
 }
 
@@ -1093,23 +1095,32 @@ function Get-IsRAWSource ([string]$validateUpstreamCode) {
 function Set-IsVOB {
     [Parameter(Mandatory=$true)][string]$ffprobeCsvPath
     if ([string]::IsNullOrWhiteSpace($ffprobeCsvPath)) {
-        throw "Set-IsVOB: parameter ffprobeCsvPath empty, cannot detect"
+        throw "Set-IsVOB: parameter ffprobeCsvPath is empty, cannot detect"
     }
     $script:interlacedArgs.isVOB = $ffprobeCsvPath -like "*_vob*"
+}
+
+# Determine if file is MOV format ASAP (determined by the previous script, and written to filename)
+# this redefines the $ffprobeCSV variable structure, which affects numerous subsequent parameters
+function Set-IsMOV {
+    [Parameter(Mandatory=$true)][string]$ffprobeCsvPath
+    if ([string]::IsNullOrWhiteSpace($ffprobeCsvPath)) {
+        throw "Set-IsMOV：ffprobeCsvPath is empty, cannot detect"
+    }
+    $script:interlacedArgs.isMOV = $ffprobeCsvPath -like "*_mov*"
 }
 
 function Set-InterlacedArgs {
     Param(
         [Parameter(Mandatory=$true)]
         [string]$fieldOrderOrIsInterlacedFrame, # VOB: $ffprobe.H；Other: $ffprobeCsv.J
-        [Parameter(Mandatory=$true)]
-        [string]$topFieldFirst # $ffprobeCsv.K
+        [string]$tffAttribute # !MOV & !VOB: $ffprobeCsv.K
     )
     # Initialize
     $script:interlacedArgs.isInterlaced = $false
     $script:interlacedArgs.isTFF = $false
 
-    # Process VOB fromat
+    # Process VOB, MOV fromat
     if ($script:interlacedArgs.isVOB) {
         $fieldOrder = $fieldOrderOrIsInterlacedFrame.ToLower().Trim()
         
@@ -1143,7 +1154,7 @@ function Set-InterlacedArgs {
             }
         }
     }
-    else { # Non-VOB format, analyze interlaced_frame (0/1)
+    else { # Non-VOB/MOV format, analyze interlaced_frame (0/1)
         $interlacedFrame = $fieldOrderOrIsInterlacedFrame.Trim()
         
         if ([string]::IsNullOrWhiteSpace($interlacedFrame)) {
@@ -1162,11 +1173,11 @@ function Set-InterlacedArgs {
         }
         
         # Analyze top_field_first (-1/0/1)
-        $tff = $topFieldFirst.Trim()
+        $tff = $tffAttribute.Trim()
         
         if ([string]::IsNullOrWhiteSpace($tff)) {
             if ($script:interlacedArgs.isInterlaced) {
-                Show-Warning "Set-InterlacedArgs: Unknown field order and video is interlaced, taking as top field first"
+                Show-Warning "Set-InterlacedArgs: Unknown field order and video is interlaced, assuming top field first"
                 $script:interlacedArgs.isTFF = $true
             }
             else {
@@ -1194,7 +1205,7 @@ function Set-InterlacedArgs {
         }
     }
     
-    Show-Debug "Set-InterlacedArgs: Interlaced=$($script:interlacedArgs.isInterlaced), Top-field-first=$($script:interlacedArgs.isTFF)"
+    Show-Debug "Set-InterlacedArgs: Interlaced: $($script:interlacedArgs.isInterlaced), Top-field-first: $($script:interlacedArgs.isTFF)"
 }
 
 #region Main
@@ -1241,7 +1252,15 @@ function Main {
     # SVT-AV1: Natively unsupported, show error and exit
     Show-Info "Detecting interlaced formats..."
     Set-IsVOB -ffprobeCsvPath $ffprobeCsvPath
-    Set-InterlacedArgs -fieldOrderOrIsInterlacedFrame $ffprobeCSV.H -topFieldFirst $ffprobeCSV.J
+    Set-IsMOV -ffprobeCsvPath $ffprobeCsvPath
+
+    # MOV, VOB formats' field order data is in H
+    if (-not $script:interlacedArgs.isMOV -and -not $script:interlacedArgs.isVOB) {
+        Set-InterlacedArgs -fieldOrderOrIsInterlacedFrame $ffprobeCSV.H -tffAttribute $ffprobeCSV.J
+    }
+    else {
+        Set-InterlacedArgs -fieldOrderOrIsInterlacedFrame $ffprobeCSV.H
+    }
 
     # Calculate and assign to object properties
     Show-Info "Optimizing encoding parameters (Profile, resolution, dynamic search range, etc.)..."
@@ -1256,39 +1275,38 @@ function Main {
     $x265Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -Codec x265
     $x264Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -Codec x264
 
-    # VOB formats' framerate data is in I
-    if ($script:interlacedArgs.isVOB) {
-        $ffmpegParams.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target ffmpeg
-        $svtav1Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target svtav1
-        $x265Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target x265
-        $x264Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target x264
-
-        $x265Params.Subme = Get-x265Subme -fpsString $ffprobeCSV.I
-        [int]$x265SubmeInt = Get-x265Subme -fpsString $ffprobeCSV.I -getInteger $true
-        Show-Debug "VOB source framerate: $(ConvertTo-Fraction $ffprobeCSV.I)"
-        $x264Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.I -bframes 250 -askUser -isx264
-        $x265Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.I -bframes $x265SubmeInt -askUser -isx265
-        $svtav1Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.I -bframes 999 -askUser -isSVTAV1
-        
-        $x264Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.I -bframes 250 # hack: implement suggested maximum value in x264 using fake bframes
-        $x265Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.I -bframes $x265SubmeInt
-    }
-    else {
+    # VOB, MOV formats' framerate data is in I
+    if (-not $script:interlacedArgs.isVOB -and -not $script:interlacedArgs.isMOV) {
         $ffmpegParams.FPS = Get-FPSParam -fpsString $ffprobeCSV.H -Target ffmpeg
         $svtav1Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.H -Target svtav1
         $x265Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.H -Target x265
         $x264Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.H -Target x264
 
-        $x265Params.Subme = Get-x265Subme -fpsString $ffprobeCSV.H
-        [int]$x265SubmeInt = Get-x265Subme -fpsString $ffprobeCSV.H -getInteger $true
-        Show-Debug "Source video framerate: $(ConvertTo-Fraction $ffprobeCSV.H)"
+        $x265Params.Subme = Get-x265SubmotionEstimation -fpsString $ffprobeCSV.H
+        [int]$x265SubmeInt = Get-x265SubmotionEstimation -fpsString $ffprobeCSV.H -stripParameterName
         $x264Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.H -bframes 250 -askUser -isx264
         $x265Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.H -bframes $x265SubmeInt -askUser -isx265
         $svtav1Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.H -bframes 999 -askUser -isSVTAV1
         $x264Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.H -bframes 250
         $x265Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.H -bframes $x265SubmeInt
     }
-    
+    else {
+        $ffmpegParams.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target ffmpeg
+        $svtav1Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target svtav1
+        $x265Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target x265
+        $x264Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target x264
+
+        $x265Params.Subme = Get-x265SubmotionEstimation -fpsString $ffprobeCSV.I
+        [int]$x265SubmeInt = Get-x265SubmotionEstimation -fpsString $ffprobeCSV.I -stripParameterName
+        Show-Debug "MOV/VOB source framerate: $(ConvertTo-Fraction $ffprobeCSV.I)"
+        $x264Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.I -bframes 250 -askUser -isx264
+        $x265Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.I -bframes $x265SubmeInt -askUser -isx265
+        $svtav1Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.I -bframes 999 -askUser -isSVTAV1
+        
+        $x264Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.I -bframes 250 # hack：借 bframes 做出建议最大值
+        $x265Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.I -bframes $x265SubmeInt
+    }
+
     # VOB formats' frame count data is in J
     $x265Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $false
     $x264Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $false

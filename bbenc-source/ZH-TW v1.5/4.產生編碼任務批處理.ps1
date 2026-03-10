@@ -82,6 +82,7 @@ $interlacedArgs = [PSCustomObject]@{
     isInterlaced = $false
     isTFF = $false
     isVOB = $false
+    isMOV = $false
 }
 
 function Get-EncodeOutputName {
@@ -418,7 +419,7 @@ function Get-x265BaseParam {
     Param ([Parameter(Mandatory=$true)]$pickOps)
     # TODO：添加 DJATOM? Mod 的深度自訂 AQ
     # $isHelp = $pickOps -in @('helpzh', 'helpen')
-    $default = "--high-tier --preset slow --me umh --subme 5 --weightb --aq-mode 4 --bframes 5 --ref 3"
+    $default = "--high-tier --preset slow --me umh --weightb --aq-mode 4 --bframes 5 --ref 3"
 
     switch ($pickOps) {
         # 通用 General Purpose，bframes 5
@@ -656,22 +657,23 @@ function Get-x265MERange {
     else { return "--merange 36" }
 }
 
-function Get-x265Subme { # 24fps=3, 48fps=4, 60fps=5, ++=6
+# 根據影片幀率給出 x265 子像素搜索參數值
+function Get-x265SubmotionEstimation { # 24fps=3, 48fps=4, 60fps=5, ++=6
     Param (
         [Parameter(Mandatory=$true)][string]$fpsString,
-        [bool]$getInteger=$false
+        [switch]$stripParameterName
     )
-    $encoderFPS = ConvertTo-Fraction $fpsString
+    $fps = ConvertTo-Fraction $fpsString
     $subme = 6
-    if ($encoderFPS -lt 25) {$subme = 3}
-    elseif ($encoderFPS -lt 49) {$subme = 4}
-    elseif ($encoderFPS -lt 61) {$subme = 5}
+    if ($fps -lt 25) {$subme = 3}
+    elseif ($fps -lt 49) {$subme = 4}
+    elseif ($fps -lt 61) {$subme = 5}
 
-    if ($getInteger) { return $subme }
+    if ($stripParameterName) { return $subme }
     return ("--subme " + $subme)
 }
 
-# 核心數大於 36 時開啟並行動態搜索
+# 判斷核心數大於 36 時開啟並行動態搜索
 function Get-x265PME {
     if ([int](wmic cpu get NumberOfCores)[2] -gt 36) {
         return "--pme"
@@ -1086,18 +1088,26 @@ function Set-IsVOB {
     $script:interlacedArgs.isVOB = $ffprobeCsvPath -like "*_vob*"
 }
 
+# 盡快判斷檔案是否為 MOV 格式（格式判斷已被先前腳本確定），影響後續大量參數的 $ffprobeCSV 變數讀法
+function Set-IsMOV {
+    [Parameter(Mandatory=$true)][string]$ffprobeCsvPath
+    if ([string]::IsNullOrWhiteSpace($ffprobeCsvPath)) {
+        throw "Set-IsMOV：ffprobeCsvPath 参数为空，无法判断"
+    }
+    $script:interlacedArgs.isMOV = $ffprobeCsvPath -like "*_mov*"
+}
+
 function Set-InterlacedArgs {
     Param(
         [Parameter(Mandatory=$true)]
         [string]$fieldOrderOrIsInterlacedFrame, # VOB：$ffprobe.H；其它：$ffprobeCsv.J
-        [Parameter(Mandatory=$true)]
-        [string]$topFieldFirst # $ffprobeCsv.K
+        [string]$tffAttribute # !MOV & !VOB: $ffprobeCsv.K
     )
     # 初始化
     $script:interlacedArgs.isInterlaced = $false
     $script:interlacedArgs.isTFF = $false
 
-    # 處理 VOB 格式
+    # 處理 VOB、MOV 格式
     if ($script:interlacedArgs.isVOB) {
         $fieldOrder = $fieldOrderOrIsInterlacedFrame.ToLower().Trim()
         
@@ -1119,7 +1129,7 @@ function Set-InterlacedArgs {
                 $script:interlacedArgs.isInterlaced = $false
                 $script:interlacedArgs.isTFF = $false
             }
-            { [string]::IsNullOrWhiteSpace($fieldOrder) } {
+            {[string]::IsNullOrWhiteSpace($fieldOrder)} {
                 Show-Warning "Set-InterlacedArgs: VOB field_order 為空，將視為逐行"
                 $script:interlacedArgs.isInterlaced = $false
                 $script:interlacedArgs.isTFF = $false
@@ -1131,7 +1141,7 @@ function Set-InterlacedArgs {
             }
         }
     }
-    else { # 非 VOB 格式，解析 interlaced_frame (0/1)
+    else { # 非 VOB、MOV 格式，解析 interlaced_frame (0/1)
         $interlacedFrame = $fieldOrderOrIsInterlacedFrame.Trim()
         
         if ([string]::IsNullOrWhiteSpace($interlacedFrame)) {
@@ -1150,7 +1160,7 @@ function Set-InterlacedArgs {
         }
         
         # 解析 top_field_first (-1/0/1)
-        $tff = $topFieldFirst.Trim()
+        $tff = $tffAttribute.Trim()
         
         if ([string]::IsNullOrWhiteSpace($tff)) {
             if ($script:interlacedArgs.isInterlaced) {
@@ -1229,7 +1239,15 @@ function Main {
     # SVT-AV1：原生不支持，報錯並退出
     Show-Info "正在區分隔行掃描格式..."
     Set-IsVOB -ffprobeCsvPath $ffprobeCsvPath
-    Set-InterlacedArgs -fieldOrderOrIsInterlacedFrame $ffprobeCSV.H -topFieldFirst $ffprobeCSV.J
+    Set-IsMOV -ffprobeCsvPath $ffprobeCsvPath
+
+    # MOV、VOB 格式的隔行場率資訊位於 H
+    if (-not $script:interlacedArgs.isMOV -and -not $script:interlacedArgs.isVOB) {
+        Set-InterlacedArgs -fieldOrderOrIsInterlacedFrame $ffprobeCSV.H -tffAttribute $ffprobeCSV.J
+    }
+    else {
+        Set-InterlacedArgs -fieldOrderOrIsInterlacedFrame $ffprobeCSV.H
+    }
 
     # 計算並賦值給對象屬性
     Show-Info "正在最佳化編碼參數（Profile、解析度、動態搜索範圍等）..."
@@ -1244,37 +1262,36 @@ function Main {
     $x265Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -Codec x265
     $x264Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -Codec x264
 
-    # VOB 格式的幀率資訊位於 I
-    if ($script:interlacedArgs.isVOB) {
-        $ffmpegParams.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target ffmpeg
-        $svtav1Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target svtav1
-        $x265Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target x265
-        $x264Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target x264
-
-        $x265Params.Subme = Get-x265Subme -fpsString $ffprobeCSV.I
-        [int]$x265SubmeInt = Get-x265Subme -fpsString $ffprobeCSV.I -getInteger $true
-        Show-Debug "VOB 源的幀率為：$(ConvertTo-Fraction $ffprobeCSV.I)"
-        $x264Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.I -bframes 250 -askUser -isx264
-        $x265Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.I -bframes $x265SubmeInt -askUser -isx265
-        $svtav1Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.I -bframes 999 -askUser -isSVTAV1
-        
-        $x264Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.I -bframes 250 # hack：借 bframes 做出建議最大值
-        $x265Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.I -bframes $x265SubmeInt
-    }
-    else {
+    # VOB、MOV 格式的幀率資訊位於 I
+    if (-not $script:interlacedArgs.isVOB -and -not $script:interlacedArgs.isMOV) {
         $ffmpegParams.FPS = Get-FPSParam -fpsString $ffprobeCSV.H -Target ffmpeg
         $svtav1Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.H -Target svtav1
         $x265Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.H -Target x265
         $x264Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.H -Target x264
 
-        $x265Params.Subme = Get-x265Subme -fpsString $ffprobeCSV.H
-        [int]$x265SubmeInt = Get-x265Subme -fpsString $ffprobeCSV.H -getInteger $true
-        Show-Debug "源影片的幀率為：$(ConvertTo-Fraction $ffprobeCSV.H)"
+        $x265Params.Subme = Get-x265SubmotionEstimation -fpsString $ffprobeCSV.H
+        [int]$x265SubmeInt = Get-x265SubmotionEstimation -fpsString $ffprobeCSV.H -stripParameterName
         $x264Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.H -bframes 250 -askUser -isx264
         $x265Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.H -bframes $x265SubmeInt -askUser -isx265
         $svtav1Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.H -bframes 999 -askUser -isSVTAV1
         $x264Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.H -bframes 250
         $x265Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.H -bframes $x265SubmeInt
+    }
+    else {
+        $ffmpegParams.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target ffmpeg
+        $svtav1Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target svtav1
+        $x265Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target x265
+        $x264Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target x264
+
+        $x265Params.Subme = Get-x265SubmotionEstimation -fpsString $ffprobeCSV.I
+        [int]$x265SubmeInt = Get-x265SubmotionEstimation -fpsString $ffprobeCSV.I -stripParameterName
+        Show-Debug "MOV/VOB 源的幀率為：$(ConvertTo-Fraction $ffprobeCSV.I)"
+        $x264Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.I -bframes 250 -askUser -isx264
+        $x265Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.I -bframes $x265SubmeInt -askUser -isx265
+        $svtav1Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.I -bframes 999 -askUser -isSVTAV1
+        
+        $x264Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.I -bframes 250 # hack：借 bframes 做出建议最大值
+        $x265Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.I -bframes $x265SubmeInt
     }
 
     # VOB 的總幀數資訊位於 J
