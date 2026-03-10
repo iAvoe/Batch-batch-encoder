@@ -86,14 +86,19 @@ function Get-VFRWarning {
         [double]$RelativeTolerance = 0.000000001
     )
     
-    Show-Info "Detecting if video is in variable frame rate..."
+    Show-Info "Get-VFRWarning: Detecting if video is in variable frame rate..."
     
     try {
         $s = Get-VideoStreamInfo -ffprobePath $ffprobePath -videoSource $videoSource `
             -showEntries "stream=r_frame_rate,avg_frame_rate,nb_frames,duration"
         
         # Call Set-FpsParams to update the base frame rate and average frame rate
-        Set-FpsParams -rFpsString ([string]$s.r_frame_rate).Trim() -aFpsString ([string]$s.avg_frame_rate).Trim()
+        try {
+            Set-FpsParams -rFpsString ([string]$s.r_frame_rate).Trim() -aFpsString ([string]$s.avg_frame_rate).Trim()
+        }
+        catch {
+            Show-Warning "Get-VFRWarning: Video frame rate data is missing or corrupted, could not analyze"
+        }
         $rFps = $script:fpsParams.rDouble
         $aFps = $script:fpsParams.aDouble
 
@@ -105,7 +110,7 @@ function Get-VFRWarning {
             $duration = [double]$s.duration.Trim()
         }
         catch {
-            Show-Warning "Get-VFRWarning：Invalid number of video frames and/or duration data."
+            Show-Warning "Get-VFRWarning: Invalid number of video frames and/or duration data"
         }
 
         # Estimated fps
@@ -243,7 +248,14 @@ function Get-NonSquarePixelWarning {
     try {
         $s = Get-VideoStreamInfo -ffprobePath $ffprobePath -videoSource $videoSource `
             -showEntries "stream=sample_aspect_ratio"
-        $sampleAspectRatio = $s.sample_aspect_ratio.Trim()
+
+        $sampleAspectRatio = "1:1"
+        try {
+            $sampleAspectRatio = $s.sample_aspect_ratio.Trim()
+        }
+        catch {
+            Show-Warning "Get-NonSquarePixelWarning: sample aspect radio (SAR) is missing or corrupted, defaulting to 1:1"
+        }
 
         if ($sampleAspectRatio -notlike "1:1") {
             Show-Warning "$videoSource has a $sampleAspectRatio sample aspect ratio (non-square pixel)"

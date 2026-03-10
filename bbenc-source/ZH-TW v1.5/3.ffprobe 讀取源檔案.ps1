@@ -155,7 +155,12 @@ function Get-VFRWarning {
             -showEntries "stream=r_frame_rate,avg_frame_rate,nb_frames,duration"
         
         # 調用 Set-FpsParams 更新基礎幀率、平均幀率
-        Set-FpsParams -rFpsString ([string]$s.r_frame_rate).Trim() -aFpsString ([string]$s.avg_frame_rate).Trim()
+        try {
+            Set-FpsParams -rFpsString ([string]$s.r_frame_rate).Trim() -aFpsString ([string]$s.avg_frame_rate).Trim()
+        }
+        catch {
+            Show-Warning "Get-VFRWarning：影片幀率數據為空或損壞，無法處理幀率"
+        }
         $rFps = $script:fpsParams.rDouble
         $aFps = $script:fpsParams.aDouble
 
@@ -296,12 +301,20 @@ function Get-NonSquarePixelWarning {
         [Parameter(Mandatory=$true)][string]$ffprobePath,
         [Parameter(Mandatory=$true)][string]$videoSource
     )
+
     
     try {
         $s = Get-VideoStreamInfo -ffprobePath $ffprobePath -videoSource $videoSource `
             -showEntries "stream=sample_aspect_ratio"
-        $sampleAspectRatio = $s.sample_aspect_ratio.Trim()
         
+        $sampleAspectRatio = "1:1"
+        try {
+            $sampleAspectRatio = $s.sample_aspect_ratio.Trim()
+        }
+        catch {
+            Show-Warning "Get-NonSquarePixelWarning：源的變寬比（SAR）數據損壞，將預設為 1:1"
+        }
+
         if ($sampleAspectRatio -notlike "1:1") {
             Show-Warning "源的變寬比（SAR）非 1:1（$sampleAspectRatio 的長方形象素）"
             Write-Host " 本程式暫無對策（強行編碼會恢復到方形象素，致畫面縮寬），" -ForegroundColor Yellow

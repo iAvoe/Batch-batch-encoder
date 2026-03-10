@@ -155,7 +155,12 @@ function Get-VFRWarning {
             -showEntries "stream=r_frame_rate,avg_frame_rate,nb_frames,duration"
         
         # 调用 Set-FpsParams 更新基础帧率、平均帧率
-        Set-FpsParams -rFpsString ([string]$s.r_frame_rate).Trim() -aFpsString ([string]$s.avg_frame_rate).Trim()
+        try {
+            Set-FpsParams -rFpsString ([string]$s.r_frame_rate).Trim() -aFpsString ([string]$s.avg_frame_rate).Trim()
+        }
+        catch {
+            Show-Warning "Get-VFRWarning：视频帧率数据为空或损坏，无法处理帧率"
+        }
         $rFps = $script:fpsParams.rDouble
         $aFps = $script:fpsParams.aDouble
 
@@ -300,7 +305,14 @@ function Get-NonSquarePixelWarning {
     try {
         $s = Get-VideoStreamInfo -ffprobePath $ffprobePath -videoSource $videoSource `
             -showEntries "stream=sample_aspect_ratio"
-        $sampleAspectRatio = $s.sample_aspect_ratio.Trim()
+
+        $sampleAspectRatio = "1:1"
+        try {
+            $sampleAspectRatio = $s.sample_aspect_ratio.Trim()
+        }
+        catch {
+            Show-Warning "Get-NonSquarePixelWarning：源的变宽比（SAR）数据损坏，将默认为 1:1"
+        }
         
         if ($sampleAspectRatio -notlike "1:1") {
             Show-Warning "源的变宽比（SAR）非 1:1（$sampleAspectRatio 的长方形像素）"
