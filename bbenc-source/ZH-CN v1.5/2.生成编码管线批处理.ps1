@@ -165,7 +165,7 @@ function Main {
 
     Show-Success "输出文件：$batchFullPath"
 
-    Show-Info "开始导入上游编码工具..."
+    Show-Info "开始导入上游编码工具可执行文件..."
     Write-Host " 提示：Select-File 支持 -InitialDirectory 参数，在此脚本中添加即可优化导入操作步骤" -ForegroundColor DarkGray
     Write-Host " 或者，可以通过创建文件夹快捷方式来减少点击次数"
     
@@ -176,7 +176,7 @@ function Main {
     $i=0
     foreach ($tool in @($upstreamTools.Keys)) {
         $i++
-        $choice = Read-Host "`r`n [上游] ($i/$($upstreamTools.Count)) 导入 $tool？（y=是，Enter 跳过）"
+        $choice = Read-Host "`r`n [上游] ($i/$($upstreamTools.Count)) 导入 $tool？（.exe，y=是，Enter 跳过）"
         if ($choice -eq 'y') {
             $upstreamTools[$tool] =
                 if ($tool -eq 'svfi') {

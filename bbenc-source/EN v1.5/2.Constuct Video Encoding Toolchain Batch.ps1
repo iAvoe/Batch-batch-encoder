@@ -165,7 +165,7 @@ function Main {
 
     Show-Success "Output file defined: $batchFullPath"
 
-    Show-Info "Start importing upstream tools..."
+    Show-Info "Start importing upstream executable tools..."
     Write-Host " Hint: Use add -InitialDirectory parameter to customize the import statements" -ForegroundColor DarkGray
     Write-Host " or create shortcut paths" -ForegroundColor DarkGray
     
@@ -177,7 +177,7 @@ function Main {
     foreach ($tool in @($upstreamTools.Keys)) {
         $i++
         # Caution: "?" destroys variable names
-        $choice = Read-Host "`r`n [Upstream] ($i/$($upstreamTools.Count)) Import $($tool)? (y=yes，Enter=Skip)"
+        $choice = Read-Host "`r`n [Upstream] ($i/$($upstreamTools.Count)) Import $($tool)? (.exe, y=yes, Enter=Skip)"
         if ($choice -eq 'y') {
             $upstreamTools[$tool] =
                 if ($tool -eq 'svfi') {
@@ -238,7 +238,7 @@ function Main {
     $i=0
     foreach ($tool in @($downstreamTools.Keys)) {
         $i++
-        $choice = Read-Host "`r`n [Downstream] ($i/$($downstreamTools.Count)) Import $($tool)? (y=yes，Enter=Skip)"
+        $choice = Read-Host "`r`n [Downstream] ($i/$($downstreamTools.Count)) Import $($tool)? (y=yes, Enter=Skip)"
         if ($choice -eq 'y') {
             $downstreamTools[$tool] = Select-File -Title "Select $tool executable" -ExeOnly
             Show-Success "$tool imported: $($downstreamTools[$tool])"
