@@ -9,9 +9,10 @@
     1.5
 #>
 
-# Downstream pipe (video encoders) must support Y4M pipe, otherwise upstream-overrides should be added
-# For simplicity, usage of Y4M/RAW pipe is dictated by upstream tools only
-# i.e., one_line_shot_args (SVFI) Support RAW YUV pipe only, and always override downstreams
+# Downstream tools (encoders) must support Y4M pipelines; otherwise, error exit for pipeline mismatch needs should be triggered (not yet implemented since all tools supports it)
+# The choice between Y4M/RAW should be determined by the upstream; one_line_shot_args (SVFI) has recently implemented Y4M pipeline support,
+# If there is an upstream tool that only supports RAW YUV pipelines, then the pipeline input of the downstream tool should be overridden,
+# and the pure parameter assignments for resolution, frame rate, etc., should be specified using the video metadata/SEI obtained by ffprobe (implemented)
 
 # Load globals
 . "$PSScriptRoot\Common\Core.ps1"
