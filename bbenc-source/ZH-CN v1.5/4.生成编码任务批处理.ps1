@@ -557,15 +557,15 @@ function Get-Keyint {
     if ($askUser) {
         if ($isx264) {
             Write-Host ""
-            Show-Info "请指定 x264 的关键帧最大间隔秒（正整数，非帧数）"
+            Show-Info "请指定 x264 的最大关键帧间隔秒（正整数，非帧数，如：11 代表 11 秒）"
         }
         elseif ($isx265) {
             Write-Host ""
-            Show-Info "请指定 x265 的关键帧最大间隔秒数（正整数，非帧数）"
+            Show-Info "请指定 x265 的最大关键帧间隔秒数（正整数，非帧数，如：12 代表 12 秒）"
         }
         elseif ($isSVTAV1) {
             Write-Host ""
-            Show-Info "请指定 SVT-AV1 的关键帧最大间隔秒数（正整数，非帧数）"
+            Show-Info "请指定 SVT-AV1 的最大关键帧间隔秒数（正整数，非帧数，如：13 代表 13 秒）"
         }
         else {
             throw "未指定要配置最大关键帧间隔参数的编码器，无法执行"
@@ -576,7 +576,7 @@ function Get-Keyint {
             Write-Host " 1. 分辨率高于 2560x1440 则偏左选一格"
             Write-Host " 2. 画面内容简单，平面居多则偏右选一格"
             $userSecond =
-                Read-Host " 大致范围：[低功耗/多轨剪辑：6-7 秒| 一般：8-10 秒| 高：11-13+ 秒]"
+                Read-Host " 大致范围：[低功耗/多轨剪辑：6-7 | 一般（不确定则用）：8-10 | 高：11-13+ ]"
             if ($userSecond -notmatch "^\d+$") {
                 if ((Read-Host " 未输入正整数，按 Enter 重试，输入 'q' 强制退出") -eq 'q') {
                     exit 1

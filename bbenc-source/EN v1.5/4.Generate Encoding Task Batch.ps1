@@ -560,18 +560,18 @@ function Get-Keyint {
     if ($askUser) {
         if ($isx264) {
             Write-Host ""
-            Show-Info "Please specify the maximum keyframe interval for x264 in seconds (positive integer, not frame number)"
+            Show-Info "Please specify the maximum keyframe interval for x264 in seconds (positive integer, not frame number, i.e. 11 seconds: 11)"
         }
         elseif ($isx265) {
             Write-Host ""
-            Show-Info "Please specify the maximum keyframe interval for x265 in seconds (positive integer, not frame number)"
+            Show-Info "Please specify the maximum keyframe interval for x265 in seconds (positive integer, not frame number, i.e. 12 seconds: 12)"
         }
         elseif ($isSVTAV1) {
             Write-Host ""
-            Show-Info "Please specify the maximum keyframe interval for SVT-AV1 in seconds (positive integer, not frame number)"
+            Show-Info "Please specify the maximum keyframe interval for SVT-AV1 in seconds (positive integer, not frame number, i.e. 13 seconds: 13)"
         }
         else {
-            throw "The encoder for which the maximum keyframe interval parameter is not specified cannot be executed"
+            throw "Maximum keyframe interval parameter is missing, cannot proceed"
         }
         
         $userSecond = $null
