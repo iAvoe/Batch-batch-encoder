@@ -45,6 +45,8 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 ![bbenc-ttl5zh.png](bbenc-ttl5zh.png)
 3. 解壓下載好的壓縮包
 4. 運行步驟 1 從而完成基本環境檢測
+    - Windows 10: ![Run-In-Windows-10-zh](bbenc-run-in-win10-zh.png)
+    - Windows 11: ![Run-In-Windows-11](bbenc-run-in-win11.jpg)
     1. 如果安裝了 VSCode，則建議直接安裝微軟 PowerShell 插件運行
     2. VSCode 選擇 `文件 → 打開文件夾 → 打開腳本根目錄（...\bbenc-source\ZH v1.x\）`
     3. VSCode 需要確認「信任發布者」才能運行腳本

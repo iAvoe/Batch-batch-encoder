@@ -43,6 +43,8 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 ![bbenc-ttl5zh.png](bbenc-ttl5en.png)
 3. Unzip the downloaded compressed file.
 4. Run step 1 to complete the basic environment check.
+    - Windows 10: ![Run-In-Windows-10-zh](bbenc-run-win10-en.png)
+    - Windows 11: ![Run-In-Windows-11](bbenc-run-win11.jpg)
     1. If VSCode is installed, it is recommended to directly install the Microsoft PowerShell plugin to run it.
     2. In VSCode, select `File → Open Folder → Open Script Root Directory (...\bbenc-source\ZH v1.x\)`
     3. VSCode requires confirmation of "Trust Publisher" before running the script.
