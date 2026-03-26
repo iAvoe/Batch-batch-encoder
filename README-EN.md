@@ -73,6 +73,12 @@ Developing these tools wasn't easy. If this tool improve your efficiency, consid
 <p align="center"><img src="bmc_qr.png" alt="Support me -_-"><br><img src="pp_tip_qr.png" alt="Support me =_="></p>
 
 ## Update Information
+**v1.6.3**
+- Step 3: Code Optimization
+  - Reduced ffprobe calls
+  - Prettified console output
+  - Removed redundant if branches
+
 **v1.6.0**
 - Step 2: Improved the import system
   - Added fuzzy matching for ffmpeg, avs2yuv, avs2pipemod, x264, x265, and SvtAv1EncApp located in the script's directory

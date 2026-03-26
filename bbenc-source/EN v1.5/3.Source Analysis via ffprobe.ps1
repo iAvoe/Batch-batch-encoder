@@ -320,22 +320,22 @@ function Get-NonSquarePixelWarning {
 }
 
 # Use ffprobe to detect the actual video file container format, ignoring the file extension (the container format is represented by uppercase letters)
-function Test-VideoContainerFormat {
+function Test-VContainerFormat {
     param (
         [Parameter(Mandatory = $true)][string]$ffprobePath,
         [Parameter(Mandatory = $true)][string]$videoSource
     )
-    Show-Info "Test-VideoContainerFormat: Validating if container format is genuine..."
+    Show-Info "Test-VContainerFormat: Validating if container format is genuine..."
     
     # Temporarily change text encoding
     $oldEncoding = [Console]::OutputEncoding
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
     if (-not (Test-Path -LiteralPath $ffprobePath)) {
-        throw "Test-VideoContainerFormat: ffprobe.exe does not exist ($ffprobePath)"
+        throw "Test-VContainerFormat: ffprobe.exe does not exist ($ffprobePath)"
     }
     if (-not (Test-Path -LiteralPath $videoSource)) {
-        throw "Test-VideoContainerFormat: Input video does not exist ($videoSource)"
+        throw "Test-VContainerFormat: Input video does not exist ($videoSource)"
     }
 
     # Get the file extension for subsequent logics
@@ -368,68 +368,40 @@ function Test-VideoContainerFormat {
 
                 # VOBs typically contain DVD navigation packets or specific stream structures
                 if ($hasDVD -or $hasMPEG2) {
-                    Show-Success "Test-VideoContainerFormat: VOB format (DVD video) detected"
+                    Show-Success "Test-VContainerFormat: VOB format (DVD video) detected"
                     return "VOB"
                 }
-                elseif ($hasMPEG2) {
-                    Show-Warning "Test-VideoContainerFormat: MPEG2 source, assuming VOB format (DVD video)"
-                    return "VOB"
-                }
-                elseif ($hasDVD) {
-                    Show-Warning "Test-VideoContainerFormat: Non-MPEG2 source, but contains DVD navigation identifiers, assuming VOB format (DVD video)"
-                    return "VOB"
-                }
-                else {
-                    Show-Warning "Test-VideoContainerFormat: Non-MPEG2 source, no DVD navigation identifier, assuming general container format"
-                    return "std"
-                }
+
+                Show-Warning "Test-VContainerFormat: Non-MPEG2 source, no DVD navigation identifier, assuming general container format"
+                return "std"
             }
-            elseif ($formatName -match "mov|mp4|m4a|3gp|3g2|mj2") {
-                if ($formatName -match "qt" -or $ext -eq ".mov") {
-                    Show-Success "Test-VideoContainerFormat: MOV format detected"
-                    return "MOV"
-                }
-                else {
-                    Show-Success "Test-VideoContainerFormat: MP4 format detected"
+
+            # Mapping regular formats
+            switch -Regex ($formatName) {
+                "mov|mp4|m4a|3gp|3g2|mj2" {
+                    if ($formatName -match "qt" -or $ext -eq ".mov") {
+                        Show-Success "MOV container detected"
+                        return "MOV"
+                    }
+                    Show-Success "MP4 container detected"
                     return "MP4"
                 }
-            }
-            elseif ($formatName -match "matroska") {
-                Show-Success "Test-VideoContainerFormat: MKV format detected"
-                return "MKV"
-            }
-            elseif ($formatName -match "webm") {
-                Show-Success "Test-VideoContainerFormat: WebM format detected"
-                return "WebM"
-            }
-            elseif ($formatName -match "avi") {
-                Show-Success "Test-VideoContainerFormat: AVI format detected"
-                return "AVI"
-            }
-            elseif ($formatName -match "ivf") {
-                Show-Success "Test-VideoContainerFormat: ivf format detected"
-                return "ivf"
-            }
-            elseif ($formatName -match "hevc") {
-                Show-Success "Test-VideoContainerFormat: hevc format detected"
-                return "hevc"
-            }
-            elseif ($formatName -match "h264" -or $formatName -match "avc") {
-                Show-Success "Test-VideoContainerFormat: avc format detected"
-                return "avc"
-            }
-            elseif ($formatName -match "ffv1") {
-                Show-Success "Test-VideoContainerFormat：检测到 ffv1 格式"
-                return "ffv1"
+                "matroska" { Show-Success "MKV container detected"; return "MKV" }
+                "webm"     { Show-Success "WebM container detected"; return "WebM" }
+                "avi"      { Show-Success "AVI container detected"; return "AVI" }
+                "ivf"      { Show-Success "IVF container detected"; return "ivf" }
+                "hevc"     { Show-Success "HEVC H.265 raw stream detected"; return "hevc" }
+                "h264|avc" { Show-Success "AVC H.264 raw stream detected"; return "avc" }
+                "ffv1"     { Show-Success "FFV1 detected"; return "ffv1" }
             }
             return $formatName
         }
         else { # ffprobe failed
-            throw "Test-VideoContainerFormat: ffprobe execution or JSON parsing failed"
+            throw "Test-VContainerFormat: ffprobe execution or JSON parsing failed"
         }
     }
     catch {
-        throw ("Test-VideoContainerFormat: Detection failed" + $_)
+        throw ("Test-VContainerFormat: Detection failed" + $_)
     }
     finally { # 还原编码设置
         [Console]::OutputEncoding = $oldEncoding
@@ -782,7 +754,7 @@ function Main {
     Write-Host ("─" * 50)
 
     # Detect if video container format is genuine
-    $realFormatName = Test-VideoContainerFormat -ffprobePath $ffprobePath -videoSource $videoSource
+    $realFormatName = Test-VContainerFormat -ffprobePath $ffprobePath -videoSource $videoSource
     $isMOV = ($realFormatName -like "MOV")
     $isVOB = ($realFormatName -like "VOB")
     # if ($isMOV) { Show-Debug "The imported video $videoSource is in MOV format" }
@@ -836,8 +808,6 @@ function Main {
     #     else {
     #         Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_debug.csv"
     #     }
-
-    Write-Host ("─" * 50)
 
     # If the CSV file already exists, manually confirm and delete
     Confirm-FileDelete (Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_mov.csv")
