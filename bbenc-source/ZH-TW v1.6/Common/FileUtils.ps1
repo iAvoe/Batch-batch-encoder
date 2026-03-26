@@ -1,35 +1,35 @@
-﻿# 检测文件名是否符合 Windows 命名规则
+﻿# 檢測檔案名是否符合 Windows 命名規則
 function Test-FilenameValid {
     param([string]$Filename)
     $invalid = [IO.Path]::GetInvalidFileNameChars()
     return $Filename.IndexOfAny($invalid) -eq -1
 }
 
-# 安全的文件引用函数（确保有引号并转义）
+# 安全的文件引用函數（確保有引號並轉義）
 function Get-QuotedPath {
     param([string]$Path)
     return "`"$Path`""
 }
 
-# 若文件存在则确认是否删除
+# 若文件存在則確認是否刪除
 function Confirm-FileDelete {
     param([string]$Path)
 
     if (-not (Test-Path -LiteralPath $Path)) { return }
 
-    Show-Warning "检测到已存在文件：$Path"
-    $confirm = Read-Host " 是否删除该文件以继续？输入 'y' 确认，其它任意键取消（永久删除）"
+    Show-Warning "檢測到已存在文件：$Path"
+    $confirm = Read-Host " 是否刪除該文件以繼續？輸入 'y' 確認，其它任意鍵取消（永久刪除）"
 
     if ($confirm -ne 'y') {
-        Show-Info "用户取消操作，脚本终止"
+        Show-Info "用戶取消操作，腳本終止"
         exit 1
     }
 
     Remove-Item $Path -Force
-    Show-Success "已删除旧文件：$Path"
+    Show-Success "已刪除舊文件：$Path"
 }
 
-# 尝试在脚本所在目录和 PATH 变量中模糊匹配含有特征名的 .exe 文件
+# 嘗試在腳本所在目錄和 PATH 變數中模糊匹配含有特徵名的 .exe 文件
 function Find-Tool {
     param(
         [Parameter(Mandatory = $true)][string]$Keyword,
@@ -37,10 +37,10 @@ function Find-Tool {
         [switch]$IncludePathEnv
     )
 
-    # 收集所有要搜索的目录
+    # 收集所有要搜索的目錄
     $allPaths = New-Object System.Collections.ArrayList
 
-    # 用户指定的额外路径 + 环境变量 PATH 中的目录（如果启用）
+    # 用戶指定的額外路徑 + 環境變數 PATH 中的目錄（如果啟用）
     foreach ($p in $SearchPaths) {
         if (Test-Path -Path $p -PathType Container) {
             [void]$allPaths.Add($p)
@@ -62,24 +62,50 @@ function Find-Tool {
         $allPaths = $allPaths | Select-Object -Unique
     }
 
-    # 在每条路径中搜索 *.exe，并筛选文件名包含关键字的文件
+    # 在每條路徑中搜索 *.exe，並篩選檔案名包含關鍵字的文件
     foreach ($dir in $allPaths) {
         try {
             $hits = Get-ChildItem -Path $dir -Filter *.exe -ErrorAction SilentlyContinue |
                 Where-Object { $_.Name -like "*$Keyword*" }
 
-            if ($hits) { # 返回首个匹配项
+            if ($hits) { # 返回首個匹配項
                 return $hits[0].FullName
             }
         }
-        catch { continue } # 忽略无法访问的目录
+        catch { continue } # 忽略無法訪問的目錄
     }
+    Write-Host " Find-Tool：腳本所在位置、環境變數與用戶指定路徑中均未發現 $keyword，需手動導入"
     return $null
 }
 
-#　通用的文件选择逻辑
+function Invoke-AutoSearch {
+    param(
+        [Parameter(Mandatory = $true)][string]$ToolName,
+        [Parameter(Mandatory = $true)][string]$ScriptDir
+    )
+    <#
+    .SYNOPSIS
+        自動搜索工具路徑（不包含交互）
+    .DESCRIPTION
+        在腳本目錄、額外路徑和 PATH 中搜尋包含指定關鍵字的可執行文件。
+        返回找到的路徑，若未找到則返回 $null。
+        額外路徑（需手動在 Common/Core.ps1 中定義。
+    .PARAMETER ToolName
+        工具名稱（用於關鍵字匹配和在 ToolExtraSearchPaths 中尋找額外路徑）
+    .PARAMETER ScriptDir
+        腳本所在目錄（通常傳入 $scriptDir）
+    #>
+    # 構建搜索路徑列表：腳本目錄 + 額外路徑
+    $searchPaths = @($ScriptDir)
+    if ($Global:ToolExtraSearchPaths.ContainsKey($ToolName)) {
+        $searchPaths += $Global:ToolExtraSearchPaths[$ToolName]
+    }
+    return Find-Tool -Keyword $ToolName -SearchPaths $searchPaths -IncludePathEnv
+}
+
+#　通用的文件選擇邏輯
 function Select-File(
-        [string]$Title = "选择文件",
+        [string]$Title = "選擇文件",
         [string]$InitialDirectory = [Environment]::GetFolderPath('Desktop'),
         [switch]$ExeOnly,
         [switch]$AvsOnly,
@@ -89,7 +115,7 @@ function Select-File(
         [switch]$BatOnly
     ) {
     
-    # 若是文件路径则取其父目录；如果路径不存在回到 Desktop
+    # 若是文件路徑則取其父目錄；如果路徑不存在回到 Desktop
     if ($InitialDirectory) {
         if (Test-Path $InitialDirectory -PathType Leaf) {
             $InitialDirectory = Split-Path $InitialDirectory -Parent
@@ -107,7 +133,7 @@ function Select-File(
     $dialog.InitialDirectory = $InitialDirectory
     $dialog.Multiselect = $false
 
-    # 后缀名过滤
+    # 後綴名過濾
     if ($ExeOnly) { $dialog.Filter = 'exe files (*.exe)|*.exe' }
     elseif ($AvsOnly) { $dialog.Filter = 'avs files (*.avs)|*.avs' }
     elseif ($VpyOnly) { $dialog.Filter = 'vpy files (*.vpy)|*.vpy' }
@@ -116,19 +142,19 @@ function Select-File(
     elseif ($BatOnly) { $dialog.Filter = 'bat Files (*.bat)|*.bat' }
     else { $dialog.Filter = 'All files (*.*)|*.*' }
 
-    Write-Host " 选窗可能会在本窗口后面打开，这里不要按回车"
+    Write-Host " 選窗可能會在本窗口後面打開，這裡不要按回車"
 
     while ($true) {
         if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
             return $dialog.FileName
         }
-        $choice = Read-Host "未选择文件，按回车重试或输入 'q' 强制退出"
+        $choice = Read-Host "未選擇文件，按回車重試或輸入 'q' 強制退出"
         if ($choice -eq 'q') { exit 1 }
     }
 }
 
 function Select-Folder(
-    [string]$Description = "选择文件夹",
+    [string]$Description = "選擇文件夾",
     [string]$InitialPath = [Environment]::GetFolderPath('Desktop')
     ) {
     # (Put on top of script) Add-Type -AssemblyName System.Windows.Forms
@@ -137,7 +163,7 @@ function Select-Folder(
     $dialog.SelectedPath = $InitialPath
     $dialog.ShowNewFolderButton = $true
 
-    Write-Host " 选窗可能会在本窗口后面打开，这里不要按回车"
+    Write-Host " 選窗可能會在本窗口後面打開，這裡不要按回車"
     
     while ($true) {
         if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
@@ -145,40 +171,40 @@ function Select-Folder(
             if (-not $path.EndsWith('\')) { $path += '\' }
             return $path
         }
-        $choice = Read-Host "未选择文件夹，按回车重试或输入 'q' 强制退出"
+        $choice = Read-Host "未選擇文件夾，按回車重試或輸入 'q' 強制退出"
         if ($choice -eq 'q') { exit 1 }
     }
 }
 
-# 生成使用 Windows（CRLF 换行）、UTF-8 BOM 文本编码的批处理
-function Write-TextFile { # 需在 Core.ps1 写入全局变量后运行
+# 生成使用 Windows（CRLF 換行）、UTF-8 BOM 文本編碼的批處理
+function Write-TextFile { # 需在 Core.ps1 寫入全局變數後運行
     param(
         [Parameter(Mandatory=$true)][string]$Path,
         [Parameter(Mandatory=$true)][string]$Content,
         [bool]$UseBOM = $true
     )
     if ([string]::IsNullOrWhiteSpace($Path)) {
-        Write-Error "Write-TextFile - 文件写入失败：空路径"
+        Write-Error "Write-TextFile - 文件寫入失敗：空路徑"
         return
     }
     if ([string]::IsNullOrWhiteSpace($Content)) {
-        Write-Error "Write-TextFile - 文件写入失败：空内容"
+        Write-Error "Write-TextFile - 文件寫入失敗：空內容"
         return
     }
 
-    # 必须使用 CRLF 换行符，否则 CMD 无法读取（乱码）
+    # 必須使用 CRLF 換行符，否則 CMD 無法讀取（亂碼）
     $normalizedContent = $Content -replace "`r?`n", "`r`n"
     
-    # 选择编码
+    # 選擇編碼
     $encoding = if ($UseBOM) { $Global:utf8BOM } else { $Global:utf8NoBOM }
     
-    # 写入文件
+    # 寫入檔案
     [System.IO.File]::WriteAllText($Path, $normalizedContent, $encoding)
-    Show-Debug "编码：$($encoding.EncodingName), 换行符：CRLF"
-    Show-Success "文件已写入：$Path"
+    Show-Debug "編碼：$($encoding.EncodingName), 換行符：CRLF"
+    Show-Success "文件已寫入：$Path"
 }
 
-# 验证批处理文件格式
+# 驗證批處理檔案格式
 function Test-TextFileFormat {
     param([Parameter(Mandatory=$true)][string]$Path)
     
@@ -188,42 +214,42 @@ function Test-TextFileFormat {
     }
     
     try {
-        # 读取文件内容
+        # 讀取文件內容
         $content = [System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::UTF8)
         
         $hasUnixLF = $content -match "(?<!`r)`n"
         if ($hasUnixLF) {
-            Write-Host "检测到 Unix(LF) 换行符"
+            Write-Host "檢測到 Unix(LF) 換行符"
         }
         $hasMacCR = $content -match "`r(?!`n)"
         if ($hasMacCR) {
-            Write-Host "检测到 Mac(CR) 换行符"
+            Write-Host "檢測到 Mac(CR) 換行符"
         }
-        # 统计 CR 和 LF 数量
+        # 統計 CR 和 LF 數量
         $crCount = ($content -split "`r").Count - 1
         $lfCount = ($content -split "`n").Count - 1
         if ($crCount -ne $lfCount) {
-            Show-Warning "换行符 CR($crCount) 和 LF($lfCount) 数量不相等，执行时可能会乱码"
+            Show-Warning "換行符 CR($crCount) 和 LF($lfCount) 數量不相等，執行時可能會亂碼"
         }
         
-        # 返回验证结果
+        # 返回驗證結果
         $isValid = (-not $hasUnixLF) -and (-not $hasMacCR) -and ($crCount -eq $lfCount)
         
         if ($isValid) {
-            Show-Success "文件格式正确 (CRLF：$crCount)" -ForegroundColor Green
+            Show-Success "檔案格式正確 (CRLF：$crCount)" -ForegroundColor Green
         }
         else {
-            Show-Warning "文件格式有问题" -ForegroundColor Red
+            Show-Warning "檔案格式有問題" -ForegroundColor Red
         }
         return $isValid
     }
     catch {
-        Show-Error "验证失败：$_" -ForegroundColor Red
+        Show-Error "驗證失敗：$_" -ForegroundColor Red
         return $false
     }
 }
 
-# 用 ffprobe 获取媒体流元数据
+# 用 ffprobe 獲取媒體流元數據
 function Get-StreamMetadata {
     param(
         [Parameter(Mandatory = $true)][string]$FFprobePath,
@@ -231,7 +257,7 @@ function Get-StreamMetadata {
         [Parameter(Mandatory = $true)][string]$StreamType
     )
     
-    # 验证流文件/ffprobe存在
+    # 驗證流檔案/ffprobe存在
     if (-not (Test-Path -LiteralPath $FilePath)) {
         Show-Error "文件不存在：$FilePath"
         return $null
@@ -241,12 +267,12 @@ function Get-StreamMetadata {
         return $null
     }
     
-    try { # 构建 ffprobe 命令参数
+    try { # 構建 ffprobe 命令參數
         $streamSelector = switch ($StreamType.ToLower()) {
-            "v" { "v" }  # 视频
-            "a" { "a" }  # 音频
+            "v" { "v" }  # 影片
+            "a" { "a" }  # 音訊
             "s" { "s" }  # 字幕
-            "t" { "t" }  # 字体
+            "t" { "t" }  # 字體
             default { $StreamType }
         }
         
@@ -258,40 +284,40 @@ function Get-StreamMetadata {
             "`"$FilePath`""
         )
         
-        Show-Debug "执行 ffprobe：$FFprobePath $arguments"
+        Show-Debug "執行 ffprobe：$FFprobePath $arguments"
         
-        # 执行 ffprobe 并捕获输出
+        # 執行 ffprobe 並捕獲輸出
         $result = & $FFprobePath @arguments 2>&1
         
-        # 检查是否有错误
+        # 檢查是否有錯誤
         if ($LASTEXITCODE -ne 0) {
-            Show-Warning "ffprobe 执行失败（退出代码: $LASTEXITCODE）：$result"
+            Show-Warning "ffprobe 執行失敗（退出代碼: $LASTEXITCODE）：$result"
             return $null
         }
         
-        # 解析 JSON 输出
+        # 解析 JSON 輸出
         $jsonOutput = $result | Out-String
         $metadata = $jsonOutput | ConvertFrom-Json
         
-        # 如果没有找到指定类型的流
+        # 如果沒有找到指定類型的流
         if (-not $metadata.streams -or $metadata.streams.Count -eq 0) {
-            Show-Debug "未找到指定为 $StreamType 类型的流：$FilePath"
+            Show-Debug "未找到指定為 $StreamType 類型的流：$FilePath"
             return $null
         }
         
-        # 返回第一个匹配的流信息（根据上下文，通常只需要第一个）
+        # 返回第一個匹配的流資訊（根據上下文，通常只需要第一個）
         $stream = $metadata.streams[0]
         
-        # 构建返回对象
+        # 構建返回對象
         $streamInfo = [PSCustomObject]@{
             Index      = if ($stream.index) { [int]$stream.index } else { 0 }
             CodecName  = if ($stream.codec_name) { $stream.codec_name } else { $null }
             CodecTag   = if ($stream.codec_tag_string) { $stream.codec_tag_string } else { $null }
             CodecType  = if ($stream.codec_type) { $stream.codec_type } else { $null }
             FrameRate  = if ($stream.r_frame_rate) { 
-                # 将分数格式化为字符串（如 24000/1001）
+                # 將分數格式化為字串（如 24000/1001）
                 $frameRateStr = $stream.r_frame_rate.ToString()
-                # 如果是整数（如 24/1），简化为整数
+                # 如果是整數（如 24/1），簡化為整數
                 if ($frameRateStr -match '^(\d+)/1$') {
                     $matches[1]
                 }
@@ -305,35 +331,35 @@ function Get-StreamMetadata {
             SampleRate = if ($stream.sample_rate) { [int]$stream.sample_rate } else { $null }
             Channels   = if ($stream.channels) { [int]$stream.channels } else { $null }
             Language   = if ($stream.tags -and $stream.tags.language) { $stream.tags.language } else { $null }
-            RawData    = $stream  # 保留原始数据以备用
+            RawData    = $stream  # 保留原始數據以備用
         }
         
-        Show-Debug "获取到流信息：$($streamInfo.CodecType) - $($streamInfo.CodecName)"
+        Show-Debug "獲取到流資訊：$($streamInfo.CodecType) - $($streamInfo.CodecName)"
         if ($streamInfo.FrameRate) {
-            Show-Debug "帧率：$($streamInfo.FrameRate)"
+            Show-Debug "幀率：$($streamInfo.FrameRate)"
         }
         
         return $streamInfo
         
     }
     catch {
-        Show-Error "解析 ffprobe 输出时出错：$_"
-        Show-Debug "错误详情：$($_.ScriptStackTrace)"
+        Show-Error "解析 ffprobe 輸出時出錯：$_"
+        Show-Debug "錯誤詳情：$($_.ScriptStackTrace)"
         return $null
     }
 }
 
-# 从 SVFI INI 文件中直接提取路径用
+# 從 SVFI INI 文件中直接提取路徑用
 function Convert-IniPath {
     param([string]$iniPath)
     
-    # 先处理 Unicode 转义
+    # 先處理 Unicode 轉義
     $path = [regex]::Unescape($iniPath)
     
-    # 移除可能存在的双引号
+    # 移除可能存在的雙引號
     $path = $path.Trim('"')
     
-    # 双反换单反斜杠
+    # 雙反換單眼斜槓
     $path = $path -replace '\\\\', '\'
     return $path
 }

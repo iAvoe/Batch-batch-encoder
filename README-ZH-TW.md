@@ -80,6 +80,11 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 <p align="center"><img src="bmc_qr.png" alt="支持一下 -_-"><br><img src="pp_tip_qr.png" alt="支持一下 =_="></p>
 
 ## 更新信息
+**v1.6.4**
+- 步驟 3 改良了導入系統
+  - 添加了腳本所在目錄下的 ffprobe 模糊匹配功能
+  - 添加了環境變數的 ffprobe 模糊匹配功能
+
 **v1.6.3**
 - 步驟 3 代碼最佳化
   - 減少調用 ffprobe 的次數

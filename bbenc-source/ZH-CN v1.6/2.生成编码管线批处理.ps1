@@ -135,31 +135,6 @@ function Get-CommandFromPreset([string]$presetName, $tools, $vspipeInfo) {
     }
 }
 
-function Invoke-AutoSearch {
-    param(
-        [Parameter(Mandatory = $true)][string]$ToolName,
-        [Parameter(Mandatory = $true)][string]$ScriptDir
-    )
-    <#
-    .SYNOPSIS
-        自动搜索工具路径（不包含交互）
-    .DESCRIPTION
-        在脚本目录、额外路径和 PATH 中搜索包含指定关键字的可执行文件。
-        返回找到的路径，若未找到则返回 $null。
-        额外路径（需手动在 Common/Core.ps1 中定义。
-    .PARAMETER ToolName
-        工具名称（用于关键字匹配和在 ToolExtraSearchPaths 中查找额外路径）
-    .PARAMETER ScriptDir
-        脚本所在目录（通常传入 $scriptDir）
-    #>
-    # 构建搜索路径列表：脚本目录 + 额外路径
-    $searchPaths = @($ScriptDir)
-    if ($Global:ToolExtraSearchPaths.ContainsKey($ToolName)) {
-        $searchPaths += $Global:ToolExtraSearchPaths[$ToolName]
-    }
-    return Find-Tool -Keyword $ToolName -SearchPaths $searchPaths -IncludePathEnv
-}
-
 #region Main
 function Main {
     # 显示标题

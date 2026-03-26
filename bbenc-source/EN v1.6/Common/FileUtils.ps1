@@ -75,7 +75,33 @@ function Find-Tool {
         }
         catch { continue } # Move on from failed match
     }
+    Write-Host " Find-Tool: Cannot find $keyword in the script directory, environment variables, or user-specified additional paths. Manual tool import required"
     return $null
+}
+
+function Invoke-AutoSearch {
+    param(
+        [Parameter(Mandatory = $true)][string]$ToolName,
+        [Parameter(Mandatory = $true)][string]$ScriptDir
+    )
+    <#
+    .SYNOPSIS
+        Automatically search for encoding tools, UI not included
+    .DESCRIPTION
+        Search for .exe files containing a keyword in the script directory, additional paths, and PATH.
+        Return the paths found; otherwise, return $null.
+        Additional paths (must be manually defined in Common/Core.ps1).
+    .PARAMETER ToolName
+        Tool name (used for keyword matching and finding additional paths in ToolExtraSearchPaths)
+    .PARAMETER ScriptDir
+        Where the script is located (use the $scriptDir)
+    #>
+    # Build a list of search paths: script directory + additional paths
+    $searchPaths = @($ScriptDir)
+    if ($Global:ToolExtraSearchPaths.ContainsKey($ToolName)) {
+        $searchPaths += $Global:ToolExtraSearchPaths[$ToolName]
+    }
+    return Find-Tool -Keyword $ToolName -SearchPaths $searchPaths -IncludePathEnv
 }
 
 function Select-File(

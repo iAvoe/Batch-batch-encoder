@@ -1,30 +1,33 @@
 ﻿<#
 .SYNOPSIS
-    ffprobe 视频源分析脚本
+    ffprobe 影片源分析腳本
 .DESCRIPTION
-    分析源视频并导出到 %USERPROFILE%\temp_v_info(_is_mov).csv: 总帧数，宽，高，色彩空间，传输特定等。繁体本地化由繁化姬实现：https://zhconvert.org
+    分析源影片並導出到 %USERPROFILE%\temp_v_info(_is_mov).csv: 總幀數，寬，高，色彩空間，傳輸特定等。繁體在地化由繁化姬實現：https://zhconvert.org
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
     1.5
 #>
 
-# 若同时检测到 temp_v_info_is_mov.csv 与 temp_v_info.csv，则使用其中创建日期最新的文件
+# 若同時檢測到 temp_v_info_is_mov.csv 與 temp_v_info.csv，則使用其中創建日期最新的文件
 
-# 加载共用代码，包括 $utf8NoBOM、Get-QuotedPath、Select-File、Select-Folder...
+# 載入共用代碼，包括 $utf8NoBOM、Get-QuotedPath、Select-File、Select-Folder...
 . "$PSScriptRoot\Common\Core.ps1"
 
-# 需要结合视频数据统计的参数
+# 需要結合影片數據統計的參數
 $fpsParams = [PSCustomObject]@{
-    rNumerator = [int]0 # 基础帧率
+    rNumerator = [int]0 # 基礎幀率
     rDenumerator = [int]0
     rDouble = [double]0
-    aNumerator = [int]0 # 平均帧率
+    aNumerator = [int]0 # 平均幀率
     aDenumerator = [int]0
     aDouble = [double]0
 }
 
-# 统计并更新视频源的基础帧率、平均帧率、总帧数、总时长数据
+# 腳本運行位置
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+
+# 統計並更新影片源的基礎幀率、平均幀率、總幀數、總時長數據
 function Set-FpsParams {
     param(
         [Parameter(Mandatory=$true)][string]$rFpsString,
@@ -34,25 +37,25 @@ function Set-FpsParams {
     $aFpsString = $aFpsString.Trim()
     $fpsRegex = '^\s*(\d+)\s*/\s*(\d+)\s*$'
 
-    # 整数帧率补充分母
+    # 整數幀率補充分母
     if ($rFpsString -notmatch "/") { $rFpsString += "/1" }
     if ($aFpsString -notmatch "/") { $aFpsString += "/1" }
     
-    # 处理基础帧率
+    # 處理基礎幀率
     if ($rFpsString -match $fpsRegex) {
         $rNum = [int]$Matches[1]
         $rDnm = [int]$Matches[2]
-        if ($rDnm -eq 0) { throw "基础帧率分母不能为零" }
+        if ($rDnm -eq 0) { throw "基礎幀率分母不能為零" }
         $script:fpsParams.rNumerator = $rNum
         $script:fpsParams.rDenumerator = $rDnm
         $script:fpsParams.rDouble = [double]$rNum / $rDnm
     }
     
-    # 处理平均帧率
+    # 處理平均幀率
     if ($aFpsString -match $fpsRegex) {
         $aNum = [int]$Matches[1]
         $aDnm = [int]$Matches[2]
-        if ($aDnm -eq 0) { throw "平均帧率分母不能为零" }
+        if ($aDnm -eq 0) { throw "平均幀率分母不能為零" }
         $script:fpsParams.aNumerator = $aNum
         $script:fpsParams.aDenumerator = $aDnm
         $script:fpsParams.aDouble = [double]$aNum / $aDnm
@@ -65,13 +68,13 @@ function Set-FpsParams {
     }
 }
 
-# 检测整数是否类似质数，来源：buttondown.com/behind-the-powershell-pipeline/archive/a-prime-scripting-solution
+# 檢測整數是否類似質數，來源：buttondown.com/behind-the-powershell-pipeline/archive/a-prime-scripting-solution
 function Test-IsLikePrime {
     param (
         [Parameter(Mandatory=$true)][int]$number,
-        [int]$threshold = 5 # 整除数的数量阈值，超过后判断为不类似质数
+        [int]$threshold = 5 # 整除數的數量閾值，超過後判斷為不類似質數
     )
-    if ($number -lt 3) { throw "测试值必须大于 3" }
+    if ($number -lt 3) { throw "測試值必須大於 3" }
     $t = 0
     for ($i=2; $i -le [math]::Sqrt($number); $i++) {
         if ($number % $i -eq 0) {
@@ -84,7 +87,7 @@ function Test-IsLikePrime {
     return $true
 }
 
-# 模块化的 ffprobe 信息读取函数
+# 模組化的 ffprobe 資訊讀取函數
 function Get-VideoStreamInfo {
     param (
         [Parameter(Mandatory=$true)][string]$ffprobePath,
@@ -92,15 +95,15 @@ function Get-VideoStreamInfo {
         [string]$showEntries = "stream"
     )
     
-    # 参数验证
+    # 參數驗證
     if (-not (Test-Path -LiteralPath $ffprobePath)) {
         throw "Get-VideoStreamInfo：ffprobe.exe 不存在（$ffprobePath）"
     }
     if (-not (Test-Path -LiteralPath $videoSource)) {
-        throw "Get-VideoStreamInfo：输入视频不存在（$videoSource）"
+        throw "Get-VideoStreamInfo：輸入影片不存在（$videoSource）"
     }
     
-    # 构建 ffprobe 参数
+    # 構建 ffprobe 參數
     $ffprobeArgs = @(
         '-v', 'quiet', '-hide_banner',
         '-select_streams', 'v:0',
@@ -109,20 +112,20 @@ function Get-VideoStreamInfo {
         '-of', 'json', $videoSource
     )
     
-    # 执行 ffprobe
+    # 執行 ffprobe
     $ffprobeJson = &$ffprobePath @ffprobeArgs 2>$null
     if ($LASTEXITCODE -ne 0 -or -not $ffprobeJson) {
-        throw "Get-VideoStreamInfo：ffprobe 执行失败或未返回有效数据"
+        throw "Get-VideoStreamInfo：ffprobe 執行失敗或未返回有效數據"
     }
     try {
         $streamInfo = $ffprobeJson | ConvertFrom-Json
     }
     catch {
-        throw "Get-VideoStreamInfo：无法解析 ffprobe 返回的 JSON"
+        throw "Get-VideoStreamInfo：無法解析 ffprobe 返回的 JSON"
     }
     
     if (-not $streamInfo.streams -or $streamInfo.streams.Count -lt 1) {
-        throw "Get-VideoStreamInfo：未找到视频流信息"
+        throw "Get-VideoStreamInfo：未找到影片串流資訊"
     }
     
     return $streamInfo.streams[0]
@@ -134,21 +137,21 @@ function Get-VFRWarning {
         [double]$RelativeTolerance = 0.000000001
     )
     
-    Show-Info "Get-VFRWarning：正在检测视频是否为可变帧率..."
+    Show-Info "Get-VFRWarning：正在檢測影片是否為可變幀率..."
     
-    try { # 调用 Set-FpsParams 更新基础帧率、平均帧率
+    try { # 調用 Set-FpsParams 更新基礎幀率、平均幀率
         try {
             Set-FpsParams `
                 -rFpsString ([string]$ffprobeStreamInfo.r_frame_rate).Trim() `
                 -aFpsString ([string]$ffprobeStreamInfo.avg_frame_rate).Trim()
         }
         catch {
-            Show-Warning "Get-VFRWarning：视频帧率数据为空或损坏，帧率无从得知"
+            Show-Warning "Get-VFRWarning：影片幀率數據為空或損壞，幀率無從得知"
         }
         $rFps = $script:fpsParams.rDouble
         $aFps = $script:fpsParams.aDouble
 
-        # 解析总帧数、总时长
+        # 解析總幀數、總時長
         $nbFrames = 0
         $duration = 0
         try {
@@ -156,90 +159,90 @@ function Get-VFRWarning {
             $duration = [double]$ffprobeStreamInfo.duration.Trim()
         }
         catch {
-            Show-Info "Get-VFRWarning：视频总帧数、时长元数据缺失，编码器将不显示 ETA"
+            Show-Info "Get-VFRWarning：影片總幀數、時長元數據缺失，編碼器將不顯示 ETA"
         }
 
-        # 估计帧率
+        # 估計幀率
         $eFps = $null
         if ($nbFrames -and $duration -and $duration -gt 0) {
             $eFps = $nbFrames / $duration
         }
 
-        # 判断视频为 VFR 的理由和可能性，只要大于零则咎
+        # 判斷影片為 VFR 的理由和可能性，只要大於零則咎
         $vReasons = @()
         $score = 0
 
-        # 1. 比较基础帧率与平均帧率
+        # 1. 比較基礎幀率與平均幀率
         if ($rFps -gt 0 -and $aFps -gt 0) {
             $relDiff =
                 [math]::Abs($rFps-$aFps) / [math]::Max(1e-9, [math]::Max($rFps, $aFps))
             if ($relDiff -gt $RelativeTolerance) {
                 $score += 1
-                $vReasons += "基础帧率（$rFps）与平均帧率（$aFps）不同"
+                $vReasons += "基礎幀率（$rFps）與平均幀率（$aFps）不同"
             }
             else {
-                $cReasons += "基础帧率与平均帧率相同"
+                $cReasons += "基礎幀率與平均幀率相同"
             }
         }
         else {
-            $cReasons += "无法解析基础帧率（r_frame_rate）或平均帧率（avg_frame_rate），可能为 N/A"
+            $cReasons += "無法解析基礎幀率（r_frame_rate）或平均幀率（avg_frame_rate），可能為 N/A"
         }
 
-        # 2. 比较估计帧率与平均帧率
+        # 2. 比較估計幀率與平均幀率
         if ($eFps -and $aFps -gt 0) {
             $relDiff2 = [math]::Abs($eFps-$aFps) / [math]::Max($eFps, $aFps)
             if ($relDiff2 -gt $RelativeTolerance) {
                 $score += 2
-                $vReasons += "估计帧率（$eFps）与平均帧率（$aFps）不同"
+                $vReasons += "估計幀率（$eFps）與平均幀率（$aFps）不同"
             }
             else {
-                $cReasons += "估计帧率与平均帧率相同"
+                $cReasons += "估計幀率與平均幀率相同"
             }
         }
 
-        # 3. 特殊值（据说常见于 VFR）
+        # 3. 特殊值（據說常見於 VFR）
         if ($ffprobeStreamInfo.r_frame_rate -eq "90000/1") {
             $score += 3
-            $vReasons += "特征 r_frame_rate（90000）为 VFR 容器标记"
+            $vReasons += "特徵 r_frame_rate（90000）為 VFR 容器標記"
         }
 
-        # 4. 接近质数的大分母
+        # 4. 接近質數的大分母
         $aDnm = $script:fpsParams.aDenumerator
         if ($aDnm -gt 50000) {
             if (Test-IsLikePrime -number $aDnm) {
                 $score += 2
-                $vReasons += "平均帧率分母值较大（$aDnm）且接近质数"
+                $vReasons += "平均幀率分母值較大（$aDnm）且接近質數"
             }
             else {
                 $score++
-                $vReasons += "平均帧率分母值较大（$aDnm）"
+                $vReasons += "平均幀率分母值較大（$aDnm）"
             }
         }
         else {
-            $cReasons += "平均帧率分母值不大（$aDnm）"
+            $cReasons += "平均幀率分母值不大（$aDnm）"
         }
 
-        # 最终判定映射
-        $mode = "「确定」是恒定帧率（CFR）"
+        # 最終判定映射
+        $mode = "「確定」是恆定幀率（CFR）"
         # $confidence = "高"
         if ($score -ge 5) {
-            $mode = "「确定」是可变帧率（VFR）"
-            # $confidence = "确认"
+            $mode = "「確定」是可變幀率（VFR）"
+            # $confidence = "確認"
         }
         if ($score -ge 4) {
-            $mode = "「大概率」是可变帧率（VFR）"
+            $mode = "「高機率」是可變幀率（VFR）"
             # $confidence = "高"
         }
         elseif ($score -ge 2) {
-            $mode = "「应该」是可变帧率（VFR）"
+            $mode = "「應該」是可變幀率（VFR）"
             # $confidence = "中"
         }
         elseif ($score -gt 0) {
-            $mode = "「有迹象」是可变帧率（VFR）"
+            $mode = "「有跡象」是可變幀率（VFR）"
             # $confidence = "低"
         }
         # else {
-        #     $mode = "是恒定帧率（CFR）"
+        #     $mode = "是恆定幀率（CFR）"
         #     $confidence = "高"
         # }
         # return [PSCustomObject]@{
@@ -255,19 +258,19 @@ function Get-VFRWarning {
         #     cfr_reasons    = $cReasons
         # }
         if ($score -gt 0) {
-            Show-Warning "源$mode，本程序暂无对策（强行编码可能会导致视频时长错误，随播放与音频失联）"
+            Show-Warning "源$mode，本程式暫無對策（強行編碼可能會導致影片時長錯誤，隨播放與音訊失聯）"
             $vReasons | ForEach-Object { Write-Host ("   - " + $_) -ForegroundColor Yellow }
-            Write-Host " 建议重新渲染为恒定帧率（CFR）再继续，或在对应线路添加 ffmpeg/VS/AVS 滤镜组矫正" -ForegroundColor Yellow
+            Write-Host " 建議重新渲染為恆定幀率（CFR）再繼續，或在對應線路添加 ffmpeg/VS/AVS 濾鏡組矯正" -ForegroundColor Yellow
             $quotedVideoSource = Get-QuotedPath $videoSource
             $rNum = $script:fpsParams.rNumerator
             $rDnm = $script:fpsParams.rDenumerator
-            Write-Host " 例：渲染并编码为 FFV1 无损视频："
+            Write-Host " 例：渲染並編碼為 FFV1 無損影片："
             Write-Host "   - ffmpeg -i $quotedVideoSource -r $rNum/$rDnm -c:v ffv1 -level 3 -context 1 -g 180 -c:a copy output.mkv" -ForegroundColor Magenta
-            Write-Host " 例：测量视频帧以确定 VFR："
+            Write-Host " 例：測量影片幀以確定 VFR："
             Write-Host "   - ffmpeg -i $quotedVideoSource -vf vfrdet -an -f null -" -ForegroundColor Magenta
-            Write-Host "   - 结束后根据 [Parsed_vfrdet_0 @ 0000012a34b5cd00] VFR:0.xxx (yyy/zzz) 字样即可确定"
-            Write-Host "   - yyy：显示时长对不上帧率帧的总数" -ForegroundColor Magenta
-            Read-Host " 按任意键继续..."
+            Write-Host "   - 結束後根據 [Parsed_vfrdet_0 @ 0000012a34b5cd00] VFR:0.xxx (yyy/zzz) 字樣即可確定"
+            Write-Host "   - yyy：顯示時長對不上幀率幀的總數" -ForegroundColor Magenta
+            Read-Host " 按任意鍵繼續..."
         }
         else {
             Show-Success "源$mode"
@@ -287,14 +290,14 @@ function Get-NonSquarePixelWarning {
             $sampleAspectRatio = $ffprobeStreamInfo.sample_aspect_ratio.Trim()
         }
         catch {
-            Show-Warning "Get-NonSquarePixelWarning：源的变宽比（SAR）数据损坏，将默认为 1:1"
+            Show-Warning "Get-NonSquarePixelWarning：源的變寬比（SAR）數據損壞，將預設為 1:1"
         }
         
         if ($sampleAspectRatio -notlike "1:1") {
-            Show-Warning "源的变宽比（SAR）非 1:1（$sampleAspectRatio 的长方形像素）"
-            Write-Host " 本程序暂无对策（强行编码会恢复到方形像素，致画面缩宽），" -ForegroundColor Yellow
-            Write-Host " 请手动修正元数据，或在对应线路添加 ffmpeg/VS/AVS 滤镜组矫正" -ForegroundColor Yellow
-            Write-Host " 手动指定元数据的矫正方法："
+            Show-Warning "源的變寬比（SAR）非 1:1（$sampleAspectRatio 的長方形象素）"
+            Write-Host " 本程式暫無對策（強行編碼會恢復到方形象素，致畫面縮寬），" -ForegroundColor Yellow
+            Write-Host " 請手動修正元數據，或在對應線路添加 ffmpeg/VS/AVS 濾鏡組矯正" -ForegroundColor Yellow
+            Write-Host " 手動指定元數據的矯正方法："
             $quotedVideoSource = Get-QuotedPath $videoSource
             $e = @(
                 " 1. ffmpeg -i $quotedVideoSource -c copy -aspect $sampleAspectRatio output.mkv",
@@ -306,7 +309,7 @@ function Get-NonSquarePixelWarning {
                 "    clip.write_videofile('output.mp4')"
             )
             $e | ForEach-Object { Write-Host $_ }
-            Read-Host " 按任意键继续..."
+            Read-Host " 按任意鍵繼續..."
         }
     }
     catch {
@@ -314,15 +317,15 @@ function Get-NonSquarePixelWarning {
     }
 }
 
-# 利用 ffprobe 验证视频文件封装格式，无视后缀名（封装格式用大写字母表示）
+# 利用 ffprobe 驗證影片檔案封裝格式，無視后綴名（封裝格式用大寫字母表示）
 function Test-VContainerFormat {
     param (
         [Parameter(Mandatory=$true)][string]$ffprobePath,
         [Parameter(Mandatory=$true)][string]$videoSource
     )
-    Show-Info "Test-VContainerFormat：正在检测视频文件封装格式真伪..."
+    Show-Info "Test-VContainerFormat：正在檢測影片檔案封裝格式真偽..."
 
-    # 临时切换文本编码
+    # 臨時切換文本編碼
     $oldEncoding = [Console]::OutputEncoding
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
@@ -330,9 +333,9 @@ function Test-VContainerFormat {
         throw "Test-VContainerFormat：ffprobe.exe 不存在（$ffprobePath）"
     }
     if (-not (Test-Path -LiteralPath $videoSource)) {
-        throw "Test-VContainerFormat：输入视频不存在（$videoSource）"
+        throw "Test-VContainerFormat：輸入影片不存在（$videoSource）"
     }
-    # 获取后缀名，用于后续逻辑
+    # 獲取後綴名，用於後續邏輯
     $ext = [System.IO.Path]::GetExtension($videoSource)
     $ffprobeArgs = @(
         '-v', 'quiet', '-hide_banner',
@@ -344,85 +347,85 @@ function Test-VContainerFormat {
         $videoSource
     )
 
-    try { # 使用 JSON 输入分析
+    try { # 使用 JSON 輸入分析
         $ffprobeJson = &$ffprobePath @ffprobeArgs 2>$null
 
-        if ($LASTEXITCODE -eq 0) { # ffprobe 正常退出，分析结果存在
+        if ($LASTEXITCODE -eq 0) { # ffprobe 正常退出，分析結果存在
             $formatInfo = $ffprobeJson | ConvertFrom-Json
             $formatName = $formatInfo.format.format_name
 
-            # VOB 格式检测
+            # VOB 格式檢測
             if ($formatName -match "mpeg") {
-                # 进一步检测，捕获 stderr
+                # 進一步檢測，捕獲 stderr
                 $ffprobeText = &$ffprobePath @$ffprobeArgs2 2>&1
-                # 文件名含 VTS_ 字样（不确定是否全是大写，因此不用 cmatch）
+                # 檔案名含 VTS_ 字樣（不確定是否全是大寫，因此不用 cmatch）
                 # $hasVTSFileName = $filename -match "^VTS_"
-                # 元数据含 dvd_nav、mpeg2video 字样
+                # 元數據含 dvd_nav、mpeg2video 字樣
                 $hasDVD = $ffprobeText -match "dvd_nav"
                 $hasMPEG2 = $ffprobeText -match "mpeg2video"
 
-                # VOB 通常包含 DVD 导航包或特定的流结构
+                # VOB 通常包含 DVD 導航包或特定的流結構
                 if ($hasDVD -or $hasMPEG2) {
-                    Show-Success "Test-VContainerFormat：检测到 VOB 格式（DVD 视频）"
+                    Show-Success "Test-VContainerFormat：檢測到 VOB 格式（DVD 影片）"
                     return "VOB"
                 }
 
-                Show-Warning "Test-VContainerFormat：源非 MPEG2 编码，且无 DVD 导航标识，将视作一般封装格式"
+                Show-Warning "Test-VContainerFormat：源非 MPEG2 編碼，且無 DVD 導航標識，將視作一般封裝格式"
                 return "std"
             }
              
-            # 常规格式映射
+            # 常規格式映射
             switch -Regex ($formatName) {
                 "mov|mp4|m4a|3gp|3g2|mj2" {
                     if ($formatName -match "qt" -or $ext -eq ".mov") {
-                        Show-Success "检测到 MOV 格式"
+                        Show-Success "檢測到 MOV 格式"
                         return "MOV"
                     }
-                    Show-Success "检测到 MP4 格式"
+                    Show-Success "檢測到 MP4 格式"
                     return "MP4"
                 }
-                "matroska" { Show-Success "检测到 MKV 格式"; return "MKV" }
-                "webm"     { Show-Success "检测到 WebM 格式"; return "WebM" }
-                "avi"      { Show-Success "检测到 AVI 格式"; return "AVI" }
-                "ivf"      { Show-Success "检测到 IVF 格式"; return "ivf" }
-                "hevc"     { Show-Success "检测到 HEVC 裸流"; return "hevc" }
-                "h264|avc" { Show-Success "检测到 AVC 裸流"; return "avc" }
-                "ffv1"     { Show-Success "检测到 FFV1"; return "ffv1" }
+                "matroska" { Show-Success "檢測到 MKV 格式"; return "MKV" }
+                "webm"     { Show-Success "檢測到 WebM 格式"; return "WebM" }
+                "avi"      { Show-Success "檢測到 AVI 格式"; return "AVI" }
+                "ivf"      { Show-Success "檢測到 IVF 格式"; return "ivf" }
+                "hevc"     { Show-Success "檢測到 HEVC 裸流"; return "hevc" }
+                "h264|avc" { Show-Success "檢測到 AVC 裸流"; return "avc" }
+                "ffv1"     { Show-Success "檢測到 FFV1"; return "ffv1" }
             }
             return $formatName
         }
-        else { # ffprobe 失败
-            throw "Test-VContainerFormat：ffprobe 执行或 JSON 解析失败"
+        else { # ffprobe 失敗
+            throw "Test-VContainerFormat：ffprobe 執行或 JSON 解析失敗"
         }
     }
     catch {
-        throw ("Test-VContainerFormat - 检测失败：" + $_)
+        throw ("Test-VContainerFormat - 檢測失敗：" + $_)
     }
-    finally { # 还原编码设置
+    finally { # 還原編碼設置
         [Console]::OutputEncoding = $oldEncoding
     }
 }
 
-# 同时生成占位 AVS/VS 脚本到 %USERPROFILE%，从而在用户暂无可用脚本的情况下顶替
+# 同時生成占位 AVS/VS 腳本到 %USERPROFILE%，從而在用戶暫無可用腳本的情況下頂替
 function Get-BlankAVSVSScript {
     param([Parameter(Mandatory=$true)][string]$videoSource)
 
-    # 尝试用共用函数拿到带引号的路径
+    # 嘗試用共用函數拿到帶引號的路徑
     $quotedImport = Get-QuotedPath $videoSource
 
-    # 空脚本与导出路径
+    # 空腳本與導出路徑
     $AVSScriptPath = Join-Path $Global:TempFolder "blank_avs_script.avs"
     $VSScriptPath = Join-Path $Global:TempFolder "blank_vs_script.vpy"
-    # 生成 AVS 内容（LWLibavVideoSource 需要双引号包裹路径）
-    # 文件夹：C:\Program Files (x86)\AviSynth+\plugins64+\ 中必须有 libvslsmashsource.dll
-    $blankAVSScript = "LWLibavVideoSource($quotedImport) # 自动生成的占位脚本，按需修改"
-    # 生成 VapourSynth 内容（使用原始字符串 literal r"..." 以避免转义问题）
-    # 若 Get-QuotedPath 返回例如 "C:\path\file.mp4"，则 r$quotedImport 将成为 r"C:\path\file.mp4"
+    # 生成 AVS 內容（LWLibavVideoSource 需要雙引號包裹路徑）
+    # 文件夾：C:\Program Files (x86)\AviSynth+\plugins64+\ 中必須有 libvslsmashsource.dll
+    $blankAVSScript = "LWLibavVideoSource($quotedImport) # 自動生成的占位腳本，按需修改"
+    # 生成 VapourSynth 內容（使用原始字串 literal r"..." 以避免轉義問題）
+    # 若 Get-QuotedPath 返回例如 "C:\path\file.mp4"，則 r$quotedImport 將成為 r"C:\path\file.mp4"
     $blankVSScript = @"
 import vapoursynth as vs
 core = vs.core
 src = core.lsmas.LWLibavSource(source=r$quotedImport)
-# 自动生成无滤镜脚本：按需在此处加入滤镜、裁切、帧率调整等
+# 自動生成無濾鏡腳本：按需在此處加入濾鏡、裁切、幀率調整等
 src.set_output()
 "@
 
@@ -430,13 +433,13 @@ src.set_output()
         Confirm-FileDelete $AVSScriptPath
         Confirm-FileDelete $VSScriptPath
 
-        Show-Info "正在生成无滤镜脚本：`n $AVSScriptPath`n $VSScriptPath"
+        Show-Info "正在生成無濾鏡腳本：`n $AVSScriptPath`n $VSScriptPath"
         Write-TextFile -Path $AVSScriptPath -Content $blankAVSScript -UseBOM $false
         Write-TextFile -Path $VSScriptPath -Content $blankVSScript -UseBOM $false
-        Show-Success "已生成无滤镜脚本到用户目录。"
+        Show-Success "已生成無濾鏡腳本到用戶目錄。"
 
-        # 验证换行符
-        Show-Debug "验证脚本文件格式..."
+        # 驗證換行符
+        Show-Debug "驗證腳本檔案格式..."
         if (-not (Test-TextFileFormat -Path $AVSScriptPath)) {
             return
         }
@@ -444,14 +447,14 @@ src.set_output()
             return
         }
 
-        # 调用方根据上游类型选择使用哪个脚本
+        # 調用方根據上游類型選擇使用哪個腳本
         return @{
             AVS = $AVSScriptPath
             VPY = $VSScriptPath
         }
     }
     catch {
-        Show-Error ("生成无滤镜脚本失败：" + $_)
+        Show-Error ("生成無濾鏡腳本失敗：" + $_)
         return $null
     }
 }
@@ -459,11 +462,11 @@ src.set_output()
 #region Main
 function Main {
     Show-Border
-    Show-info ("ffprobe 源读取工具，导出 " + $Global:TempFolder + "temp_v_info(_is_mov).csv 以备用")
+    Show-info ("ffprobe 源讀取工具，導出 " + $Global:TempFolder + "temp_v_info(_is_mov).csv 以備用")
     Show-Border
     Write-Host ""
 
-    # 根据管道上游程序选择源类型
+    # 根據管道上遊程序選擇源類型
     $sourceTypes = @{
         'A' = @{ Name = 'ffmpeg'; Ext = ''; Message = "任意源" }
         'B' = @{ Name = 'vspipe'; Ext = '.vpy'; Message = ".vpy 源" }
@@ -472,14 +475,14 @@ function Main {
         'E' = @{ Name = 'SVFI'; Ext = ''; Message = ".ini 源" } 
     }
 
-    # 获取源文件类型
+    # 獲取源文件類型
     $selectedType = $null
     while ($true) {
-        Show-Info "选择先前脚本所用的管道上游程序（确认源符合程序要求）："
+        Show-Info "選擇先前腳本所用的管道上遊程序（確認源符合程序要求）："
         $sourceTypes.GetEnumerator() | Sort-Object Key | ForEach-Object {
             Write-Host "  $($_.Key): $($_.Value.Name)"
         }
-        $choice = (Read-Host " 请输入选项（A/B/C/D/E）").ToUpper()
+        $choice = (Read-Host " 請輸入選項（A/B/C/D/E）").ToUpper()
 
         if ($sourceTypes.ContainsKey($choice)) {
             $selectedType = $sourceTypes[$choice]
@@ -488,7 +491,7 @@ function Main {
         }
     }
     
-    # 获取上游程序代号（写入 CSV）；为 Avs2PipeMod 导入必须的 DLL
+    # 獲取上遊程序代號（寫入 CSV）；為 Avs2PipeMod 導入必須的 DLL
     $upstreamCode = $null
     $Avs2PipeModDLL = $null
     $OneLineShotArgsINI = $null
@@ -501,41 +504,41 @@ function Main {
         'avs2yuv'     { $upstreamCode = 'c' }
         'avs2pipemod' {
             $upstreamCode = 'd'
-            Show-Info "指定 AviSynth.dll 的路径..."
-            Write-Host " 在 AviSynth+ 仓库（https://github.com/AviSynth/AviSynthPlus/releases）中，"
-            Write-Host " 下载 AviSynthPlus_x.x.x_yyyymmdd-filesonly.7z，即可获取 DLL"
+            Show-Info "指定 AviSynth.dll 的路徑..."
+            Write-Host " 在 AviSynth+ 倉庫（https://github.com/AviSynth/AviSynthPlus/releases）中，"
+            Write-Host " 下載 AviSynthPlus_x.x.x_yyyymmdd-filesonly.7z，即可獲取 DLL"
             do {
-                $Avs2PipeModDLL = Select-File -Title "选择 avisynth.dll" -InitialDirectory ([Environment]::GetFolderPath('System')) -DllOnly
+                $Avs2PipeModDLL = Select-File -Title "選擇 avisynth.dll" -InitialDirectory ([Environment]::GetFolderPath('System')) -DllOnly
                 if (-not $Avs2PipeModDLL) {
-                    $placeholderScript = Read-Host "未选择 DLL。按 Enter 重试，输入 'q' 强制退出"
+                    $placeholderScript = Read-Host "未選擇 DLL。按 Enter 重試，輸入 'q' 強制退出"
                     if ($placeholderScript -eq 'q') { exit }
                 }
             }
             while (-not $Avs2PipeModDLL)
-            Show-Success "已记录 AviSynth.dll 路径：$Avs2PipeModDLL"
+            Show-Success "已記錄 AviSynth.dll 路徑：$Avs2PipeModDLL"
         }
         'SVFI'        {
             $upstreamCode = 'e'
-            Show-Info "正在检测 SVFI 渲染配置 INI 可能的路径..."
+            Show-Info "正在檢測 SVFI 渲染配置 INI 可能的路徑..."
             $foundPath = Get-PSDrive -PSProvider FileSystem | ForEach-Object { 
                 $p = "$($_.Root)SteamLibrary\steamapps\common\SVFI\Configs"
                 if (Test-Path $p) { $p }
             } | Select-Object -First 1
 
-            Show-Info "请指定 SVFI 渲染配置 INI 文件的路径"
+            Show-Info "請指定 SVFI 渲染配置 INI 文件的路徑"
             Write-Host " 如 X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini"
 
             do {
-                if ($foundPath) { # 尝试自动定位到的 SVFI 路径（Select-File 能自动回退到 Desktop）
-                    Show-Success "已定位候选路径：$foundPath"
-                    $OneLineShotArgsINI = Select-File -Title "选择 SVFI 渲染配置文件（.ini）" -IniOnly -InitialDirectory $foundPath
+                if ($foundPath) { # 嘗試自動定位到的 SVFI 路徑（Select-File 能自動回退到 Desktop）
+                    Show-Success "已定位候選路徑：$foundPath"
+                    $OneLineShotArgsINI = Select-File -Title "選擇 SVFI 渲染設定檔（.ini）" -IniOnly -InitialDirectory $foundPath
                 }
                 else { # DIY
-                    $OneLineShotArgsINI = Select-File -Title "选择 SVFI 渲染配置文件（.ini）" -IniOnly
+                    $OneLineShotArgsINI = Select-File -Title "選擇 SVFI 渲染設定檔（.ini）" -IniOnly
                 }
 
                 if (-not $OneLineShotArgsINI -or -not (Test-Path -LiteralPath $OneLineShotArgsINI)) {
-                    $placeholderScript = Read-Host " INI 路径不存在；按 Enter 重试，输入 'q' 强制退出"
+                    $placeholderScript = Read-Host " INI 路徑不存在；按 Enter 重試，輸入 'q' 強制退出"
                     if ($placeholderScript -eq 'q') { exit }
                 }
             }
@@ -546,64 +549,64 @@ function Main {
 
     Write-Host ("─" * 50)
 
-    # 定义 IO 变量
-    $videoSource = $null # ffprobe 将分析这个视频文件
-    $scriptSource = $null # 脚本文件路径，如果有则在导出的 CSV 中覆盖视频源
+    # 定義 IO 變數
+    $videoSource = $null # ffprobe 將分析這個影片檔案
+    $scriptSource = $null # 腳本文件路徑，如果有則在導出的 CSV 中覆蓋影片源
     $encodeImportSourcePath = $null
     $svfiTaskId = $null
 
-    # vspipe / avs2yuv / avs2pipemod：提供生成无滤镜脚本选项
+    # vspipe / avs2yuv / avs2pipemod：提供生成無濾鏡腳本選項
     if ($isScriptUpstream) {
         do {
-            # 选择视频源文件（ffprobe 分析）
-            Show-Info "选择（脚本引用的）视频源文件（ffprobe 将分析此文件）"
+            # 選擇影片源文件（ffprobe 分析）
+            Show-Info "選擇（腳本引用的）影片源文件（ffprobe 將分析此文件）"
             while ($null -eq $videoSource) {
-                $videoSource = Select-File -Title "选择视频源文件（例如 .mp4/.mkv/.mov）"
-                if ($null -eq $videoSource) { Show-Error "未选择视频文件" }
+                $videoSource = Select-File -Title "選擇影片源文件（例如 .mp4/.mkv/.mov）"
+                if ($null -eq $videoSource) { Show-Error "未選擇影片檔案" }
             }
         
-            # 询问用户是否要生成无滤镜脚本
-            $mode = Read-Host "输入 'y' 导入自定义脚本，输入 'n' 或 Enter 为视频源生成无滤镜脚本"
+            # 詢問用戶是否要生成無濾鏡腳本
+            $mode = Read-Host "輸入 'y' 導入自訂腳本，輸入 'n' 或 Enter 為影片源生成無濾鏡腳本"
         
-            if ($mode -eq 'y') { # 导入自定义脚本
-                Show-Warning "由于脚本支持的导入源路径的种类繁多，如先定义路径变量或直接写入、"
-                Write-Host " 不同解析器、多种字面意义符搭配不同字符串引号、多视频源等条件组合过于复杂，" -ForegroundColor Yellow
-                Write-Host " 因此请自行检查脚本中的视频源是否真实存在`r`n" -ForegroundColor Yellow
+            if ($mode -eq 'y') { # 導入自訂腳本
+                Show-Warning "由於腳本支持的導入源路徑的種類繁多，如先定義路徑變數或直接寫入、"
+                Write-Host " 不同解析器、多種字面意義符搭配不同字串引號、多影片源等條件組合過於複雜，" -ForegroundColor Yellow
+                Write-Host " 因此請自行檢查腳本中的影片源是否真實存在`r`n" -ForegroundColor Yellow
                 do {
-                    $scriptSource = Select-File -Title "定位脚本文件（.avs/.vpy...）"
+                    $scriptSource = Select-File -Title "定位腳本文件（.avs/.vpy...）"
                     if (-not $scriptSource) {
-                        Show-Error "未选择文件"
+                        Show-Error "未選擇文件"
                         continue
                     }
                 
-                    # 验证文件扩展名
+                    # 驗證文件副檔名
                     $ext = [IO.Path]::GetExtension($scriptSource).ToLower()
                     if ($selectedType.Name -in @('avs2yuv', 'avs2pipemod') -and $ext -ne '.avs') {
-                        Show-Error "对于 $($selectedType.Name)，需要 .avs 脚本文件"
+                        Show-Error "對於 $($selectedType.Name)，需要 .avs 腳本文件"
                         $scriptSource = $null
                     }
                     elseif ($selectedType.Name -eq 'vspipe' -and $ext -ne '.vpy') {
-                        Show-Error "对于 vspipe，需要 .vpy 脚本文件"
+                        Show-Error "對於 vspipe，需要 .vpy 腳本文件"
                         $scriptSource = $null
                     }
                 }
                 while (-not $scriptSource)
             
-                Show-Success "已选择脚本文件：$scriptSource"
-                # 注意：视频源 $videoSource 仍然用于 ffprobe
+                Show-Success "已選擇腳本文件：$scriptSource"
+                # 注意：影片源 $videoSource 仍然用於 ffprobe
             }
-            # 生成无滤镜脚本
+            # 生成無濾鏡腳本
             elseif ([string]::IsNullOrWhiteSpace($mode) -or $mode -eq 'n') {
-                Show-Warning "AviSynth(+) 默认不自带 LSMASHSource.dll（视频导入滤镜）请保证该文件存在，"
-                Write-Host " AVS 安装路径为：C:\Program Files (x86)\AviSynth+\plugins64+\" -ForegroundColor Yellow
-                Write-Host " 下载并解压 64bit 版：https://github.com/HomeOfAviSynthPlusEvolution/L-SMASH-Works/releases`r`n" -ForegroundColor Magenta
+                Show-Warning "AviSynth(+) 默認不自帶 LSMASHSource.dll（影片導入濾鏡）請保證該文件存在，"
+                Write-Host " AVS 安裝路徑為：C:\Program Files (x86)\AviSynth+\plugins64+\" -ForegroundColor Yellow
+                Write-Host " 下載並解壓 64bit 版：https://github.com/HomeOfAviSynthPlusEvolution/L-SMASH-Works/releases`r`n" -ForegroundColor Magenta
                 $placeholderScript = Get-BlankAVSVSScript -videoSource $videoSource
                 if (-not $placeholderScript) { 
-                    Show-Error "生成无滤镜脚本失败，请重试"
+                    Show-Error "生成無濾鏡腳本失敗，請重試"
                     continue
                 }
             
-                # 根据上游类型选择正确的脚本路径
+                # 根據上游類型選擇正確的腳本路徑
                 if ($selectedType.Name -in @('avs2yuv', 'avs2pipemod')) {
                     $scriptSource = $placeholderScript.AVS
                 }
@@ -611,10 +614,10 @@ function Main {
                     $scriptSource = $placeholderScript.VPY
                 }
                 
-                Show-Success "已生成无滤镜脚本：$scriptSource"
+                Show-Success "已生成無濾鏡腳本：$scriptSource"
             }
             else {
-                Show-Warning "无效输入"
+                Show-Warning "無效輸入"
                 continue
             }
             break
@@ -623,95 +626,95 @@ function Main {
 
         $encodeImportSourcePath = $scriptSource
     }
-    # SVFI：从 INI 文件中读取视频路径，以及 task_id
+    # SVFI：從 INI 文件中讀取影片路徑，以及 task_id
     elseif ($OneLineShotArgsINI -and (Test-Path -LiteralPath $OneLineShotArgsINI)) { 
-        # SVFI ini 文件中的视频路径（实际上内容为单行）：gui_inputs="{
+        # SVFI ini 文件中的影片路徑（實際上內容為單行）：gui_inputs="{
         #     \"inputs\": [{
-        #         \"task_id\": \"必须获取并赋值到 CSV\",
-        #         \"input_path\": \"X:\\\\Video\\\\\\u5176\\u5b83-\\u52a8\\u6f2b\\u753b\\u516c\\u79cd\\\\视频.mp4\",
+        #         \"task_id\": \"必須獲取並賦值到 CSV\",
+        #         \"input_path\": \"X:\\\\Video\\\\\\u5176\\u5b83-\\u52a8\\u6f2b\\u753b\\u516c\\u79cd\\\\影片.mp4\",
         #         \"is_surveillance_folder\": false
         #     }]
         # }"
-        # 读取文件并找到 gui_inputs 行，如：
+        # 讀取文件並找到 gui_inputs 行，如：
         # gui_inputs="{\"inputs\": [{\"task_id\": \"798_2aa174\", \"input_path\": \"X:\\\\Video\\\\\\u5176\\u5b83-\\u52a8\\u6f2b\\u753b\\u516c\\u79cd\\\\[Airota][Yuru Yuri\\u3001][OVA][BDRip 1080p AVC AAC][CHS].mp4\", \"is_surveillance_folder\": false}]}"
-        Show-Info " 将尝试从 SVFI 渲染配置 INI 中读取视频源路径..."
+        Show-Info " 將嘗試從 SVFI 渲染配置 INI 中讀取影片源路徑..."
 
-        try { # 读取 INI 并查找 gui_inputs 行
+        try { # 讀取 INI 並尋找 gui_inputs 行
             $iniContent = Get-Content -LiteralPath $OneLineShotArgsINI -Raw -ErrorAction Stop
             $pattern = 'gui_inputs\s*=\s*"((?:[^"\\]|\\.)*)"'
             $guiInputsMatch = [regex]::Match($iniContent, $pattern)
             if (-not $guiInputsMatch.Success) {
-                Show-Error "在 SVFI INI 文件中未找到 gui_inputs 字段，请重新用 SVFI 生成 INI 文件"
+                Show-Error "在 SVFI INI 文件中未找到 gui_inputs 欄位，請重新用 SVFI 生成 INI 文件"
                 Read-Host "按 Enter 退出"
                 return
             }
 
-            # 提取含路径的 JSON 字符串（移除外层 gui_inputs="..."）
+            # 提取含路徑的 JSON 字串（移除外層 gui_inputs="..."）
             $jsonString = $guiInputsMatch.Groups[1].Value
             $jsonString = $jsonString -replace '\\"', '"'
             $jsonString = $jsonString -replace '\\\\', '\\'
-            Show-Debug "JSON 解析结果：$jsonString"
+            Show-Debug "JSON 解析結果：$jsonString"
 
-            # 转译 JSON 并提取视频源路径到 PowerShell 变量
+            # 轉譯 JSON 並提取影片源路徑到 PowerShell 變數
             try {
                 $jsonObject = $jsonString | ConvertFrom-Json -ErrorAction Stop
                 if ($null -eq $jsonObject.inputs -or ($jsonObject.inputs.Count -eq 0)) {
-                    Show-Error "SVFI INI 文件中缺少视频源导入（input）语句，请重新用 SVFI 生成 INI 文件"
+                    Show-Error "SVFI INI 文件中缺少影片源導入（input）語句，請重新用 SVFI 生成 INI 文件"
                     Read-Host "按 Enter 退出"
                     return
                 }
 
-                # 获取首个输入文件的路径
-                Show-Success "成功检测到导入语句"
-                Show-Warning "将导入其中的首个视频源，忽略其它视频源"
+                # 獲取首個輸入文件的路徑
+                Show-Success "成功檢測到導入語句"
+                Show-Warning "將導入其中的首個影片源，忽略其它影片源"
                 $jsonSource = $jsonObject.inputs[0].input_path
                 if ([string]::IsNullOrWhiteSpace($jsonSource)) {
-                    Show-Error "SVFI INI 文件中的导入语句指向空路径，请重新用 SVFI 生成 INI 文件"
+                    Show-Error "SVFI INI 文件中的導入語句指向空路徑，請重新用 SVFI 生成 INI 文件"
                     Read-Host "按 Enter 退出"
                     return
                 }
                 $svfiTaskId = $jsonObject.inputs[0].task_id
                 if ([string]::IsNullOrWhiteSpace($svfiTaskId)) {
-                    Show-Error "SVFI INI 文件中的 task_id 语句损坏，请重新用 SVFI 生成 INI 文件"
+                    Show-Error "SVFI INI 文件中的 task_id 語句損壞，請重新用 SVFI 生成 INI 文件"
                     Read-Host "按 Enter 退出"
                     return
                 }
-                Show-Success "从 SVFI INI 中解析到 Task ID: $svfiTaskId"
+                Show-Success "從 SVFI INI 中解析到 Task ID: $svfiTaskId"
 
-                $videoSource = Convert-IniPath -iniPath $jsonSource # FileUtils.ps1 函数
-                Show-Success "从 SVFI INI 中解析到视频源：$videoSource"
+                $videoSource = Convert-IniPath -iniPath $jsonSource # FileUtils.ps1 函數
+                Show-Success "從 SVFI INI 中解析到影片源：$videoSource"
 
-                # 验证视频文件是否存在
+                # 驗證影片檔案是否存在
                 if (-not (Test-Path -LiteralPath $videoSource)) {
-                    Show-Error "视频文件已不存在：$videoSource，请重新用 SVFI 生成 INI 文件"
+                    Show-Error "影片檔案已不存在：$videoSource，請重新用 SVFI 生成 INI 文件"
                     Read-Host "按 Enter 退出"
                     return
                 }
             }
             catch {
-                Show-Error "解析 JSON 失败：$_"
-                Show-Debug "原始 JSON 字符串：$jsonString"
+                Show-Error "解析 JSON 失敗：$_"
+                Show-Debug "原始 JSON 字串：$jsonString"
                 Read-Host "按 Enter 退出"
                 return
             }
         }
         catch {
-            Show-Error "读取 SVFI INI 文件失败：$_"
+            Show-Error "讀取 SVFI INI 文件失敗：$_"
             Read-Host "按 Enter 退出"
             return
         }
 
         $encodeImportSourcePath = $videoSource
     }
-    else { # ffmpeg：视频源
+    else { # ffmpeg：影片源
         do {
-            Show-Info "选择要分析的视频源文件"
-            $videoSource = Select-File -Title "定位视频文件，如视频（.mp4/.mov/...）、RAW（.yuv/.y4m/...）"
+            Show-Info "選擇要分析的影片源文件"
+            $videoSource = Select-File -Title "定位影片檔案，如影片（.mp4/.mov/...）、RAW（.yuv/.y4m/...）"
             if (-not $videoSource) { 
-                Show-Error "未选择文件" 
+                Show-Error "未選擇文件" 
                 continue
             }
-            Show-Success "已选择视频源文件：$videoSource"
+            Show-Success "已選擇影片源文件：$videoSource"
             break
         }
         while ($true)
@@ -721,44 +724,58 @@ function Main {
 
     Write-Host ("─" * 50)
 
-    # 定位 ffprobe 程序
     Show-Info "定位 ffprobe.exe..."
-    do {
-        $ffprobePath =
-            Select-File -Title "定位 ffprobe.exe" -InitialDirectory ([Environment]::GetFolderPath('ProgramFiles')) -ExeOnly
-        if (-not (Test-Path -LiteralPath $ffprobePath)) {
-            Show-Warning "找不到 ffprobe 可执行文件，请重试"
-        }
+    # 使用 Invoke-AutoSearch 定位 ffprobe 程序
+    $ffprobePath = Invoke-AutoSearch -ToolName 'ffprobe' -ScriptDir $scriptDir
+    if ($ffprobePath) {
+        Show-Success "將直接使用自動檢測到的 ffprobe.exe：$ffprobePath"
+        # $useAuto = Read-Host "是否使用此文件？（Enter=確認, n=手動選擇）"
+        # if ($useAuto -eq 'n') {
+        #     $upstreamTools[$tool] = Select-File -Title "選擇 $tool 可執行文件" -ExeOnly
+        # }
+        # else {
+        #     $upstreamTools[$tool] = $autoPath
+        # }
     }
-    while (-not (Test-Path -LiteralPath $ffprobePath))
+    else {
+        do {
+            $ffprobePath =
+                Select-File -Title "定位 ffprobe.exe" -InitialDirectory ([Environment]::GetFolderPath('ProgramFiles')) -ExeOnly
+            if (-not (Test-Path -LiteralPath $ffprobePath)) {
+                Show-Warning "找不到 ffprobe 可執行文件，請重試"
+            }
+        }
+        while (-not (Test-Path -LiteralPath $ffprobePath))
+    }
+    
 
     Write-Host ("─" * 50)
 
     $streamInfo = Get-VideoStreamInfo -ffprobePath $ffprobePath -videoSource $videoSource `
         -showEntries "stream=r_frame_rate,avg_frame_rate,nb_frames,duration,sample_aspect_ratio"
-    Show-Debug "帧率，平均帧率，总帧数，时长，变宽比："
+    Show-Debug "幀率，平均幀率，總幀數，時長，變寬比："
     Write-Host $streamInfo
 
     Write-Host ("─" * 50)
 
-    # 检测可变帧率源、非方形像素源并告警
+    # 檢測可變幀率源、非方形象素源並告警
     Get-VFRWarning -ffprobeStreamInfo $streamInfo
     Get-NonSquarePixelWarning -ffprobeStreamInfo $streamInfo
 
     Write-Host ("─" * 50)
 
-    # 检测封装文件真伪
+    # 檢測封裝文件真偽
     $realFormatName = Test-VContainerFormat -ffprobePath $ffprobePath -videoSource $videoSource
 
     Write-Host ("─" * 50)
 
     $isMOV = ($realFormatName -like "MOV")
     $isVOB = ($realFormatName -like "VOB")
-    # if ($isMOV) { Show-Debug "导入视频 $videoSource 的封装格式为 MOV" }
-    # elseif ($isVOB -like "VOB") { Show-Debug "导入视频 $videoSource 的封装格式为 VOB" }
-    # else { Show-Debug "导入视频 $videoSource 的封装格式非 MOV、VOB" }
+    # if ($isMOV) { Show-Debug "導入影片 $videoSource 的封裝格式為 MOV" }
+    # elseif ($isVOB -like "VOB") { Show-Debug "導入影片 $videoSource 的封裝格式為 VOB" }
+    # else { Show-Debug "導入影片 $videoSource 的封裝格式非 MOV、VOB" }
 
-    # 根据封装文件类型选用 ffprobe 命令、定义文件名
+    # 根據封裝文件類型選用 ffprobe 命令、定義檔案名
     $ffprobeArgs =
         if ($isMOV) {@(
             '-i', $videoSource, '-select_streams', 'v:0', '-v', 'error', '-hide_banner', '-show_streams', '-show_entries',
@@ -784,7 +801,7 @@ function Main {
     #        '-of', 'ini'
     #    )}
     
-    # 由于 ffprobe 读取不同源所产生的列数不一，导致读取额外插入的信息随机错位，因此需要独立的 CSV（s_info）来储存源信息
+    # 由於 ffprobe 讀取不同源所產生的列數不一，導致讀取額外插入的資訊隨機錯位，因此需要獨立的 CSV（s_info）來儲存源資訊
     $sourceCSVExportPath = Join-Path $Global:TempFolder "temp_s_info.csv"
     $ffprobeCSVExportPath =
         if ($isMOV) {
@@ -804,18 +821,18 @@ function Main {
     #         Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_debug.csv"
     #     }
 
-    # 若 CSV 已存在，要求手动确认后清理，避免覆盖
+    # 若 CSV 已存在，要求手動確認後清理，避免覆蓋
     Confirm-FileDelete (Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_mov.csv")
     Confirm-FileDelete (Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_vob.csv")
     Confirm-FileDelete (Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info.csv")
     Confirm-FileDelete $sourceCSVExportPath
 
-    # 执行 ffprobe 并插入视频源路径
+    # 執行 ffprobe 並插入影片源路徑
     try {
         $ffprobeOutputCSV = (& $ffprobePath @ffprobeArgs).Trim()
         # $ffprobeOutputCSVDebug = (& $ffprobePath @ffprobeArgsDebug).Trim()
 
-        # 构建源 CSV 行
+        # 構建源 CSV 行
         $sourceInfoCSV = @"
 "$encodeImportSourcePath",$upstreamCode,"$Avs2PipeModDLL","$OneLineShotArgsINI","$svfiTaskId"
 "@
@@ -828,8 +845,8 @@ function Main {
 
         Write-Host ("─" * 50)
 
-        # 验证换行符
-        Show-Debug "验证 CSV 文件格式..."
+        # 驗證換行符
+        Show-Debug "驗證 CSV 檔案格式..."
         if (-not (Test-TextFileFormat -Path $ffprobeCSVExportPath)) {
             return
         }
@@ -837,18 +854,18 @@ function Main {
             return
         }
     }
-    catch { throw ("ffprobe 执行失败：" + $_) }
+    catch { throw ("ffprobe 執行失敗：" + $_) }
 
     Write-Host ""
-    Show-Success "脚本执行完成！"
+    Show-Success "腳本執行完成！"
     Read-Host "按 Enter 退出"
 }
 #endregion
 
 try { Main }
 catch {
-    Show-Error "脚本执行出错：$_"
-    Write-Host "错误详情：" -ForegroundColor Red
+    Show-Error "腳本執行出錯：$_"
+    Write-Host "錯誤詳情：" -ForegroundColor Red
     Write-Host $_.Exception.ToString()
     Read-Host "按 Enter 退出"
 }
