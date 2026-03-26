@@ -26,6 +26,25 @@ $Global:PipePresets = @{
     'svfi_svtav1'        = @{ ID=15; Upstream='svfi';        Downstream='svtav1' }
 }
 
+# Specify extra search pathes for particular upstream and downstream tools 
+# (In parallel with other searches in i.e., $PSScriptRoot),
+# default search includes script's file path, therefore no need to add that
+$Global:ToolExtraSearchPaths = @{
+    'vspipe'   = @("$env:ProgramFiles\VapourSynth\core")
+    'svfi'     = @((Get-PSDrive -PSProvider FileSystem | ForEach-Object {
+                        "$($_.Root)SteamLibrary\steamapps\common\SVFI"
+                    }))
+    <#
+        Customizable executable locations：
+        'ffmpeg'      = @("$env:USERPROFILE\ffmpeg\bin")
+        'avs2yuv'     = @("avs2yuv64.exe")
+        'avs2pipemod' = @("avs2pipemod.exe")
+        'x264'        = @("x264.exe")
+        'x265'        = @("x265.exe")
+        'svtav1'      = @("SvtAv1EncApp.exe")
+    #>
+}
+
 # Define a cache folder; Create if missing
 $Global:TempFolder = $env:USERPROFILE + "\bbenc\"
 if (-not (Test-Path -PathType Container $Global:TempFolder)) {

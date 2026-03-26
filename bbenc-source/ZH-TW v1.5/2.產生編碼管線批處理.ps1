@@ -29,6 +29,9 @@ $Script:DownstreamPipeParams = @{
     }
 }
 
+# 腳本運行位置
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+
 # 編碼工具
 $upstreamTools = [ordered]@{
     'ffmpeg' = $null
@@ -133,6 +136,31 @@ function Get-CommandFromPreset([string]$presetName, $tools, $vspipeInfo) {
     }
 }
 
+function Invoke-AutoSearch {
+    param(
+        [Parameter(Mandatory = $true)][string]$ToolName,
+        [Parameter(Mandatory = $true)][string]$ScriptDir
+    )
+    <#
+    .SYNOPSIS
+        自動搜索工具路徑（不包含交互）
+    .DESCRIPTION
+        在腳本目錄、額外路徑和 PATH 中搜尋包含指定關鍵字的可執行文件。
+        返回找到的路徑，若未找到則返回 $null。
+        額外路徑（需手動在 Common/Core.ps1 中定義。
+    .PARAMETER ToolName
+        工具名稱（用於關鍵字匹配和在 ToolExtraSearchPaths 中尋找額外路徑）
+    .PARAMETER ScriptDir
+        腳本所在目錄（通常傳入 $scriptDir）
+    #>
+    # 構建搜索路徑列表：腳本目錄 + 額外路徑
+    $searchPaths = @($ScriptDir)
+    if ($Global:ToolExtraSearchPaths.ContainsKey($ToolName)) {
+        $searchPaths += $Global:ToolExtraSearchPaths[$ToolName]
+    }
+    return Find-Tool -Keyword $ToolName -SearchPaths $searchPaths -IncludePathEnv
+}
+
 #region Main
 function Main {
     # 顯示標題
@@ -140,21 +168,20 @@ function Main {
     Write-Host "影片編碼工具調用管線生成器" -ForegroundColor Cyan
     Show-Border
     Write-Host ""
-    
-    # 顯示編碼範例
-    Show-Info "常用編碼命令範例："
-    Write-Host "ffmpeg -i [輸入] -an -f yuv4mpegpipe -strict unofficial - | x265.exe --y4m - -o"
-    Write-Host "vspipe [腳本.vpy] --y4m - | x265.exe --y4m - -o"
-    Write-Host "avs2pipemod [腳本.avs] -y4mp | x265.exe --y4m - -o"
-    Write-Host ""
-    
+    Show-Info "使用說明："
+    Write-Host "1. 後續的腳本將基於此‘管線批處理’（encode_single.bat）生成‘編碼批處理’"
+    Write-Host "   因此無需每次編碼都要運行此步驟"
+    Write-Host "2. 本工具會嘗試在腳本本地目錄，常見安裝目錄和環境變數中搜索工具，"
+    Write-Host "   因此複製工具到此腳本目錄下即可減少手動操作複雜度"
+    Write-Host ("─" * 50)
+
     # 選擇輸出路徑
     Show-Info "選擇批處理文件保存位置..."
     $outputPath = $null
     do {
         $outputPath = Select-Folder -Description "選擇批處理文件保存位置"
         if (-not $outputPath -or -not (Test-Path $outputPath)) {
-            if ((Read-Host "未選擇導出路徑，請重試。輸入 'q' 強制退出") -eq 'q') {
+            if ((Read-Host "未選擇導出路徑，請重試輸入 'q' 強制退出") -eq 'q') {
                 return
             }
         }
@@ -176,53 +203,39 @@ function Main {
     $i=0
     foreach ($tool in @($upstreamTools.Keys)) {
         $i++
-        $choice = Read-Host "`r`n [上游] ($i/$($upstreamTools.Count)) 導入 $tool？（.exe，y=是，Enter 跳過）"
-        if ($choice -eq 'y') {
-            $upstreamTools[$tool] =
-                if ($tool -eq 'svfi') {
-                    Show-Info "正在檢測 SVFI (one_line_shot_args.exe) 可能的路徑..."
-                    $foundPath = Get-PSDrive -PSProvider FileSystem | ForEach-Object { 
-                        $p = "$($_.Root)SteamLibrary\steamapps\common\SVFI"
-                        if (Test-Path $p) { $p }
-                    } | Select-Object -First 1
+        $choice = Read-Host "`r`n [上游] ($i/$($upstreamTools.Count)) 導入 $tool 可執行文件？（y=是，Enter 跳過）"
+        if ($choice -ne 'y') { continue }
 
-                    if ($foundPath) { # 嘗試自動定位到的 SVFI 路徑（Select-File 能自動回退到 Desktop）
-                        Show-Success "已定位候選路徑：$foundPath"
-                        Select-File -Title "選擇 one_line_shot_args.exe" -ExeOnly -InitialDirectory $foundPath
-                    }
-                    else { # DIY
-                        Show-Info "SVFI（one_line_shot_args.exe）Steam 發布版的路徑是 X:\SteamLibrary\steamapps\common\SVFI\"
-                        Select-File -Title "選擇 one_line_shot_args.exe" -ExeOnly
-                    }
-                }
-                elseif ($tool -eq 'vspipe') {
-                    Show-Info "正在檢測 vspipe.exe 可能的路徑..."
-                    $foundPath = Get-PSDrive -PSProvider FileSystem | ForEach-Object {
-                        $p = "$($_.Root)Program Files\VapourSynth\core"
-                        if (Test-Path $p) { $p }
-                    } | Select-Object -First 1
+        # 使用 Invoke-AutoSearch 獲取自動找到的路徑
+        $autoPath = Invoke-AutoSearch -ToolName $tool -ScriptDir $scriptDir
 
-                    if ($foundPath) { # 嘗試自動定位到的 vspipe 路徑（Select-File 能自動回退到 Desktop）
-                        Show-Success "已定位候選路徑：$foundPath"
-                        Select-File -Title "選擇 vspipe.exe" -ExeOnly -InitialDirectory $foundPath
-                    }
-                    else { # DIY
-                        Show-Info "安裝版 VapourSynth 的默認可執行文件路徑是 C:\Program Files\VapourSynth\core\vspipe.exe"
-                        Select-File -Title "選擇 vspipe.exe" -ExeOnly
-                    }
-                }
-                elseif ($tool -eq 'avs2yuv') {
-                    Show-Info "此工具同時提供 AviSynth（0.26）和支持 AviSynth+（0.30）的 avs2yuv 支持"
-                    Select-File -Title "選擇 avs2yuv.exe 或 avs2yuv64.exe" -ExeOnly
-                }
-                else {
-                    Select-File -Title "選擇 $tool 可執行文件" -ExeOnly
-                }
-
-            Show-Success "$tool 已導入: $($upstreamTools[$tool])"
+        if ($autoPath) {
+            Write-Host "自動檢測到 $tool 位於：$autoPath" -ForegroundColor Green
+            $useAuto = Read-Host "是否使用此文件？（Enter=確認, n=手動選擇）"
+            if ($useAuto -eq 'n') {
+                $upstreamTools[$tool] = Select-File -Title "選擇 $tool 可執行文件" -ExeOnly
+            }
+            else {
+                $upstreamTools[$tool] = $autoPath
+            }
+        }
+        else {
+            Show-Info "未自動檢測到 $tool，請手動選擇。" -ForegroundColor Yellow
+            if ($tool -eq 'svfi') {
+                Write-Host " SVFI（one_line_shot_args.exe）Steam 發布版的路徑是 X:\SteamLibrary\steamapps\common\SVFI\"
+            }
+            elseif ($tool -eq 'vspipe') {
+                Write-Host " 安裝版 VapourSynth 的默認可執行文件路徑是 C:\Program Files\VapourSynth\core\vspipe.exe"
+            }
+            elseif ($tool -eq 'avs2yuv') {
+                Write-Host " 同時支持 AviSynth（0.26）和 AviSynth+（0.30）的 avs2yuv"
+            }
+            $upstreamTools[$tool] = Select-File -Title "選擇 $tool 可執行文件" -ExeOnly
         }
 
-        # 若是 vspipe，檢測 API 版本
+        Show-Success "$tool 已導入: $($upstreamTools[$tool])"
+
+        # 檢測 vspipe API 版本
         if ($tool -eq 'vspipe' -and $upstreamTools[$tool]) {
             Write-Host ""
             Show-Info "檢測 VapourSynth 管道參數..."
@@ -238,10 +251,26 @@ function Main {
     foreach ($tool in @($downstreamTools.Keys)) {
         $i++
         $choice = Read-Host "`r`n [下游] ($i/$($downstreamTools.Count)) 導入 $tool？（y=是，Enter 跳過）"
-        if ($choice -eq 'y') {
-            $downstreamTools[$tool] = Select-File -Title "選擇 $tool 可執行文件" -ExeOnly
-            Show-Success "$tool 已導入: $($downstreamTools[$tool])"
+        if ($choice -ne 'y') { continue }
+        
+        # 使用 Invoke-AutoSearch 獲取自動找到的路徑
+        $autoPath = Invoke-AutoSearch -ToolName $tool -ScriptDir $scriptDir
+        if ($autoPath) {
+            Write-Host "自動檢測到 $tool 位於：$autoPath" -ForegroundColor Green
+            $useAuto = Read-Host "是否使用此文件？(Enter=確認, n=手動選擇)"
+            if ($useAuto -eq 'n') {
+                $downstreamTools[$tool] = Select-File -Title "選擇 $tool 可執行文件" -ExeOnly
+            }
+            else {
+                $downstreamTools[$tool] = $autoPath
+            }
         }
+        else {
+            Write-Host "未自動檢測到 $tool，請手動選擇。"
+            $downstreamTools[$tool] = Select-File -Title "選擇 $tool 可執行文件" -ExeOnly
+        }
+
+        Show-Success "$tool 已導入: $($downstreamTools[$tool])"
     }
 
     # 合併工具（手動合併以避免 Clone() 帶來的對象引用/類型問題）
@@ -253,8 +282,8 @@ function Main {
     # 複製下游工具
     foreach ($k in $downstreamTools.Keys) {
         if ($k -eq 'svtav1') {
-            Write-Host " 由於性能差距大且編譯好的 EXE 不易獲取，因此建議自行編譯 SVT-AV1 編碼器"
-            Write-Host " 編譯教學可在 AV1 教學完整版（iavoe.github.io）或 SVT-AV1 教學急用版中查看"
+            Write-Host " 建議自行編譯 SVT-AV1 編碼器（大幅提高性能）"
+            Write-Host " 編譯教學：https://iavoe.github.io/av1-web-tutorial/HTML/index.html"
         }
         $tools[$k] = $downstreamTools[$k]
     }
@@ -283,6 +312,7 @@ function Main {
     }
 
     # 顯示可用工具鏈
+    Write-Host ""
     Show-Info "可用編碼工具鏈："
     Write-Host ("─" * 60)
 
@@ -412,15 +442,8 @@ cmd /k
             return
         }
     
-        # 顯示使用說明
+        # 顯示額外說明
         Write-Host ""
-        Write-Host ("─" * 50)
-        Show-Info "使用說明："
-        Write-Host "1. 後續的腳本將基於此‘管線批處理’生成新的‘編碼批處理’，從而啟動編碼串流程"
-        Write-Host "   因此只要編碼工具不變就無需在每次使用都生成新的管線批處理"
-        Write-Host "2. 建議在使用前二次確認所有工具路徑正確，尤其是長時間未使用後"
-        Write-Host "3. 儘管可以透過編輯已生成的批處理來變更工具，但重新生成可以減少失誤機率"
-        
         if ($downstream -eq 'x265') {
             Show-Warning "x265 編碼器默認輸出 .hevc 文件"
             Write-Host " 如需容器，請使用後續腳本或 ffmpeg 封裝"

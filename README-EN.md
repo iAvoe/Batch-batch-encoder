@@ -73,6 +73,11 @@ Developing these tools wasn't easy. If this tool improve your efficiency, consid
 <p align="center"><img src="bmc_qr.png" alt="Support me -_-"><br><img src="pp_tip_qr.png" alt="Support me =_="></p>
 
 ## Update Information
+**v1.6.0**
+- Step 2: Improved the import system
+  - Added fuzzy matching for ffmpeg, avs2yuv, avs2pipemod, x264, x265, and SvtAv1EncApp located in the script's directory
+  - Added fuzzy matching for ffmpeg, avs2yuv, avs2pipemod, x264, x265, and SvtAv1EncApp in the PATH environment variable.
+
 **v1.5.0**
 - Step 3 added relatively reliable variable frame rate (VFR) detection, and warnings
   - Added ffmpeg processing examples

@@ -29,6 +29,55 @@ function Confirm-FileDelete {
     Show-Success "已删除旧文件：$Path"
 }
 
+# 尝试在脚本所在目录和 PATH 变量中模糊匹配含有特征名的 .exe 文件
+function Find-Tool {
+    param(
+        [Parameter(Mandatory = $true)][string]$Keyword,
+        [string[]]$SearchPaths = @(),
+        [switch]$IncludePathEnv
+    )
+
+    # 收集所有要搜索的目录
+    $allPaths = New-Object System.Collections.ArrayList
+
+    # 用户指定的额外路径 + 环境变量 PATH 中的目录（如果启用）
+    foreach ($p in $SearchPaths) {
+        if (Test-Path -Path $p -PathType Container) {
+            [void]$allPaths.Add($p)
+        }
+    }
+    if ($IncludePathEnv) {
+        $envPaths = $env:Path -split ';'
+        foreach ($p in $envPaths) {
+            if ([string]::IsNullOrWhiteSpace($P)) { continue }
+            $p = $p.trim()
+            if (Test-Path -LiteralPath $p -PathType Container) {
+                [void]$allPaths.Add($p)
+            }
+        }
+    }
+
+    # 去重
+    if (@($allPaths).Count -gt 1) {
+        $allPaths = $allPaths | Select-Object -Unique
+    }
+
+    # 在每条路径中搜索 *.exe，并筛选文件名包含关键字的文件
+    foreach ($dir in $allPaths) {
+        try {
+            $hits = Get-ChildItem -Path $dir -Filter *.exe -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -like "*$Keyword*" }
+
+            if ($hits) { # 返回首个匹配项
+                return $hits[0].FullName
+            }
+        }
+        catch { continue } # 忽略无法访问的目录
+    }
+    return $null
+}
+
+#　通用的文件选择逻辑
 function Select-File(
         [string]$Title = "选择文件",
         [string]$InitialDirectory = [Environment]::GetFolderPath('Desktop'),
@@ -79,7 +128,10 @@ function Select-File(
     while ($true)
 }
 
-function Select-Folder([string]$Description = "选择文件夹", [string]$InitialPath = [Environment]::GetFolderPath('Desktop')) {
+function Select-Folder(
+    [string]$Description = "选择文件夹",
+    [string]$InitialPath = [Environment]::GetFolderPath('Desktop')
+    ) {
     # (Put on top of script) Add-Type -AssemblyName System.Windows.Forms
     $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
     $dialog.Description = $Description

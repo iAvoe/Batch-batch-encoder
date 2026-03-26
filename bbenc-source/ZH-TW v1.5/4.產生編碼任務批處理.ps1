@@ -149,7 +149,7 @@ function Get-EncodeOutputName {
         }
         elseif ($inputOp -eq 'b') { # 3-3：選項 b
             Show-Info "手動輸入..."
-            Show-Warning "兩個方括號間必須要有字元隔開，不要輸入特殊符號"
+            Write-Host " 兩個方括號間必須要有字元隔開，不要輸入特殊符號"
             
             $manualName = $null
             while ($true) {

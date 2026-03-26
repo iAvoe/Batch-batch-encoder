@@ -29,6 +29,55 @@ function Confirm-FileDelete {
     Show-Success "已刪除舊文件：$Path"
 }
 
+# 嘗試在腳本所在目錄和 PATH 變數中模糊匹配含有特徵名的 .exe 文件
+function Find-Tool {
+    param(
+        [Parameter(Mandatory = $true)][string]$Keyword,
+        [string[]]$SearchPaths = @(),
+        [switch]$IncludePathEnv
+    )
+
+    # 收集所有要搜索的目錄
+    $allPaths = New-Object System.Collections.ArrayList
+
+    # 用戶指定的額外路徑 + 環境變數 PATH 中的目錄（如果啟用）
+    foreach ($p in $SearchPaths) {
+        if (Test-Path -Path $p -PathType Container) {
+            [void]$allPaths.Add($p)
+        }
+    }
+    if ($IncludePathEnv) {
+        $envPaths = $env:Path -split ';'
+        foreach ($p in $envPaths) {
+            if ([string]::IsNullOrWhiteSpace($P)) { continue }
+            $p = $p.trim()
+            if (Test-Path -LiteralPath $p -PathType Container) {
+                [void]$allPaths.Add($p)
+            }
+        }
+    }
+
+    # 去重
+    if (@($allPaths).Count -gt 1) {
+        $allPaths = $allPaths | Select-Object -Unique
+    }
+
+    # 在每條路徑中搜索 *.exe，並篩選檔案名包含關鍵字的文件
+    foreach ($dir in $allPaths) {
+        try {
+            $hits = Get-ChildItem -Path $dir -Filter *.exe -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -like "*$Keyword*" }
+
+            if ($hits) { # 返回首個匹配項
+                return $hits[0].FullName
+            }
+        }
+        catch { continue } # 忽略無法訪問的目錄
+    }
+    return $null
+}
+
+#　通用的文件選擇邏輯
 function Select-File(
         [string]$Title = "選擇文件",
         [string]$InitialDirectory = [Environment]::GetFolderPath('Desktop'),
@@ -79,7 +128,10 @@ function Select-File(
     while ($true)
 }
 
-function Select-Folder([string]$Description = "選擇文件夾", [string]$InitialPath = [Environment]::GetFolderPath('Desktop')) {
+function Select-Folder(
+    [string]$Description = "選擇文件夾",
+    [string]$InitialPath = [Environment]::GetFolderPath('Desktop')
+    ) {
     # (Put on top of script) Add-Type -AssemblyName System.Windows.Forms
     $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
     $dialog.Description = $Description
@@ -115,7 +167,7 @@ function Write-TextFile { # 需在 Core.ps1 寫入全局變數後運行
         Write-Error "Write-TextFile - 文件寫入失敗：空內容"
         return
     }
-    
+
     # 必須使用 CRLF 換行符，否則 CMD 無法讀取（亂碼）
     $normalizedContent = $Content -replace "`r?`n", "`r`n"
     

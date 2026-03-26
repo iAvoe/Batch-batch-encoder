@@ -80,6 +80,11 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 <p align="center"><img src="bmc_qr.png" alt="支持一下 -_-"><br><img src="pp_tip_qr.png" alt="支持一下 =_="></p>
 
 ## 更新信息
+**v1.6.0**
+- 步驟 2 改良了導入系統
+  - 添加了腳本所在目錄下的 ffmpeg、avs2yuv、avs2pipemod、x264、x265、SvtAv1EncApp 的模糊匹配功能
+  - 添加了 PATH 路徑的 ffmpeg、avs2yuv、avs2pipemod、x264、x265、SvtAv1EncApp 的模糊匹配功能
+
 **v1.5.0**
 - 步驟 3 添加了相對可靠的可變幀率（VFR）檢測與警告
   - 添加了 ffmpeg 處理範例

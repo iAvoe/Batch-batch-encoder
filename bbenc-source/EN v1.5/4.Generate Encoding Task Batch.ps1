@@ -150,7 +150,7 @@ function Get-EncodeOutputName {
         }
         elseif ($inputOp -eq 'b') { # 3-3: Option b (manual)
             Show-Info "Input filename..."
-            Show-Warning "There must be a character separating both square brackets; avoid special characters"
+            Write-Host " There must be a character separating 2 square brackets; avoid special characters"
             
             $manualName = $null
             while ($true) {

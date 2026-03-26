@@ -30,6 +30,54 @@ function Confirm-FileDelete {
     Show-Success "File deleted: $Path"
 }
 
+# Try fuzzy matching for .exe files containing the specified name in the script's directory and the PATH variable
+function Find-Tool {
+    param(
+        [Parameter(Mandatory = $true)][string]$Keyword,
+        [string[]]$SearchPaths = @(),
+        [switch]$IncludePathEnv
+    )
+
+    # Collect all search locations
+    $allPaths = New-Object System.Collections.ArrayList
+
+    # Additional paths specified by the user + directories in the PATH environment variable (if enabled)
+    foreach ($p in $SearchPaths) {
+        if (Test-Path -Path $p -PathType Container) {
+            [void]$allPaths.Add($p)
+        }
+    }
+    if ($IncludePathEnv) {
+        $envPaths = $env:Path -split ';'
+        foreach ($p in $envPaths) {
+            if ([string]::IsNullOrWhiteSpace($P)) { continue }
+            $p = $p.trim()
+            if (Test-Path -LiteralPath $p -PathType Container) {
+                [void]$allPaths.Add($p)
+            }
+        }
+    }
+
+    # Deduplicate
+    if (@($allPaths).Count -gt 1) {
+        $allPaths = $allPaths | Select-Object -Unique
+    }
+
+    # Search for *.exe in each path and filter for files whose filenames contain the keyword
+    foreach ($dir in $allPaths) {
+        try {
+            $hits = Get-ChildItem -Path $dir -Filter *.exe -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -like "*$Keyword*" }
+
+            if ($hits) { # Return the first match
+                return $hits[0].FullName
+            }
+        }
+        catch { continue } # Move on from failed match
+    }
+    return $null
+}
+
 function Select-File(
         [string]$Title = "Select File",
         [string]$InitialDirectory = [Environment]::GetFolderPath('Desktop'),

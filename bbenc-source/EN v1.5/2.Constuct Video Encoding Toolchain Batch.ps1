@@ -30,6 +30,9 @@ $Script:DownstreamPipeParams = @{
     }
 }
 
+# Script file path
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+
 # Import encoding tools
 $upstreamTools = [ordered]@{
     'ffmpeg' = $null
@@ -56,8 +59,8 @@ function Get-PipeType($upstream) {
     }
 }
 
-# Get correct Y4M pipe parameter for vspipe automatically
-# Instead of reading VapourSynth versions and map API to Y4M parameters, simply try a list of commands and find the working one
+# Instead of reading VapourSynth versions and map API to Y4M parameters,
+# simply try a list of commands and find the working one
 function Get-VSPipeY4MArgument {
     param([Parameter(Mandatory=$true)][string]$VSpipePath)
 
@@ -68,7 +71,7 @@ function Get-VSPipeY4MArgument {
     )
 
     foreach ($testArgs in $tests) {
-        Write-Host (" 测试：{0} {1}" -f $VSpipePath, ($testArgs -join " "))
+        Write-Host (" Testing: {0} {1}" -f $VSpipePath, ($testArgs -join " "))
         
         # Use Start-Process to execute on a different process,
         # so it doesn't break the character code page used in current console
@@ -98,7 +101,6 @@ function Get-VSPipeY4MArgument {
             }
         }
     }
-    
     throw "Could not detect vspipe's Y4M parameter"
 }
 
@@ -136,18 +138,43 @@ function Get-CommandFromPreset([string]$presetName, $tools, $vspipeInfo) {
     }
 }
 
+function Invoke-AutoSearch {
+    param(
+        [Parameter(Mandatory = $true)][string]$ToolName,
+        [Parameter(Mandatory = $true)][string]$ScriptDir
+    )
+    <#
+    .SYNOPSIS
+        Automatically search for encoding tools, UI not included
+    .DESCRIPTION
+        Search for .exe files containing a keyword in the script directory, additional paths, and PATH.
+        Return the paths found; otherwise, return $null.
+        Additional paths (must be manually defined in Common/Core.ps1).
+    .PARAMETER ToolName
+        Tool name (used for keyword matching and finding additional paths in ToolExtraSearchPaths)
+    .PARAMETER ScriptDir
+        Where the script is located (use the $scriptDir)
+    #>
+    # Build a list of search paths: script directory + additional paths
+    $searchPaths = @($ScriptDir)
+    if ($Global:ToolExtraSearchPaths.ContainsKey($ToolName)) {
+        $searchPaths += $Global:ToolExtraSearchPaths[$ToolName]
+    }
+    return Find-Tool -Keyword $ToolName -SearchPaths $searchPaths -IncludePathEnv
+}
+
 #region Main
 function Main {
     Show-Border
     Write-Host "Video encoding toolchain generator" -ForegroundColor Cyan
     Show-Border
     Write-Host ""
-    
-    Show-Info "Example of common encoding commandlines:"
-    Write-Host "ffmpeg -i [source] -an -f yuv4mpegpipe -strict unofficial - | x265.exe --y4m - -o"
-    Write-Host "vspipe [source.vpy] --y4m - | x265.exe --y4m - -o"
-    Write-Host "avs2pipemod [source.avs] -y4mp | x265.exe --y4m - -o"
-    Write-Host ""
+    Show-Info "Usage:"
+    Write-Host "1. Subsequent scripts will generate 'encoding batch' based on this 'pipeline/toolchain batch' (encode_single.bat)."
+    Write-Host "   Therefore, once this step fnishes, step 2 can be entirely skipped until new tools needs to be added"
+    Write-Host "2. This tool will attempt to search for the tool in the script's local directory, common installation directories, and environment variables."
+    Write-Host "   Therefore, copying executables to this script's directory will streamline the configuration"
+    Write-Host ("─" * 50)
     
     Show-Info "Select path to export batch file..."
     $outputPath = $null
@@ -163,7 +190,7 @@ function Main {
     
     $batchFullPath = Join-Path -Path $outputPath -ChildPath "encode_single.bat"
 
-    Show-Success "Output file defined: $batchFullPath"
+    Show-Success "Output file: $batchFullPath"
 
     Show-Info "Start importing upstream executable tools..."
     Write-Host " Hint: Use add -InitialDirectory parameter to customize the import statements" -ForegroundColor DarkGray
@@ -176,57 +203,42 @@ function Main {
     $i=0
     foreach ($tool in @($upstreamTools.Keys)) {
         $i++
-        # Caution: "?" destroys variable names
-        $choice = Read-Host "`r`n [Upstream] ($i/$($upstreamTools.Count)) Import $($tool)? (.exe, y=yes, Enter=Skip)"
-        if ($choice -eq 'y') {
-            $upstreamTools[$tool] =
-                if ($tool -eq 'svfi') {
-                    Show-Info "Detecting possible paths for SVFI (one_line_shot_args.exe)..."
-                    $foundPath = Get-PSDrive -PSProvider FileSystem | ForEach-Object { 
-                        $p = "$($_.Root)SteamLibrary\steamapps\common\SVFI"
-                        if (Test-Path $p) { $p }
-                    } | Select-Object -First 1
+        $choice = Read-Host "`r`n [Upstream] ($i/$($upstreamTools.Count)) Import $($tool) executable? (y=yes, Enter=Skip)"
+        if ($choice -ne 'y') { continue }
 
-                    if ($foundPath) { # Try the auto-located SVFI path (Select-File can fallback)
-                        Show-Success "Candidate path to one_line_short_args.exe located: $foundPath"
-                        Select-File -Title "Select one_line_shot_args.exe" -ExeOnly -InitialDirectory $foundPath
-                    }
-                    else { # Couldn't locate, let user take over
-                        Show-Info "SVFI (one_line_shot_args.exe) Steam release path is: X:\SteamLibrary\steamapps\common\SVFI\"
-                        Select-File -Title "Select one_line_shot_args.exe" -ExeOnly
-                    }
-                }
-                elseif ($tool -eq 'vspipe') {
-                    Show-Info "Detecting possible paths for vspipe.exe..."
-                    $foundPath = Get-PSDrive -PSProvider FileSystem | ForEach-Object {
-                        $p = "$($_.Root)Program Files\VapourSynth\core"
-                        if (Test-Path $p) { $p }
-                    } | Select-Object -First 1
+        # Auto path detect with Invoke-AutoSearch
+        $autoPath = Invoke-AutoSearch -ToolName $tool -ScriptDir $scriptDir
 
-                    if ($foundPath) { # Try the auto-located vspipe path (Select-File can fallback)
-                        Show-Success "Candidate path to vspipe located: $foundPath"
-                        Select-File -Title "Select vspipe.exe" -ExeOnly -InitialDirectory $foundPath
-                    }
-                    else { # DIY
-                        Show-Info "The default VapourSynth installation places vspipe.exe in C:\Program Files\VapourSynth\core\"
-                        Select-File -Title "Select vspipe.exe" -ExeOnly
-                    }
-                }
-                elseif ($tool -eq 'avs2yuv') {
-                    Show-Info "Both 0.26 (AviSynth, AviSynth+) and 0.30 (AviSynth+ only) avs2yuv variations are supported"
-                    Select-File -Title "Select avs2yuv.exe or avs2yuv64.exe" -ExeOnly
-                }
-                else {
-                    Select-File -Title "Locate $tool executable" -ExeOnly
-                }
-
-            Show-Success "$tool imported: $($upstreamTools[$tool])"
+        if ($autoPath) {
+            Write-Host " $tool found in: $autoPath" -ForegroundColor Green
+            $useAuto = Read-Host "Proceed with this? (Enter=confirm, n=not this one)"
+            if ($useAuto -eq 'n') {
+                $upstreamTools[$tool] = Select-File -Title "Select $tool executable" -ExeOnly
+            }
+            else {
+                $upstreamTools[$tool] = $autoPath
+            }
+        }
+        else {
+            Show-Info "Could not find $tool, please locate it manually" -ForegroundColor Yellow
+            if ($tool -eq 'svfi') {
+                Write-Host " Steam installation path of SVFI (one_line_shot_args.exe) is X:\SteamLibrary\steamapps\common\SVFI\"
+            }
+            elseif ($tool -eq 'vspipe') {
+                Write-Host " Default installation path of VapourSynth is C:\Program Files\VapourSynth\core\vspipe.exe"
+            }
+            elseif ($tool -eq 'avs2yuv') {
+                Write-Host " Both AviSynth (0.26) & AviSynth+ (0.30) are supported"
+            }
+            $upstreamTools[$tool] = Select-File -Title "Select $tool executable" -ExeOnly
         }
 
+        Show-Success "$tool imported: $($upstreamTools[$tool])"
+        
         # Detect API version for vspipe
         if ($tool -eq 'vspipe' -and $upstreamTools[$tool]) {
             Write-Host ""
-            Show-Info "Detect VapourSynth pipe command..."
+            Show-Info "Detecting VapourSynth pipe command..."
             $vspipeInfo = Get-VSPipeY4MArgument -VSpipePath $upstreamTools[$tool]
             Show-Success $($vspipeInfo.Note)
         }
@@ -238,11 +250,28 @@ function Main {
     $i=0
     foreach ($tool in @($downstreamTools.Keys)) {
         $i++
-        $choice = Read-Host "`r`n [Downstream] ($i/$($downstreamTools.Count)) Import $($tool)? (y=yes, Enter=Skip)"
-        if ($choice -eq 'y') {
-            $downstreamTools[$tool] = Select-File -Title "Select $tool executable" -ExeOnly
-            Show-Success "$tool imported: $($downstreamTools[$tool])"
+        $choice = Read-Host "`r`n [Downstream] ($i/$($downstreamTools.Count)) Import $($tool) executable? (y=yes, Enter=Skip)"
+        if ($choice -ne 'y') { continue }
+
+        # Auto path detect with Invoke-AutoSearch
+        $autoPath = Invoke-AutoSearch -ToolName $tool -ScriptDir $scriptDir
+
+        if ($autoPath) {
+            Write-Host " $tool found in: $autoPath" -ForegroundColor Green
+            $useAuto = Read-Host "Proceed with this? (Enter=confirm, n=not this one)"
+            if ($useAuto -eq 'n') {
+                $downstreamTools[$tool] = Select-File -Title "Select $tool executable" -ExeOnly
+            }
+            else {
+                $downstreamTools[$tool] = $autoPath
+            }
         }
+        else {
+            Write-Host " Could not find $tool, please locate it manually"
+            $downstreamTools[$tool] = Select-File -Title "Select $tool executable" -ExeOnly
+        }
+
+        Show-Success "$tool imported: $($downstreamTools[$tool])"
     }
 
     # Merge all tools (using manual merge to avoid object reference/type issues caused by Clone())
@@ -416,13 +445,6 @@ cmd /k
     
         # Show usages
         Write-Host ""
-        Write-Host ("─" * 50)
-        Show-Info "Usages:"
-        Write-Host " 1. Later scripts will generate ‘Encoding Batch’ based on this ‘Toolchain/Pipeline Batch’ to start encoding properly"
-        Write-Host " 2. Regenration of ‘Toolchain/Pipeline Batch’ is not required as long as there are no changes in encoding tool programs"
-        Write-Host " 3. It is recommended to double check tool existense before encoding, especially after setting aside for a long time"
-        Write-Host " 4. You may simply modify the ‘Toolchain/Pipeline Batch’ to make changes, but regenerating is less likely to introduce errors"
-        
         if ($downstream -eq 'x265') {
             Show-Warning "x265 encoder will export .hevc files"
             Write-Host " To multiplex, please refer to later script steps, or use ffmpeg manually"

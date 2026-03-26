@@ -26,6 +26,23 @@ $Global:PipePresets = @{
     'svfi_svtav1'        = @{ ID=15; Upstream='svfi';        Downstream='svtav1' }
 }
 
+# 定义特定工具的额外搜索路径（与 $PSScriptRoot 等基础路径叠加），默认会搜索脚本所在目录因此无需特地添加
+$Global:ToolExtraSearchPaths = @{
+    'vspipe'   = @("$env:ProgramFiles\VapourSynth\core")
+    'svfi'     = @((Get-PSDrive -PSProvider FileSystem | ForEach-Object {
+                        "$($_.Root)SteamLibrary\steamapps\common\SVFI"
+                    }))
+    <#
+        自定义位置：
+        'ffmpeg'      = @("$env:USERPROFILE\ffmpeg\bin")
+        'avs2yuv'     = @("avs2yuv64.exe")
+        'avs2pipemod' = @("avs2pipemod.exe")
+        'x264'        = @("x264.exe")
+        'x265'        = @("x265.exe")
+        'svtav1'      = @("SvtAv1EncApp.exe")
+    #>
+}
+
 # 定义缓存文件夹，如果不存在就创建
 $Global:TempFolder = $env:USERPROFILE + "\bbenc\"
 if (-not (Test-Path -PathType Container $Global:TempFolder)) {
