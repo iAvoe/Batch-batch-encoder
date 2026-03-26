@@ -118,14 +118,13 @@ function Select-File(
 
     Write-Host " Selection window may open in the background; Avoid pressing Enter here."
     
-    do {
+    while ($true) {
         if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
             return $dialog.FileName
         }
         $choice = Read-Host "No file selected. Press Enter to retry, input 'q' to force exit"
         if ($choice -eq 'q') { exit 1 }
     }
-    while ($true)
 }
 
 function Select-Folder([string]$Description = "Select folder", [string]$InitialPath = [Environment]::GetFolderPath('Desktop')) {
@@ -137,7 +136,7 @@ function Select-Folder([string]$Description = "Select folder", [string]$InitialP
 
     Write-Host " Selection window may open in the background; Avoid pressing Enter here."
     
-    do {
+    while ($true) {
         if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
             $path = $dialog.SelectedPath
             if (-not $path.EndsWith('\')) { $path += '\' }
@@ -146,7 +145,6 @@ function Select-Folder([string]$Description = "Select folder", [string]$InitialP
         $choice = Read-Host "No folder selected. Press Enter to retry, input 'q' to force exit"
         if ($choice -eq 'q') { exit 1 }
     }
-    while ($true)
 }
 
 # Generate batch files using Windows (CRLF) and UTF-8 BOM text encoding.

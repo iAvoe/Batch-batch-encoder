@@ -24,6 +24,68 @@ $fpsParams = [PSCustomObject]@{
     aDouble = [double]0
 }
 
+# Collect and update the base frame rate, average frame rate,
+# total number of frames, and total duration data of the video source.
+function Set-FpsParams {
+    param(
+        [Parameter(Mandatory=$true)][string]$rFpsString,
+        [Parameter(Mandatory=$true)][string]$aFpsString
+    )
+    $rFpsString = $rFpsString.Trim()
+    $aFpsString = $aFpsString.Trim()
+    $fpsRegex = '^\s*(\d+)\s*/\s*(\d+)\s*$'
+
+    # Add denominator for integer frame rate 
+    if ($rFpsString -notmatch "/") { $rFpsString += "/1" }
+    if ($aFpsString -notmatch "/") { $aFpsString += "/1" }
+    
+    # Handle base frame rate
+    if ($rFpsString -match $fpsRegex) {
+        $rNum = [int]$Matches[1]
+        $rDnm = [int]$Matches[2]
+        if ($rDnm -eq 0) { throw "Base frame rate is dividing by 0" }
+        $script:fpsParams.rNumerator = $rNum
+        $script:fpsParams.rDenumerator = $rDnm
+        $script:fpsParams.rDouble = [double]$rNum / $rDnm
+    }
+    
+    # Handle average frame rate
+    if ($aFpsString -match $fpsRegex) {
+        $aNum = [int]$Matches[1]
+        $aDnm = [int]$Matches[2]
+        if ($aDnm -eq 0) { throw "Average frame rate is dividng by 0" }
+        $script:fpsParams.aNumerator = $aNum
+        $script:fpsParams.aDenumerator = $aDnm
+        $script:fpsParams.aDouble = [double]$aNum / $aDnm
+    }
+    elseif ([double]::TryParse($aFpsString, [ref]$null)) {
+        $aDouble = [double]$aFpsString
+        $script:fpsParams.aNumerator = [int]($aDouble * 1000)
+        $script:fpsParams.aDenumerator = 1000
+        $script:fpsParams.aDouble = $aDouble
+    }
+}
+
+# Detecting whether an integer is similar to a prime number
+# credit：buttondown.com/behind-the-powershell-pipeline/archive/a-prime-scripting-solution
+function Test-IsLikePrime {
+    param (
+        [Parameter(Mandatory=$true)][int]$number,
+        [int]$threshold = 5 # Threshold for the number of divisors is set
+    )
+    if ($number -lt 3) { throw "Test value must be greater than 3" }
+    $t = 0
+    for ($i=2; $i -le [math]::Sqrt($number); $i++) {
+        if ($number % $i -eq 0) {
+            $t++
+        }
+        if ($t -gt $threshold) {
+            return $false
+        }
+    }
+    return $true
+}
+
 # Modularized ffprobe information retrieval function
 function Get-VideoStreamInfo {
     param (
@@ -32,10 +94,10 @@ function Get-VideoStreamInfo {
         [string]$showEntries = "stream"
     )
     if (-not (Test-Path -LiteralPath $ffprobePath)) {
-        throw "Get-VideoStreamInfo：ffprobe.exe missing ($ffprobePath)"
+        throw "Get-VideoStreamInfo: ffprobe.exe missing ($ffprobePath)"
     }
     if (-not (Test-Path -LiteralPath $videoSource)) {
-        throw "Get-VideoStreamInfo：File not found ($videoSource)"
+        throw "Get-VideoStreamInfo: File not found ($videoSource)"
     }
     
     # ffprobe parameters
@@ -43,21 +105,23 @@ function Get-VideoStreamInfo {
         '-v', 'quiet', '-hide_banner',
         '-select_streams', 'v:0',
         '-show_entries', $showEntries,
-        '-of', 'json',
-        $videoSource
+        '-of', 'json', $videoSource
     )
     
     # Run ffprobe
     $ffprobeJson = &$ffprobePath @ffprobeArgs 2>$null
-    
     if ($LASTEXITCODE -ne 0 -or -not $ffprobeJson) {
-        throw "ffprobe failed or did not return any valid data"
+        throw "Get-VideoStreamInfo: ffprobe failed or did not return any valid data"
+    }
+    try {
+        $streamInfo = $ffprobeJson | ConvertFrom-Json
+    }
+    catch {
+        throw "Get-VideoStreamInfo: Invalid JSON returned by ffprobe"
     }
     
-    $streamInfo = $ffprobeJson | ConvertFrom-Json
-    
     if (-not $streamInfo.streams -or $streamInfo.streams.Count -lt 1) {
-        throw "Could not find video stream data"
+        throw "Get-VideoStreamInfo: Could not find video stream data"
     }
     
     return $streamInfo.streams[0]
@@ -65,20 +129,17 @@ function Get-VideoStreamInfo {
 
 function Get-VFRWarning {
     param (
-        [Parameter(Mandatory=$true)][string]$ffprobePath,
-        [Parameter(Mandatory=$true)][string]$videoSource,
+        [Parameter(Mandatory=$true)]$ffprobeStreamInfo,
         [double]$RelativeTolerance = 0.000000001
     )
     
-    Show-Info "Get-VFRWarning: Detecting if video is in variable frame rate..."
+    Show-Info "Get-VFRWarning: Validating if video frame rate is variable..."
     
-    try {
-        $s = Get-VideoStreamInfo -ffprobePath $ffprobePath -videoSource $videoSource `
-            -showEntries "stream=r_frame_rate,avg_frame_rate,nb_frames,duration"
-        
-        # Call Set-FpsParams to update the base frame rate and average frame rate
+    try { # Call Set-FpsParams to update the base frame rate and average frame rate
         try {
-            Set-FpsParams -rFpsString ([string]$s.r_frame_rate).Trim() -aFpsString ([string]$s.avg_frame_rate).Trim()
+            Set-FpsParams `
+                -rFpsString ([string]$ffprobeStreamInfo.r_frame_rate).Trim() `
+                -aFpsString ([string]$ffprobeStreamInfo.avg_frame_rate).Trim()
         }
         catch {
             Show-Warning "Get-VFRWarning: Video frame rate data is missing or corrupted, could not analyze"
@@ -90,11 +151,11 @@ function Get-VFRWarning {
         $nbFrames = 0
         $duration = 0
         try {
-            $nbFrames = [int]$s.nb_frames.Trim()
-            $duration = [double]$s.duration.Trim()
+            $nbFrames = [int]$ffprobeStreamInfo.nb_frames.Trim()
+            $duration = [double]$ffprobeStreamInfo.duration.Trim()
         }
         catch {
-            Show-Warning "Get-VFRWarning: Invalid number of video frames and/or duration data"
+            Show-Info "Get-VFRWarning: Invalid total frames & duration, video encoder will not show ETA"
         }
 
         # Estimated fps
@@ -113,15 +174,15 @@ function Get-VFRWarning {
                 [math]::Abs($rFps-$aFps) / [math]::Max(1e-9, [math]::Max($rFps, $aFps))
             if ($relDiff -gt $RelativeTolerance) {
                 $score += 1
-                $vReasons +=
-                    "Base fps ($rFps) differs from avg. fps ($aFps)"
+                $vReasons += "Base fps ($rFps) differs from avg. fps ($aFps)"
             }
             else {
                 $cReasons += "Base fps is equal to avg. fps"
             }
         }
         else {
-            $cReasons += "Could not process base fps (r_frame_rate) or avg. fps (avg_frame_rate), could be N/A"
+            $cReasons +=
+                "Could not process base fps (r_frame_rate) or avg. fps (avg_frame_rate), could be N/A"
         }
 
         # 2. Compare estimated frame rate with average frame rate
@@ -129,16 +190,15 @@ function Get-VFRWarning {
             $relDiff2 = [math]::Abs($eFps-$aFps) / [math]::Max($eFps, $aFps)
             if ($relDiff2 -gt $RelativeTolerance) {
                 $score += 2
-                $vReasons +=
-                    "Estimated fps ($eFps) differs from avg. fps ($aFps)"
+                $vReasons += "Estimated fps ($eFps) differs from avg. fps ($aFps)"
             }
             else {
                 $cReasons += "Estimated fps is equal to avg. fps"
             }
         }
 
-        # 3. Special values
-        if ($s.r_frame_rate -eq "90000/1") {
+        # 3. Special values (rumor says this indicates VFR)
+        if ($ffprobeStreamInfo.r_frame_rate -eq "90000/1") {
             $score += 3
             $vReasons += "Characteristical r_frame_rate (90000), could be VFR container"
         }
@@ -186,9 +246,9 @@ function Get-VFRWarning {
         #     Mode           = $mode
         #     Confidence     = $confidence
         #     Score          = $score
-        #     r_frame_rate   = $s.r_frame_rate
+        #     r_frame_rate   = $ffprobeStreamInfo.r_frame_rate
         #     r_fps          = if ($rFps) {$rFps} else {"N/A"}
-        #     avg_frame_rate = $s.avg_frame_rate
+        #     avg_frame_rate = $ffprobeStreamInfo.avg_frame_rate
         #     avg_fps        = if ($aFps) {$aFps} else {"N/A"}
         #     computed_fps   = if ($eFps) {$eFps} else {"N/A"}
         #     vfr_reasons    = $vReasons
@@ -213,7 +273,7 @@ function Get-VFRWarning {
             Read-Host " Press any button to continue..."
         }
         else {
-            Show-Success "源$mode"
+            Show-Success "Source $mode"
         }
     }
     catch {
@@ -224,18 +284,12 @@ function Get-VFRWarning {
 # Use ffprobe to detect the actual video file container format,
 # ignoring the file extension (the container format is represented by uppercase letters).
 function Get-NonSquarePixelWarning {
-    param (
-        [Parameter(Mandatory=$true)][string]$ffprobePath,
-        [Parameter(Mandatory=$true)][string]$videoSource
-    )
+    param ([Parameter(Mandatory=$true)]$ffprobeStreamInfo)
     
     try {
-        $s = Get-VideoStreamInfo -ffprobePath $ffprobePath -videoSource $videoSource `
-            -showEntries "stream=sample_aspect_ratio"
-
         $sampleAspectRatio = "1:1"
         try {
-            $sampleAspectRatio = $s.sample_aspect_ratio.Trim()
+            $sampleAspectRatio = $ffprobeStreamInfo.sample_aspect_ratio.Trim()
         }
         catch {
             Show-Warning "Get-NonSquarePixelWarning: sample aspect radio (SAR) is missing or corrupted, defaulting to 1:1"
@@ -271,6 +325,8 @@ function Test-VideoContainerFormat {
         [Parameter(Mandatory = $true)][string]$ffprobePath,
         [Parameter(Mandatory = $true)][string]$videoSource
     )
+    Show-Info "Test-VideoContainerFormat: Validating if container format is genuine..."
+    
     # Temporarily change text encoding
     $oldEncoding = [Console]::OutputEncoding
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -287,16 +343,13 @@ function Test-VideoContainerFormat {
     $ffprobeArgs = @(
         '-v', 'quiet', '-hide_banner',
         '-show_format',
-        '-of', 'json',
-        $videoSource
+        '-of', 'json', $videoSource
     )
     $ffprobeArgs2 = @(
-        '-v', 'quiet', '-hide_banner',
-        $videoSource
+        '-v', 'quiet', '-hide_banner', $videoSource
     )
 
-    try {
-        # Use JSON input for analysis
+    try { # Use JSON input for analysis
         $ffprobeJson = &$ffprobePath @ffprobeArgs 2>$null
 
         if ($LASTEXITCODE -eq 0) { # ffprobe exits normally, analysis results exist
@@ -315,7 +368,7 @@ function Test-VideoContainerFormat {
 
                 # VOBs typically contain DVD navigation packets or specific stream structures
                 if ($hasDVD -or $hasMPEG2) {
-                    Show-Info "Test-VideoContainerFormat: VOB format (DVD video) detected"
+                    Show-Success "Test-VideoContainerFormat: VOB format (DVD video) detected"
                     return "VOB"
                 }
                 elseif ($hasMPEG2) {
@@ -333,40 +386,40 @@ function Test-VideoContainerFormat {
             }
             elseif ($formatName -match "mov|mp4|m4a|3gp|3g2|mj2") {
                 if ($formatName -match "qt" -or $ext -eq ".mov") {
-                    Show-Info "Test-VideoContainerFormat: MOV format detected"
+                    Show-Success "Test-VideoContainerFormat: MOV format detected"
                     return "MOV"
                 }
                 else {
-                    Show-Info "Test-VideoContainerFormat: MP4 format detected"
+                    Show-Success "Test-VideoContainerFormat: MP4 format detected"
                     return "MP4"
                 }
             }
             elseif ($formatName -match "matroska") {
-                Show-Info "Test-VideoContainerFormat: MKV format detected"
+                Show-Success "Test-VideoContainerFormat: MKV format detected"
                 return "MKV"
             }
             elseif ($formatName -match "webm") {
-                Show-Info "Test-VideoContainerFormat: WebM format detected"
+                Show-Success "Test-VideoContainerFormat: WebM format detected"
                 return "WebM"
             }
             elseif ($formatName -match "avi") {
-                Show-Info "Test-VideoContainerFormat: AVI format detected"
+                Show-Success "Test-VideoContainerFormat: AVI format detected"
                 return "AVI"
             }
             elseif ($formatName -match "ivf") {
-                Show-Info "Test-VideoContainerFormat: ivf format detected"
+                Show-Success "Test-VideoContainerFormat: ivf format detected"
                 return "ivf"
             }
             elseif ($formatName -match "hevc") {
-                Show-Info "Test-VideoContainerFormat: hevc format detected"
+                Show-Success "Test-VideoContainerFormat: hevc format detected"
                 return "hevc"
             }
             elseif ($formatName -match "h264" -or $formatName -match "avc") {
-                Show-Info "Test-VideoContainerFormat: avc format detected"
+                Show-Success "Test-VideoContainerFormat: avc format detected"
                 return "avc"
             }
             elseif ($formatName -match "ffv1") {
-                Show-Info "Test-VideoContainerFormat：检测到 ffv1 格式"
+                Show-Success "Test-VideoContainerFormat：检测到 ffv1 格式"
                 return "ffv1"
             }
             return $formatName
@@ -525,7 +578,9 @@ function Main {
         default       { $upstreamCode = 'a' }
     }
 
-    # Variables for IO
+    Write-Host ("─" * 50)
+    
+    # Define IO Variables
     $videoSource = $null # ffprobe will analyze this one
     $scriptSource = $null # script source for encoding, but cannot be read by ffprobe
     $encodeImportSourcePath = $null
@@ -698,6 +753,8 @@ function Main {
         $encodeImportSourcePath = $videoSource
     }
 
+    Write-Host ("─" * 50)
+
     # Locate ffprobe
     Show-Info "Select ffprobe.exe..."
     do {
@@ -709,15 +766,23 @@ function Main {
     }
     while (-not (Test-Path -LiteralPath $ffprobePath))
 
-    # Detect variable frame rate source
-    Get-VFRWarning -ffprobePath $ffprobePath -videoSource $videoSource
+    Write-Host ("─" * 50)
 
-    # Detect non-square pixel source
-    Get-NonSquarePixelWarning -ffprobePath $ffprobePath -videoSource $videoSource
+    $streamInfo = Get-VideoStreamInfo -ffprobePath $ffprobePath -videoSource $videoSource `
+        -showEntries "stream=r_frame_rate,avg_frame_rate,nb_frames,duration,sample_aspect_ratio"
+    Show-Debug "Frame rate, Avg. frame rate, total frames, duration, sample aspect ratio:"
+    Write-Host $streamInfo
 
-    # Detect source container format
+    Write-Host ("─" * 50)
+
+    # Detect non-square pixel source, source container format and warn
+    Get-VFRWarning -ffprobeStreamInfo $streamInfo
+    Get-NonSquarePixelWarning -ffprobeStreamInfo $streamInfo
+
+    Write-Host ("─" * 50)
+
+    # Detect if video container format is genuine
     $realFormatName = Test-VideoContainerFormat -ffprobePath $ffprobePath -videoSource $videoSource
-
     $isMOV = ($realFormatName -like "MOV")
     $isVOB = ($realFormatName -like "VOB")
     # if ($isMOV) { Show-Debug "The imported video $videoSource is in MOV format" }
@@ -772,6 +837,8 @@ function Main {
     #         Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_debug.csv"
     #     }
 
+    Write-Host ("─" * 50)
+
     # If the CSV file already exists, manually confirm and delete
     Confirm-FileDelete (Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_mov.csv")
     Confirm-FileDelete (Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_vob.csv")
@@ -793,6 +860,8 @@ function Main {
 
         Write-TextFile -Path $sourceCSVExportPath -Content $sourceInfoCSV -UseBOM $true
         Show-Success "CSV file created:`r`n $ffprobeCSVExportPath`r`n $sourceCSVExportPath"
+
+        Write-Host ("─" * 50)
 
         # Check line breaks (must be CRLF)
         Show-Debug "Validating file format..."

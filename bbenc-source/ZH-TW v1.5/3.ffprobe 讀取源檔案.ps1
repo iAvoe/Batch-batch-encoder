@@ -16,10 +16,10 @@
 
 # 需要結合影片數據統計的參數
 $fpsParams = [PSCustomObject]@{
-    rNumerator = [int]0 # 基礎幀率分子
+    rNumerator = [int]0 # 基礎幀率
     rDenumerator = [int]0
     rDouble = [double]0
-    aNumerator = [int]0 # 平均幀率分子
+    aNumerator = [int]0 # 平均幀率
     aDenumerator = [int]0
     aDouble = [double]0
 }
@@ -105,18 +105,20 @@ function Get-VideoStreamInfo {
         '-v', 'quiet', '-hide_banner',
         '-select_streams', 'v:0',
         '-show_entries', $showEntries,
-        '-of', 'json',
-        $videoSource
+        '-of', 'json', $videoSource
     )
     
     # 執行 ffprobe
     $ffprobeJson = &$ffprobePath @ffprobeArgs 2>$null
-    
     if ($LASTEXITCODE -ne 0 -or -not $ffprobeJson) {
         throw "ffprobe 執行失敗或未返回有效數據"
     }
-    
-    $streamInfo = $ffprobeJson | ConvertFrom-Json
+    try {
+        $streamInfo = $ffprobeJson | ConvertFrom-Json
+    }
+    catch {
+        throw "無法解析 ffprobe 返回的 JSON"
+    }
     
     if (-not $streamInfo.streams -or $streamInfo.streams.Count -lt 1) {
         throw "未找到影片串流資訊"
@@ -127,23 +129,20 @@ function Get-VideoStreamInfo {
 
 function Get-VFRWarning {
     param (
-        [Parameter(Mandatory=$true)][string]$ffprobePath,
-        [Parameter(Mandatory=$true)][string]$videoSource,
+        [Parameter(Mandatory=$true)]$ffprobeStreamInfo,
         [double]$RelativeTolerance = 0.000000001
     )
     
     Show-Info "正在檢測影片是否為可變幀率..."
     
-    try {
-        $s = Get-VideoStreamInfo -ffprobePath $ffprobePath -videoSource $videoSource `
-            -showEntries "stream=r_frame_rate,avg_frame_rate,nb_frames,duration"
-        
-        # 調用 Set-FpsParams 更新基礎幀率、平均幀率
+    try { # 調用 Set-FpsParams 更新基礎幀率、平均幀率
         try {
-            Set-FpsParams -rFpsString ([string]$s.r_frame_rate).Trim() -aFpsString ([string]$s.avg_frame_rate).Trim()
+            Set-FpsParams `
+                -rFpsString ([string]$ffprobeStreamInfo.r_frame_rate).Trim() `
+                -aFpsString ([string]$ffprobeStreamInfo.avg_frame_rate).Trim()
         }
         catch {
-            Show-Warning "Get-VFRWarning：影片幀率數據為空或損壞，無法處理幀率"
+            Show-Warning "Get-VFRWarning：影片幀率數據為空或損壞，幀率無從得知"
         }
         $rFps = $script:fpsParams.rDouble
         $aFps = $script:fpsParams.aDouble
@@ -152,11 +151,11 @@ function Get-VFRWarning {
         $nbFrames = 0
         $duration = 0
         try {
-            $nbFrames = [int]$s.nb_frames.Trim()
-            $duration = [double]$s.duration.Trim()
+            $nbFrames = [int]$ffprobeStreamInfo.nb_frames.Trim()
+            $duration = [double]$ffprobeStreamInfo.duration.Trim()
         }
         catch {
-            Show-Warning "Get-VFRWarning：影片總幀數、時長數據異常"
+            Show-Info "Get-VFRWarning：影片總幀數、時長元數據缺失，編碼器將不顯示 ETA"
         }
 
         # 估計幀率
@@ -175,8 +174,7 @@ function Get-VFRWarning {
                 [math]::Abs($rFps-$aFps) / [math]::Max(1e-9, [math]::Max($rFps, $aFps))
             if ($relDiff -gt $RelativeTolerance) {
                 $score += 1
-                $vReasons +=
-                    "基礎幀率（$rFps）與平均幀率（$aFps）不同"
+                $vReasons += "基礎幀率（$rFps）與平均幀率（$aFps）不同"
             }
             else {
                 $cReasons += "基礎幀率與平均幀率相同"
@@ -191,8 +189,7 @@ function Get-VFRWarning {
             $relDiff2 = [math]::Abs($eFps-$aFps) / [math]::Max($eFps, $aFps)
             if ($relDiff2 -gt $RelativeTolerance) {
                 $score += 2
-                $vReasons +=
-                    "估計幀率（$eFps）與平均幀率（$aFps）不同"
+                $vReasons += "估計幀率（$eFps）與平均幀率（$aFps）不同"
             }
             else {
                 $cReasons += "估計幀率與平均幀率相同"
@@ -200,9 +197,9 @@ function Get-VFRWarning {
         }
 
         # 3. 特殊值（據說常見於 VFR）
-        if ($s.r_frame_rate -eq "90000/1") {
+        if ($ffprobeStreamInfo.r_frame_rate -eq "90000/1") {
             $score += 3
-            $vReasons += "=特徵 r_frame_rate（90000）為 VFR 容器標記"
+            $vReasons += "特徵 r_frame_rate（90000）為 VFR 容器標記"
         }
 
         # 4. 接近質數的大分母
@@ -248,9 +245,9 @@ function Get-VFRWarning {
         #     Mode           = $mode
         #     Confidence     = $confidence
         #     Score          = $score
-        #     r_frame_rate   = $s.r_frame_rate
+        #     r_frame_rate   = $ffprobeStreamInfo.r_frame_rate
         #     r_fps          = if ($rFps) {$rFps} else {"N/A"}
-        #     avg_frame_rate = $s.avg_frame_rate
+        #     avg_frame_rate = $ffprobeStreamInfo.avg_frame_rate
         #     avg_fps        = if ($aFps) {$aFps} else {"N/A"}
         #     computed_fps   = if ($eFps) {$eFps} else {"N/A"}
         #     vfr_reasons    = $vReasons
@@ -267,8 +264,8 @@ function Get-VFRWarning {
             Write-Host "   - ffmpeg -i $quotedVideoSource -r $rNum/$rDnm -c:v ffv1 -level 3 -context 1 -g 180 -c:a copy output.mkv" -ForegroundColor Magenta
             Write-Host " 例：測量影片幀以確定 VFR："
             Write-Host "   - ffmpeg -i $quotedVideoSource -vf vfrdet -an -f null -" -ForegroundColor Magenta
-            Write-Host "   - 結束後根據 [Parsed_vfrdet_0 @ 0000012a34b5cd00] VFR:0.xxx (yyy/zzz) 字樣即可確定" -ForegroundColor Magenta
-            Write-Host "   - y：顯示時長對不上幀率幀的總數" -ForegroundColor Magenta
+            Write-Host "   - 結束後根據 [Parsed_vfrdet_0 @ 0000012a34b5cd00] VFR:0.xxx (yyy/zzz) 字樣即可確定"
+            Write-Host "   - yyy：顯示時長對不上幀率幀的總數" -ForegroundColor Magenta
             Read-Host " 按任意鍵繼續..."
         }
         else {
@@ -281,24 +278,17 @@ function Get-VFRWarning {
 }
 
 function Get-NonSquarePixelWarning {
-    param (
-        [Parameter(Mandatory=$true)][string]$ffprobePath,
-        [Parameter(Mandatory=$true)][string]$videoSource
-    )
-
+    param ([Parameter(Mandatory=$true)]$ffprobeStreamInfo)
     
     try {
-        $s = Get-VideoStreamInfo -ffprobePath $ffprobePath -videoSource $videoSource `
-            -showEntries "stream=sample_aspect_ratio"
-        
         $sampleAspectRatio = "1:1"
         try {
-            $sampleAspectRatio = $s.sample_aspect_ratio.Trim()
+            $sampleAspectRatio = $ffprobeStreamInfo.sample_aspect_ratio.Trim()
         }
         catch {
             Show-Warning "Get-NonSquarePixelWarning：源的變寬比（SAR）數據損壞，將預設為 1:1"
         }
-
+        
         if ($sampleAspectRatio -notlike "1:1") {
             Show-Warning "源的變寬比（SAR）非 1:1（$sampleAspectRatio 的長方形象素）"
             Write-Host " 本程式暫無對策（強行編碼會恢復到方形象素，致畫面縮寬），" -ForegroundColor Yellow
@@ -323,12 +313,14 @@ function Get-NonSquarePixelWarning {
     }
 }
 
-# 利用 ffprobe 檢測真實的影片檔案封裝格式，無視后綴名（封裝格式用大寫字母表示）
+# 利用 ffprobe 驗證影片檔案封裝格式，無視后綴名（封裝格式用大寫字母表示）
 function Test-VideoContainerFormat {
     param (
         [Parameter(Mandatory=$true)][string]$ffprobePath,
         [Parameter(Mandatory=$true)][string]$videoSource
     )
+    Show-Info "正在檢測影片檔案封裝格式真偽..."
+
     # 臨時切換文本編碼
     $oldEncoding = [Console]::OutputEncoding
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -344,12 +336,10 @@ function Test-VideoContainerFormat {
     $ffprobeArgs = @(
         '-v', 'quiet', '-hide_banner',
         '-show_format',
-        '-of', 'json',
-        $videoSource
+        '-of', 'json', $videoSource
     )
     $ffprobeArgs2 = @(
-        '-v', 'quiet', '-hide_banner',
-        $videoSource
+        '-v', 'quiet', '-hide_banner', $videoSource
     )
 
     try { # 使用 JSON 輸入分析
@@ -365,13 +355,13 @@ function Test-VideoContainerFormat {
                 $ffprobeText = & $ffprobePath @$ffprobeArgs2 2>&1
                 # 檔案名含 VTS_ 字樣（不確定是否全是大寫，因此不用 cmatch）
                 # $hasVTSFileName = $filename -match "^VTS_"
-                # 元數據含 dvd_nav、mpeg2video 字樣（高機率是 VOB）
+                # 元數據含 dvd_nav、mpeg2video 字樣
                 $hasDVD = $ffprobeText -match "dvd_nav"
                 $hasMPEG2 = $ffprobeText -match "mpeg2video"
 
                 # VOB 通常包含 DVD 導航包或特定的流結構
                 if ($hasDVD -or $hasMPEG2) {
-                    Show-Info "Test-VideoContainerFormat：檢測到 VOB 格式（DVD 影片）"
+                    Show-Success "Test-VideoContainerFormat：檢測到 VOB 格式（DVD 影片）"
                     return "VOB"
                 }
                 elseif ($hasMPEG2) {
@@ -389,40 +379,40 @@ function Test-VideoContainerFormat {
             }
             elseif ($formatName -match "mov|mp4|m4a|3gp|3g2|mj2") {
                 if ($formatName -match "qt" -or $ext -eq ".mov") {
-                    Show-Info "Test-VideoContainerFormat：檢測到 MOV 格式"
+                    Show-Success "Test-VideoContainerFormat：檢測到 MOV 格式"
                     return "MOV"
                 }
                 else {
-                    Show-Info "Test-VideoContainerFormat：檢測到 MP4 格式"
+                    Show-Success "Test-VideoContainerFormat：檢測到 MP4 格式"
                     return "MP4"
                 }
             }
             elseif ($formatName -match "matroska") {
-                Show-Info "Test-VideoContainerFormat：檢測到 MKV 格式"
+                Show-Success "Test-VideoContainerFormat：檢測到 MKV 格式"
                 return "MKV"
             }
             elseif ($formatName -match "webm") {
-                Show-Info "Test-VideoContainerFormat：檢測到 WebM 格式"
+                Show-Success "Test-VideoContainerFormat：檢測到 WebM 格式"
                 return "WebM"
             }
             elseif ($formatName -match "avi") {
-                Show-Info "Test-VideoContainerFormat：檢測到 AVI 格式"
+                Show-Success "Test-VideoContainerFormat：檢測到 AVI 格式"
                 return "AVI"
             }
             elseif ($formatName -match "ivf") {
-                Show-Info "Test-VideoContainerFormat：檢測到 ivf 格式"
+                Show-Success "Test-VideoContainerFormat：檢測到 ivf 格式"
                 return "ivf"
             }
             elseif ($formatName -match "hevc") {
-                Show-Info "Test-VideoContainerFormat：檢測到 hevc 格式"
+                Show-Success "Test-VideoContainerFormat：檢測到 hevc 格式"
                 return "hevc"
             }
             elseif ($formatName -match "h264" -or $formatName -match "avc") {
-                Show-Info "Test-VideoContainerFormat：檢測到 avc 格式"
+                Show-Success "Test-VideoContainerFormat：檢測到 avc 格式"
                 return "avc"
             }
             elseif ($formatName -match "ffv1") {
-                Show-Info "Test-VideoContainerFormat：檢測到 ffv1 格式"
+                Show-Success "Test-VideoContainerFormat：檢測到 ffv1 格式"
                 return "ffv1"
             }
             return $formatName
@@ -579,6 +569,8 @@ function Main {
         }
         default       { $upstreamCode = 'a' }
     }
+
+    Write-Host ("─" * 50)
 
     # 定義 IO 變數
     $videoSource = $null # ffprobe 將分析這個影片檔案
@@ -753,6 +745,8 @@ function Main {
         $encodeImportSourcePath = $videoSource
     }
 
+    Write-Host ("─" * 50)
+
     # 定位 ffprobe 程序
     Show-Info "定位 ffprobe.exe..."
     do {
@@ -764,13 +758,22 @@ function Main {
     }
     while (-not (Test-Path -LiteralPath $ffprobePath))
 
-    # 檢測可變幀率源
-    Get-VFRWarning -ffprobePath $ffprobePath -videoSource $videoSource
+    Write-Host ("─" * 50)
 
-    # 檢測非方形象素源
-    Get-NonSquarePixelWarning -ffprobePath $ffprobePath -videoSource $videoSource
+    $streamInfo = Get-VideoStreamInfo -ffprobePath $ffprobePath -videoSource $videoSource `
+        -showEntries "stream=r_frame_rate,avg_frame_rate,nb_frames,duration,sample_aspect_ratio"
+    Show-Debug "幀率，平均幀率，總幀數，時長，變寬比："
+    Write-Host $streamInfo
 
-    # 檢測封裝文件類型
+    Write-Host ("─" * 50)
+
+    # 檢測可變幀率源、非方形象素源並告警
+    Get-VFRWarning -ffprobeStreamInfo $streamInfo
+    Get-NonSquarePixelWarning -ffprobeStreamInfo $streamInfo
+
+    Write-Host ("─" * 50)
+
+    # 檢測封裝文件真偽
     $realFormatName = Test-VideoContainerFormat -ffprobePath $ffprobePath -videoSource $videoSource
     $isMOV = ($realFormatName -like "MOV")
     $isVOB = ($realFormatName -like "VOB")
@@ -804,6 +807,8 @@ function Main {
     #        '-of', 'ini'
     #    )}
     
+    Write-Host ("─" * 50)
+
     # 由於 ffprobe 讀取不同源所產生的列數不一，導致讀取額外插入的資訊隨機錯位，因此需要獨立的 CSV（s_info）來儲存源資訊
     $sourceCSVExportPath = Join-Path $Global:TempFolder "temp_s_info.csv"
     $ffprobeCSVExportPath =
@@ -845,6 +850,8 @@ function Main {
 
         Write-TextFile -Path $sourceCSVExportPath -Content $sourceInfoCSV -UseBOM $true
         Show-Success "CSV 文件已生成：`r`n $ffprobeCSVExportPath`r`n $sourceCSVExportPath"
+
+        Write-Host ("─" * 50)
 
         # 驗證換行符
         Show-Debug "驗證 CSV 檔案格式..."

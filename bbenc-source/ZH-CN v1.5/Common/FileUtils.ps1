@@ -118,14 +118,13 @@ function Select-File(
 
     Write-Host " 选窗可能会在本窗口后面打开，这里不要按回车"
 
-    do {
+    while ($true) {
         if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
             return $dialog.FileName
         }
         $choice = Read-Host "未选择文件，按回车重试或输入 'q' 强制退出"
         if ($choice -eq 'q') { exit 1 }
     }
-    while ($true)
 }
 
 function Select-Folder(
@@ -140,7 +139,7 @@ function Select-Folder(
 
     Write-Host " 选窗可能会在本窗口后面打开，这里不要按回车"
     
-    do {
+    while ($true) {
         if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
             $path = $dialog.SelectedPath
             if (-not $path.EndsWith('\')) { $path += '\' }
@@ -149,7 +148,6 @@ function Select-Folder(
         $choice = Read-Host "未选择文件夹，按回车重试或输入 'q' 强制退出"
         if ($choice -eq 'q') { exit 1 }
     }
-    while ($true)
 }
 
 # 生成使用 Windows（CRLF 换行）、UTF-8 BOM 文本编码的批处理

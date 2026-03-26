@@ -94,10 +94,10 @@ function Get-VideoStreamInfo {
     
     # 参数验证
     if (-not (Test-Path -LiteralPath $ffprobePath)) {
-        throw "ffprobe.exe 不存在（$ffprobePath）"
+        throw "Get-VideoStreamInfo：ffprobe.exe 不存在（$ffprobePath）"
     }
     if (-not (Test-Path -LiteralPath $videoSource)) {
-        throw "输入视频不存在（$videoSource）"
+        throw "Get-VideoStreamInfo：输入视频不存在（$videoSource）"
     }
     
     # 构建 ffprobe 参数
@@ -105,21 +105,23 @@ function Get-VideoStreamInfo {
         '-v', 'quiet', '-hide_banner',
         '-select_streams', 'v:0',
         '-show_entries', $showEntries,
-        '-of', 'json',
-        $videoSource
+        '-of', 'json', $videoSource
     )
     
     # 执行 ffprobe
     $ffprobeJson = &$ffprobePath @ffprobeArgs 2>$null
-    
     if ($LASTEXITCODE -ne 0 -or -not $ffprobeJson) {
-        throw "ffprobe 执行失败或未返回有效数据"
+        throw "Get-VideoStreamInfo：ffprobe 执行失败或未返回有效数据"
+    }
+    try {
+        $streamInfo = $ffprobeJson | ConvertFrom-Json
+    }
+    catch {
+        throw "Get-VideoStreamInfo：无法解析 ffprobe 返回的 JSON"
     }
     
-    $streamInfo = $ffprobeJson | ConvertFrom-Json
-    
     if (-not $streamInfo.streams -or $streamInfo.streams.Count -lt 1) {
-        throw "未找到视频流信息"
+        throw "Get-VideoStreamInfo：未找到视频流信息"
     }
     
     return $streamInfo.streams[0]
@@ -127,23 +129,20 @@ function Get-VideoStreamInfo {
 
 function Get-VFRWarning {
     param (
-        [Parameter(Mandatory=$true)][string]$ffprobePath,
-        [Parameter(Mandatory=$true)][string]$videoSource,
+        [Parameter(Mandatory=$true)]$ffprobeStreamInfo,
         [double]$RelativeTolerance = 0.000000001
     )
     
-    Show-Info "正在检测视频是否为可变帧率..."
+    Show-Info "Get-VFRWarning：正在检测视频是否为可变帧率..."
     
-    try {
-        $s = Get-VideoStreamInfo -ffprobePath $ffprobePath -videoSource $videoSource `
-            -showEntries "stream=r_frame_rate,avg_frame_rate,nb_frames,duration"
-        
-        # 调用 Set-FpsParams 更新基础帧率、平均帧率
+    try { # 调用 Set-FpsParams 更新基础帧率、平均帧率
         try {
-            Set-FpsParams -rFpsString ([string]$s.r_frame_rate).Trim() -aFpsString ([string]$s.avg_frame_rate).Trim()
+            Set-FpsParams `
+                -rFpsString ([string]$ffprobeStreamInfo.r_frame_rate).Trim() `
+                -aFpsString ([string]$ffprobeStreamInfo.avg_frame_rate).Trim()
         }
         catch {
-            Show-Warning "Get-VFRWarning：视频帧率数据为空或损坏，无法处理帧率"
+            Show-Warning "Get-VFRWarning：视频帧率数据为空或损坏，帧率无从得知"
         }
         $rFps = $script:fpsParams.rDouble
         $aFps = $script:fpsParams.aDouble
@@ -152,11 +151,11 @@ function Get-VFRWarning {
         $nbFrames = 0
         $duration = 0
         try {
-            $nbFrames = [int]$s.nb_frames.Trim()
-            $duration = [double]$s.duration.Trim()
+            $nbFrames = [int]$ffprobeStreamInfo.nb_frames.Trim()
+            $duration = [double]$ffprobeStreamInfo.duration.Trim()
         }
         catch {
-            Show-Warning "Get-VFRWarning：视频总帧数、时长数据异常"
+            Show-Info "Get-VFRWarning：视频总帧数、时长元数据缺失，编码器将不显示 ETA"
         }
 
         # 估计帧率
@@ -175,8 +174,7 @@ function Get-VFRWarning {
                 [math]::Abs($rFps-$aFps) / [math]::Max(1e-9, [math]::Max($rFps, $aFps))
             if ($relDiff -gt $RelativeTolerance) {
                 $score += 1
-                $vReasons +=
-                    "基础帧率（$rFps）与平均帧率（$aFps）不同"
+                $vReasons += "基础帧率（$rFps）与平均帧率（$aFps）不同"
             }
             else {
                 $cReasons += "基础帧率与平均帧率相同"
@@ -191,8 +189,7 @@ function Get-VFRWarning {
             $relDiff2 = [math]::Abs($eFps-$aFps) / [math]::Max($eFps, $aFps)
             if ($relDiff2 -gt $RelativeTolerance) {
                 $score += 2
-                $vReasons +=
-                    "估计帧率（$eFps）与平均帧率（$aFps）不同"
+                $vReasons += "估计帧率（$eFps）与平均帧率（$aFps）不同"
             }
             else {
                 $cReasons += "估计帧率与平均帧率相同"
@@ -200,7 +197,7 @@ function Get-VFRWarning {
         }
 
         # 3. 特殊值（据说常见于 VFR）
-        if ($s.r_frame_rate -eq "90000/1") {
+        if ($ffprobeStreamInfo.r_frame_rate -eq "90000/1") {
             $score += 3
             $vReasons += "特征 r_frame_rate（90000）为 VFR 容器标记"
         }
@@ -248,9 +245,9 @@ function Get-VFRWarning {
         #     Mode           = $mode
         #     Confidence     = $confidence
         #     Score          = $score
-        #     r_frame_rate   = $s.r_frame_rate
+        #     r_frame_rate   = $ffprobeStreamInfo.r_frame_rate
         #     r_fps          = if ($rFps) {$rFps} else {"N/A"}
-        #     avg_frame_rate = $s.avg_frame_rate
+        #     avg_frame_rate = $ffprobeStreamInfo.avg_frame_rate
         #     avg_fps        = if ($aFps) {$aFps} else {"N/A"}
         #     computed_fps   = if ($eFps) {$eFps} else {"N/A"}
         #     vfr_reasons    = $vReasons
@@ -281,18 +278,12 @@ function Get-VFRWarning {
 }
 
 function Get-NonSquarePixelWarning {
-    param (
-        [Parameter(Mandatory=$true)][string]$ffprobePath,
-        [Parameter(Mandatory=$true)][string]$videoSource
-    )
+    param ([Parameter(Mandatory=$true)]$ffprobeStreamInfo)
     
     try {
-        $s = Get-VideoStreamInfo -ffprobePath $ffprobePath -videoSource $videoSource `
-            -showEntries "stream=sample_aspect_ratio"
-
         $sampleAspectRatio = "1:1"
         try {
-            $sampleAspectRatio = $s.sample_aspect_ratio.Trim()
+            $sampleAspectRatio = $ffprobeStreamInfo.sample_aspect_ratio.Trim()
         }
         catch {
             Show-Warning "Get-NonSquarePixelWarning：源的变宽比（SAR）数据损坏，将默认为 1:1"
@@ -322,12 +313,14 @@ function Get-NonSquarePixelWarning {
     }
 }
 
-# 利用 ffprobe 检测真实的视频文件封装格式，无视后缀名（封装格式用大写字母表示）
+# 利用 ffprobe 验证视频文件封装格式，无视后缀名（封装格式用大写字母表示）
 function Test-VideoContainerFormat {
     param (
         [Parameter(Mandatory=$true)][string]$ffprobePath,
         [Parameter(Mandatory=$true)][string]$videoSource
     )
+    Show-Info "Test-VideoContainerFormat：正在检测视频文件封装格式真伪..."
+
     # 临时切换文本编码
     $oldEncoding = [Console]::OutputEncoding
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -343,12 +336,10 @@ function Test-VideoContainerFormat {
     $ffprobeArgs = @(
         '-v', 'quiet', '-hide_banner',
         '-show_format',
-        '-of', 'json',
-        $videoSource
+        '-of', 'json', $videoSource
     )
     $ffprobeArgs2 = @(
-        '-v', 'quiet', '-hide_banner',
-        $videoSource
+        '-v', 'quiet', '-hide_banner', $videoSource
     )
 
     try { # 使用 JSON 输入分析
@@ -370,7 +361,7 @@ function Test-VideoContainerFormat {
 
                 # VOB 通常包含 DVD 导航包或特定的流结构
                 if ($hasDVD -or $hasMPEG2) {
-                    Show-Info "Test-VideoContainerFormat：检测到 VOB 格式（DVD 视频）"
+                    Show-Success "Test-VideoContainerFormat：检测到 VOB 格式（DVD 视频）"
                     return "VOB"
                 }
                 elseif ($hasMPEG2) {
@@ -388,40 +379,40 @@ function Test-VideoContainerFormat {
             }
             elseif ($formatName -match "mov|mp4|m4a|3gp|3g2|mj2") {
                 if ($formatName -match "qt" -or $ext -eq ".mov") {
-                    Show-Info "Test-VideoContainerFormat：检测到 MOV 格式"
+                    Show-Success "Test-VideoContainerFormat：检测到 MOV 格式"
                     return "MOV"
                 }
                 else {
-                    Show-Info "Test-VideoContainerFormat：检测到 MP4 格式"
+                    Show-Success "Test-VideoContainerFormat：检测到 MP4 格式"
                     return "MP4"
                 }
             }
             elseif ($formatName -match "matroska") {
-                Show-Info "Test-VideoContainerFormat：检测到 MKV 格式"
+                Show-Success "Test-VideoContainerFormat：检测到 MKV 格式"
                 return "MKV"
             }
             elseif ($formatName -match "webm") {
-                Show-Info "Test-VideoContainerFormat：检测到 WebM 格式"
+                Show-Success "Test-VideoContainerFormat：检测到 WebM 格式"
                 return "WebM"
             }
             elseif ($formatName -match "avi") {
-                Show-Info "Test-VideoContainerFormat：检测到 AVI 格式"
+                Show-Success "Test-VideoContainerFormat：检测到 AVI 格式"
                 return "AVI"
             }
             elseif ($formatName -match "ivf") {
-                Show-Info "Test-VideoContainerFormat：检测到 ivf 格式"
+                Show-Success "Test-VideoContainerFormat：检测到 ivf 格式"
                 return "ivf"
             }
             elseif ($formatName -match "hevc") {
-                Show-Info "Test-VideoContainerFormat：检测到 hevc 格式"
+                Show-Success "Test-VideoContainerFormat：检测到 hevc 格式"
                 return "hevc"
             }
             elseif ($formatName -match "h264" -or $formatName -match "avc") {
-                Show-Info "Test-VideoContainerFormat：检测到 avc 格式"
+                Show-Success "Test-VideoContainerFormat：检测到 avc 格式"
                 return "avc"
             }
             elseif ($formatName -match "ffv1") {
-                Show-Info "Test-VideoContainerFormat：检测到 ffv1 格式"
+                Show-Success "Test-VideoContainerFormat：检测到 ffv1 格式"
                 return "ffv1"
             }
             return $formatName
@@ -578,6 +569,8 @@ function Main {
         }
         default       { $upstreamCode = 'a' }
     }
+
+    Write-Host ("─" * 50)
 
     # 定义 IO 变量
     $videoSource = $null # ffprobe 将分析这个视频文件
@@ -752,6 +745,8 @@ function Main {
         $encodeImportSourcePath = $videoSource
     }
 
+    Write-Host ("─" * 50)
+
     # 定位 ffprobe 程序
     Show-Info "定位 ffprobe.exe..."
     do {
@@ -763,13 +758,22 @@ function Main {
     }
     while (-not (Test-Path -LiteralPath $ffprobePath))
 
-    # 检测可变帧率源
-    Get-VFRWarning -ffprobePath $ffprobePath -videoSource $videoSource
+    Write-Host ("─" * 50)
 
-    # 检测非方形像素源
-    Get-NonSquarePixelWarning -ffprobePath $ffprobePath -videoSource $videoSource
+    $streamInfo = Get-VideoStreamInfo -ffprobePath $ffprobePath -videoSource $videoSource `
+        -showEntries "stream=r_frame_rate,avg_frame_rate,nb_frames,duration,sample_aspect_ratio"
+    Show-Debug "帧率，平均帧率，总帧数，时长，变宽比："
+    Write-Host $streamInfo
 
-    # 检测封装文件类型
+    Write-Host ("─" * 50)
+
+    # 检测可变帧率源、非方形像素源并告警
+    Get-VFRWarning -ffprobeStreamInfo $streamInfo
+    Get-NonSquarePixelWarning -ffprobeStreamInfo $streamInfo
+
+    Write-Host ("─" * 50)
+
+    # 检测封装文件真伪
     $realFormatName = Test-VideoContainerFormat -ffprobePath $ffprobePath -videoSource $videoSource
     $isMOV = ($realFormatName -like "MOV")
     $isVOB = ($realFormatName -like "VOB")
@@ -823,6 +827,8 @@ function Main {
     #         Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_debug.csv"
     #     }
 
+    Write-Host ("─" * 50)
+
     # 若 CSV 已存在，要求手动确认后清理，避免覆盖
     Confirm-FileDelete (Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_mov.csv")
     Confirm-FileDelete (Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_vob.csv")
@@ -844,6 +850,8 @@ function Main {
 
         Write-TextFile -Path $sourceCSVExportPath -Content $sourceInfoCSV -UseBOM $true
         Show-Success "CSV 文件已生成：`r`n $ffprobeCSVExportPath`r`n $sourceCSVExportPath"
+
+        Write-Host ("─" * 50)
 
         # 验证换行符
         Show-Debug "验证 CSV 文件格式..."
