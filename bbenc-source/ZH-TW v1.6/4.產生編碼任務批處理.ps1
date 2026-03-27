@@ -283,7 +283,7 @@ function Get-EncodingIOArgument {
             { $_ -in @('vspipe', 'vs') } {
                 if ($sourceExtension -ne '.vpy') {
                     $newSource = [System.IO.Path]::ChangeExtension($source, ".vpy")
-                    Show-Warning "vspipe 線路缺乏 .vpy 腳本源，嘗試匹配新路徑: $(Split-Path $newSource -Leaf)"
+                    Show-Debug "vspipe 線路缺乏 .vpy 腳本源，嘗試匹配新路徑: $(Split-Path $newSource -Leaf)"
                     if (Test-Path -LiteralPath $newSource) {
                         $source = $newSource
                         $quotedInput = Get-QuotedPath $source
@@ -291,9 +291,7 @@ function Get-EncodingIOArgument {
                             Show-Success "已成功切換源到 $newSource"
                         }
                     }
-                    else {
-                        Show-Warning "源 $newSource 不存在，vspipe 線路的導入需手動糾正"
-                    }
+                    else { Show-Debug "vspipe 線路的導入需手動糾正" }
                 }
                 # 返回輸入路徑和隔行掃描參數
                 #（avs2pipemod 線路下自動提供 $interlacedArg）
@@ -305,7 +303,7 @@ function Get-EncodingIOArgument {
             { $_ -in @('avs2yuv', 'avsy', 'a2y', 'avs2pipemod', 'avsp', 'a2p') } {
                 if ($sourceExtension -ne '.avs') {
                     $newSource = [System.IO.Path]::ChangeExtension($source, ".avs")
-                    Show-Warning ($_ + " 線路缺乏 .avs 腳本源，嘗試匹配新路徑: $(Split-Path $newSource -Leaf)")
+                    Show-Debug ($_ + " 線路缺乏 .avs 腳本源，嘗試匹配新路徑: $(Split-Path $newSource -Leaf)")
                     if (Test-Path -LiteralPath $newSource) {
                         $source = $newSource
                         $quotedInput = Get-QuotedPath $source
@@ -313,9 +311,7 @@ function Get-EncodingIOArgument {
                             Show-Success "已成功切換源到 $newSource"
                         }
                     }
-                    else {
-                        Show-Warning ("源 $newSource 不存在，" + $_ + " 工具線路的導入需手動糾正")
-                    }
+                    else { Show-Debug ( $_ + " 線路的導入需手動糾正") }
                 }
                 # 返回輸入路徑和隔行掃描參數
                 if ($interlacedArg -ne "") {
@@ -557,26 +553,30 @@ function Get-Keyint {
     if ($askUser) {
         if ($isx264) {
             Write-Host ""
-            Show-Info "請指定 x264 的最大關鍵幀間隔秒（正整數，非幀數，如：11 代表 11 秒）"
+            Show-Info "請指定 x264 的最大關鍵幀間隔秒"
+            Write-Host " （正整數，非幀數，如：11 代表 11 秒）"
         }
         elseif ($isx265) {
             Write-Host ""
-            Show-Info "請指定 x265 的最大關鍵幀間隔秒數（正整數，非幀數，如：12 代表 12 秒）"
+            Show-Info "請指定 x265 的最大關鍵幀間隔秒數"
+            Write-Host " （正整數，非幀數，如：12 代表 12 秒）"
         }
         elseif ($isSVTAV1) {
             Write-Host ""
-            Show-Info "請指定 SVT-AV1 的最大關鍵幀間隔秒數（正整數，非幀數，如：13 代表 13 秒）"
+            Show-Info "請指定 SVT-AV1 的最大關鍵幀間隔秒數"
+            Write-Host " （正整數，非幀數，如：13 代表 13 秒）"
         }
         else {
             throw "未指定要配置最大關鍵幀間隔參數的編碼器，無法執行"
         }
+        Write-Host ""
         
         $userSecond = $null
         do { # 默認多軌剪輯的的解碼占用為關鍵幀間隔取和，但實際情況下，解碼占用取決於硬體解碼器的數量，所以僅設為兩倍
             Write-Host " 1. 解析度高於 2560x1440 則偏左選一格"
             Write-Host " 2. 畫面內容簡單，平面居多則偏右選一格"
             $userSecond =
-                Read-Host " 大致範圍：[低功耗/多軌剪輯：6-7 | 一般：8-10 | 高：11-13+ ]"
+                Read-Host " 大致範圍：[低功耗/多軌剪輯：6-7 | 一般（不確定則用）：8-10 | 高：11-13+ ]"
             if ($userSecond -notmatch "^\d+$") {
                 if ((Read-Host " 未輸入正整數，按 Enter 重試，輸入 'q' 強制退出") -eq 'q') {
                     exit 1
@@ -1079,20 +1079,20 @@ function Get-IsRAWSource ([string]$validateUpstreamCode) {
     return $validateUpstreamCode -eq 'e'
 }
 
-# 盡快判斷檔案是否為 VOB 格式（格式判斷已被先前腳本確定），影響後續大量參數的 $ffprobeCSV 變數讀法
+# 盡快判斷文件是否為 VOB 格式（格式判斷已被先前腳本確定），影響後續大量參數的 $ffprobeCSV 變數讀法
 function Set-IsVOB {
-    [Parameter(Mandatory=$true)][string]$ffprobeCsvPath
+    Param([Parameter(Mandatory=$true)][string]$ffprobeCsvPath)
     if ([string]::IsNullOrWhiteSpace($ffprobeCsvPath)) {
         throw "Set-IsVOB：ffprobeCsvPath 參數為空，無法判斷"
     }
     $script:interlacedArgs.isVOB = $ffprobeCsvPath -like "*_vob*"
 }
 
-# 盡快判斷檔案是否為 MOV 格式（格式判斷已被先前腳本確定），影響後續大量參數的 $ffprobeCSV 變數讀法
+# 盡快判斷文件是否為 MOV 格式（格式判斷已被先前腳本確定），影響後續大量參數的 $ffprobeCSV 變數讀法
 function Set-IsMOV {
-    [Parameter(Mandatory=$true)][string]$ffprobeCsvPath
+    Param([Parameter(Mandatory=$true)][string]$ffprobeCsvPath)
     if ([string]::IsNullOrWhiteSpace($ffprobeCsvPath)) {
-        throw "Set-IsMOV：ffprobeCsvPath 参数为空，无法判断"
+        throw "Set-IsMOV：ffprobeCsvPath 參數為空，無法判斷"
     }
     $script:interlacedArgs.isMOV = $ffprobeCsvPath -like "*_mov*"
 }
@@ -1108,7 +1108,7 @@ function Set-InterlacedArgs {
     $script:interlacedArgs.isTFF = $false
 
     # 處理 VOB、MOV 格式
-    if ($script:interlacedArgs.isVOB) {
+    if ($script:interlacedArgs.isMOV -or $script:interlacedArgs.isVOB) {
         $fieldOrder = $fieldOrderOrIsInterlacedFrame.ToLower().Trim()
         
         switch -Regex ($fieldOrder) {
@@ -1219,6 +1219,8 @@ function Main {
         throw "未找到專用資訊 CSV 文件；請運行步驟 3 腳本以補全"
     }
 
+    Write-Host ("─" * 50)
+    
     Show-Info "正在讀取 ffprobe 資訊：$(Split-Path $ffprobeCsvPath -Leaf)..."
     Show-Info "正在讀取源專用資訊：$(Split-Path $sourceInfoCsvPath -Leaf)..."
     $ffprobeCSV =
@@ -1230,6 +1232,8 @@ function Main {
     if (-not $sourceCSV.SourcePath) { # 直接驗證 CSV 項存在，不需要添加引號
         throw "temp_s_info CSV 數據不完整，請重運行步驟 3 腳本"
     }
+
+    Write-Host ("─" * 50)
 
     # 隔行掃描源支持
     # ffmpeg、vspipe、avs2yuv、svfi：忽略
@@ -1249,6 +1253,8 @@ function Main {
         Set-InterlacedArgs -fieldOrderOrIsInterlacedFrame $ffprobeCSV.H
     }
 
+    Write-Host ("─" * 50)
+    
     # 計算並賦值給對象屬性
     Show-Info "正在最佳化編碼參數（Profile、解析度、動態搜索範圍等）..."
     # $x265Params.Profile = Get-x265SVTAV1Profile -CSVpixfmt $ffprobeCSV.D -isIntraOnly $false -isSVTAV1 $false
@@ -1290,15 +1296,17 @@ function Main {
         $x265Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.I -bframes $x265SubmeInt -askUser -isx265
         $svtav1Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.I -bframes 999 -askUser -isSVTAV1
         
-        $x264Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.I -bframes 250 # hack：借 bframes 做出建议最大值
+        $x264Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.I -bframes 250 # hack：借 bframes 做出建議最大值
         $x265Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.I -bframes $x265SubmeInt
     }
+
+    Write-Host ("─" * 50)
 
     # VOB 的總幀數資訊位於 J
     $x265Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $false
     $x264Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $false
     $svtav1Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $true
-
+    
     # x265 執行緒管理
     $x265Params.PME = Get-x265PME
     $x265Params.Pools = Get-x265ThreadPool
@@ -1334,7 +1342,7 @@ function Main {
     # 1. 獲取源檔案名（用於傳遞給函數）
     $sourcePathRaw = $sourceCSV.SourcePath
     $defaultNameBase = [System.IO.Path]::GetFileNameWithoutExtension($sourcePathRaw)
-    # 2. 判斷是否為佔位符腳本源
+    # 2. 判斷是否為占位符腳本源
     $isPlaceholder = Get-IsPlaceHolderSource -defaultName $defaultNameBase
     # 3. 獲取最終檔案名（所有交互、驗證、重試都在函數內完成）
     $encodeOutputFileName = Get-EncodeOutputName -SourcePath $sourcePathRaw -IsPlaceholder $isPlaceholder
@@ -1363,6 +1371,8 @@ function Main {
     $x264Params.Output = Get-EncodingIOArgument -program 'x264' -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $x264Params.OutputExtension
     $x265Params.Output = Get-EncodingIOArgument -program 'x265' -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $x265Params.OutputExtension
     $svtav1Params.Output = Get-EncodingIOArgument -program 'svtav1' -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $svtav1Params.OutputExtension
+
+    Write-Host ("─" * 50)
 
     Show-Info "構建管道下游（編碼器）基礎參數..."
     $x264Params.BaseParam = Invoke-BaseParamSelection -CodecName "x264" -GetParamFunc ${function:Get-x264BaseParam} -ExtraParams @{ askUserFGO = $true }
@@ -1399,7 +1409,7 @@ function Main {
     Write-Host ""
     Show-Info "定位先前腳本生成的 encode_single.bat 模板..."
     $templateBatch = $null
-    do {
+    while (-not $templateBatch) {
         $templateBatch = Select-File -Title "選擇 encode_single.bat 批處理" -BatOnly
         
         if (-not $templateBatch) {
@@ -1408,7 +1418,6 @@ function Main {
             }
         }
     }
-    while (-not $templateBatch)
 
     # 讀取模板
     $batchContent = [System.io.File]::ReadAllText($templateBatch, $Global:utf8BOM)
@@ -1494,8 +1503,19 @@ REM svtav1_appendix=$svtav1RawPipeApdx
             return
         }
     
-        Show-Success "任務生成成功！直接運行該批處理文件以開始編碼。"
-        Show-Info "若批處理運行後立即退出，則打開 CMD，運行導出錯誤到文本的命令，如：`r`n X:\encode_task_final.bat 2>Y:\error.txt"
+        Show-Success "任務生成成功！"
+        Write-Host ""
+
+        Write-Host ("─" * 50)
+
+        Show-Info "批處理文件使用說明："
+        Write-Host "1. 直接運行該 encode_task_final.bat 以開始編碼。"
+        Write-Host "2. 只要編碼工具不變，就可以保留 encode_single.bat，"
+        Write-Host "   以便下次編碼跳過步驟 2，直接在本步驟導入 encode_single.bat"
+        Write-Host "   因此複製工具到此腳本目錄下即可減少手動操作複雜度"
+        Write-Host "3. 若批處理運行後立即退出，則打開 CMD，運行導出錯誤到文本的命令，"
+        Write-Host "   如：`r`n X:\encode_task_final.bat 2>Y:\error.txt"
+        Write-Host ("─" * 50)
     }
     catch {
         Show-Error "寫入檔案失敗：$_"

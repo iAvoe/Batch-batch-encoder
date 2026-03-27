@@ -287,7 +287,7 @@ function Get-EncodingIOArgument {
             { $_ -in @('vspipe', 'vs') } {
                 if ($sourceExtension -ne '.vpy') {
                     $newSource = [System.IO.Path]::ChangeExtension($source, ".vpy")
-                    Show-Warning "vspipe route without .vpy script source, trying to match: $(Split-Path $newSource -Leaf)"
+                    Show-Debug "vspipe route without .vpy script source, trying to match: $(Split-Path $newSource -Leaf)"
                     if (Test-Path -LiteralPath $newSource) {
                         $source = $newSource
                         $quotedInput = Get-QuotedPath $source
@@ -295,9 +295,7 @@ function Get-EncodingIOArgument {
                             Show-Success "Successfully switched to $newSource"
                         }
                     }
-                    else {
-                        Show-Warning "$newSource not found, vspipe route needs manual correction"
-                    }
+                    else { Show-Debug "vspipe route needs manual correction" }
                 }
                 # Return input path and interlaced specifier params
                 # (avs2pipemod route has $interlacedArg provided)
@@ -309,7 +307,7 @@ function Get-EncodingIOArgument {
             { $_ -in @('avs2yuv', 'avsy', 'a2y', 'avs2pipemod', 'avsp', 'a2p') } {
                 if ($sourceExtension -ne '.avs') {
                     $newSource = [System.IO.Path]::ChangeExtension($source, ".avs")
-                    Show-Warning ($_ + " route without .avs script source, trying to match: $(Split-Path $newSource -Leaf)")
+                    Show-Debug ($_ + " route without .avs script source, trying to match: $(Split-Path $newSource -Leaf)")
                     if (Test-Path -LiteralPath $newSource) {
                         $source = $newSource
                         $quotedInput = Get-QuotedPath $source
@@ -317,9 +315,7 @@ function Get-EncodingIOArgument {
                             Show-Success "Successfully switched to $newSource"
                         }
                     }
-                    else {
-                        Show-Warning ("$newSource not found, " + $_ + " route needs manual correction")
-                    }
+                    else { Show-Debug ($_ + " route needs manual correction") }
                 }
                 # Return input path and interlaced specifier params
                 if ($interlacedArg -ne "") {
@@ -560,28 +556,32 @@ function Get-Keyint {
     if ($askUser) {
         if ($isx264) {
             Write-Host ""
-            Show-Info "Please specify the maximum keyframe interval for x264 in seconds (positive integer, not frame number, i.e. 11 seconds: 11)"
+            Show-Info "Please specify maximum keyframe interval for x264 in seconds"
+            Write-Host " (positive integer, not frame number, i.e. 11 seconds: 11)"
         }
         elseif ($isx265) {
             Write-Host ""
-            Show-Info "Please specify the maximum keyframe interval for x265 in seconds (positive integer, not frame number, i.e. 12 seconds: 12)"
+            Show-Info "Please specify maximum keyframe interval for x265 in seconds"
+            Write-Host " (positive integer, not frame number, i.e. 12 seconds: 12)"
         }
         elseif ($isSVTAV1) {
             Write-Host ""
-            Show-Info "Please specify the maximum keyframe interval for SVT-AV1 in seconds (positive integer, not frame number, i.e. 13 seconds: 13)"
+            Show-Info "Please specify maximum keyframe interval for SVT-AV1 in seconds"
+            Write-Host " (positive integer, not frame number, i.e. 13 seconds: 13)"
         }
         else {
             throw "Maximum keyframe interval parameter is missing, cannot proceed"
         }
+        Write-Host ""
         
         $userSecond = $null
         do { # Decoding usage for video editing is the sum of the keyframe interval of all video tracks
             # However, the real-world decoding capability depends mostly on the # of hardware decoders,
             # so only setting to 2x default
-            Write-Host " 1. For resolutions higher than 2560x1440, pick from 1 section to left"
-            Write-Host " 2. For simple & flat video content, pick from 1 section to right"
+            Write-Host " 1. Resolutions greater than 2560x1440, pick section to ←"
+            Write-Host " 2. For simple & flat video content, pick section to →"
             $userSecond =
-                Read-Host " General Range to specify (second): [Low Power/Multitrack Editing: 6-7 | 8-10 | High: 11-13+ ]"
+                Read-Host " Specify second: [Low Power/Multitrack Editing: 6-7 | 8-10 | High: 11-13+ ]"
             if ($userSecond -notmatch "^\d+$") {
                 if ((Read-Host " Not receiving positive integer. Press Enter to retry, input 'q' to force exit") -eq 'q') {
                     exit 1
@@ -1093,7 +1093,7 @@ function Get-IsRAWSource ([string]$validateUpstreamCode) {
 # Determine if file is VOB format ASAP (determined by the previous script, and written to filename)
 # this redefines the $ffprobeCSV variable structure, which affects numerous subsequent parameters
 function Set-IsVOB {
-    [Parameter(Mandatory=$true)][string]$ffprobeCsvPath
+    Param([Parameter(Mandatory=$true)][string]$ffprobeCsvPath)
     if ([string]::IsNullOrWhiteSpace($ffprobeCsvPath)) {
         throw "Set-IsVOB: parameter ffprobeCsvPath is empty, cannot detect"
     }
@@ -1103,7 +1103,7 @@ function Set-IsVOB {
 # Determine if file is MOV format ASAP (determined by the previous script, and written to filename)
 # this redefines the $ffprobeCSV variable structure, which affects numerous subsequent parameters
 function Set-IsMOV {
-    [Parameter(Mandatory=$true)][string]$ffprobeCsvPath
+    Param([Parameter(Mandatory=$true)][string]$ffprobeCsvPath)
     if ([string]::IsNullOrWhiteSpace($ffprobeCsvPath)) {
         throw "Set-IsMOV：ffprobeCsvPath is empty, cannot detect"
     }
@@ -1205,7 +1205,7 @@ function Set-InterlacedArgs {
         }
     }
     
-    Show-Debug "Set-InterlacedArgs: Interlaced: $($script:interlacedArgs.isInterlaced), Top-field-first: $($script:interlacedArgs.isTFF)"
+    Show-Debug "Set-InterlacedArgs—Interlaced: $($script:interlacedArgs.isInterlaced), Top-field-first: $($script:interlacedArgs.isTFF)"
 }
 
 #region Main
@@ -1223,15 +1223,17 @@ function Main {
         ForEach-Object { $_.FullName }
 
     if ($null -eq $ffprobeCsvPath) {
-        throw "Missing CSV file created by ffprobe (step 3); Please complete step 3 script"
+        throw "Video CSV file from ffprobe (step 3) is missing; Please complete step 3 script"
     }
 
     # 2. Locate source CSV
     $sourceInfoCsvPath = Join-Path $Global:TempFolder "temp_s_info.csv"
     if (-not (Test-Path $sourceInfoCsvPath)) {
-        throw "Missing CSV file about source created by previous script; Please complete step 3 script"
+        throw "Stream CSV file from ffprobe (step 3) is missing; Please complete step 3 script"
     }
 
+    Write-Host ("─" * 50)
+    
     Show-Info "Reading ffprobe data: $(Split-Path $ffprobeCsvPath -Leaf)..."
     Show-Info "Reading source data: $(Split-Path $sourceInfoCsvPath -Leaf)..."
     $ffprobeCSV =
@@ -1243,6 +1245,8 @@ function Main {
     if (-not $sourceCSV.SourcePath) { # Validate CSV field existance, no quote needed
         throw "temp_s_info CSV data corrupted. Please rerun step 3 script"
     }
+
+    Write-Host ("─" * 50)
 
     # Interlaced source support
     # ffmpeg, vspipe, avs2yuv, svfi: Ignore
@@ -1262,8 +1266,10 @@ function Main {
         Set-InterlacedArgs -fieldOrderOrIsInterlacedFrame $ffprobeCSV.H
     }
 
+    Write-Host ("─" * 50)
+    
     # Calculate and assign to object properties
-    Show-Info "Optimizing encoding parameters (Profile, resolution, dynamic search range, etc.)..."
+    Show-Info "Optimizing encoding parameters (Profile, resolution, merange, etc.)..."
     # $x265Params.Profile = Get-x265SVTAV1Profile -CSVpixfmt $ffprobeCSV.D -isIntraOnly $false -isSVTAV1 $false
     # $svtav1Params.Profile = Get-x265SVTAV1Profile -CSVpixfmt $ffprobeCSV.D -isIntraOnly $false -isSVTAV1 $true
     $x265Params.Resolution = Get-InputResolution -CSVw $ffprobeCSV.B -CSVh $ffprobeCSV.C
@@ -1307,7 +1313,9 @@ function Main {
         $x265Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.I -bframes $x265SubmeInt
     }
 
-    # VOB formats' frame count data is in J
+    Write-Host ("─" * 50)
+
+    # VOB format—frame count: J
     $x265Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $false
     $x264Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $false
     $svtav1Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $true
@@ -1320,7 +1328,7 @@ function Main {
     $avs2yuvVersionCode = 'a'
     if ($sourceCSV.UpstreamCode -eq 'c') {
         Write-Host ""
-        Show-Info "Select the correct version of avs2yuv(64).exe used:"
+        Show-Info "Please select the version of avs2yuv(64).exe used:"
         $avs2yuvVersionCode = Read-Host " [Default Enter/a: AviSynth+ (0.30) | b: AviSynth (up to 0.26)]"
     }
     $ffmpegParams.CSP = Get-ffmpegCSP -CSVpixfmt $ffprobeCSV.D
@@ -1379,6 +1387,8 @@ function Main {
     $x265Params.Output = Get-EncodingIOArgument -program 'x265' -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $x265Params.OutputExtension
     $svtav1Params.Output = Get-EncodingIOArgument -program 'svtav1' -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $svtav1Params.OutputExtension
 
+    Write-Host ("─" * 50)
+
     Show-Info "Constructing base parameters of the pipe downstream programs..."
     $x264Params.BaseParam = Invoke-BaseParamSelection -CodecName "x264" -GetParamFunc ${function:Get-x264BaseParam} -ExtraParams @{ askUserFGO = $true }
     $x265Params.BaseParam = Invoke-BaseParamSelection -CodecName "x265" -GetParamFunc ${function:Get-x265BaseParam}
@@ -1410,20 +1420,11 @@ function Main {
         $svtav1FinalParam = $svtav1RawPipeApdx + " " + $svtav1FinalParam
     }
 
-    # Show-Debug $ffmpegFinalParam
-    # Show-Debug $vspipeFinalParam
-    # Show-Debug $avsyuvFinalParam
-    # Show-Debug $avsmodFinalParam
-    # Show-Debug $olsargFinalParam
-    # Show-Debug $x264FinalParam
-    # Show-Debug $x265FinalParam
-    # Show-Debug $svtav1FinalParam
-
     #  Generate ffmpeg, vspipe, avs2yuv, avs2pipemod encoding task batch
     Write-Host ""
-    Show-Info "Select the previously generated encode_single.bat template..."
+    Show-Info "Locate the encode_single.bat template..."
     $templateBatch = $null
-    do {
+    while (-not $templateBatch) {
         $templateBatch = Select-File -Title "Select encode_single.bat" -BatOnly
         
         if (-not $templateBatch) {
@@ -1432,7 +1433,6 @@ function Main {
             }
         }
     }
-    while (-not $templateBatch)
 
     # Read template
     $batchContent = [System.io.File]::ReadAllText($templateBatch, $Global:utf8BOM)
@@ -1466,12 +1466,12 @@ REM svtav1_appendix=$svtav1RawPipeApdx
 
 "@
 
-    # Replace anchor (translated to English): keep Chinese anchor for backward compatibility
+    # Replacement anchor is keeping Chinese anchor for code simplicity
     # Strategy: find the "REM Parameter examples" block and replace it with $paramsBlock.
     # If the template changed, fall back to inserting after the file header.
     $newBatchContent = $batchContent
 
-    # Patterns
+    # Patterns to match
     $englishAnchor = '(?msi)^REM\s+Parameter\s+examples\b'
     $chineseAnchor = '(?msi)^REM\s+参数示例\b'
 
@@ -1519,8 +1519,18 @@ REM svtav1_appendix=$svtav1RawPipeApdx
             return
         }
     
-        Show-Success "Task generated successfully! Run the batch file to begin coding."
-        Show-Warning "If the batch file exits immediately after running, run the command to export errors to text: `r`n X:\encode_task_final.bat 2>Y:\error.txt"
+        Show-Success "Task generated successfully!"
+        Write-Host ""
+
+        Write-Host ("─" * 50)
+        
+        Show-Info "Usages for generated batch files："
+        Write-Host "1. Run encode_task_final.bat to start encoding"
+        Write-Host "2. Keep encode_single.bat template to skip Step 2 next time,"
+        Write-Host "   as long as tools remain the same"
+        Write-Host "3. You can manually swap different commands in encode_single.bat"
+        Write-Host "   to switch upstream and downstream encoding tools or routes"
+        Write-Host ("─" * 50)
     }
     catch {
         Show-Error "File write failed: $_"

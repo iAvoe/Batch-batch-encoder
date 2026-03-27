@@ -262,7 +262,14 @@ function Main {
     Show-Border
     Show-Info "基于 ffmpeg 的多轨道封装命令生成器"
     Show-Border
-    
+    Write-Host ""
+    Show-Info "使用说明："
+    Write-Host "1. 后续的脚本将基于此‘管线批处理’（encode_final.bat）生成‘编码批处理’"
+    Write-Host "   因此无需每次编码都要运行此步骤"
+    Write-Host "2. 本工具会尝试在脚本本地目录，常见安装目录和环境变量中搜索工具，"
+    Write-Host "   因此复制工具到此脚本目录下即可减少手动操作复杂度"
+    Write-Host ("─" * 50)
+
     # 1. 初始化路径与工具
     Show-Info "导入工具和选择路径"
     Show-Info "（1/4）导入 ffprobe.exe..."
