@@ -60,6 +60,7 @@ $ffmpegParams = [PSCustomObject]@{
     Input = ""
     CSP = ""
     FPS = ""
+    LogLevel = "-loglevel warning" # Hide progress to fix contention with encoder progress
 }
 $vspipeParams = [PSCustomObject]@{
     Input = ""
@@ -815,7 +816,7 @@ function Get-FPSParam {
     
     # x264、x265、ffmpeg supports direct string fps value
     switch ($Target) {
-        "ffmpeg" { return "-r $fpsString" }
+        'ffmpeg' { return "-r $fpsString" }
         default  { return "--fps $fpsString" }
     }
 }
@@ -1398,7 +1399,7 @@ function Main {
     # These strings will be directly injected into the batch file "set 'xxx_params=...'"
     # Empty parameters may result in double spaces, but paths and filenames may also contain double spaces, so they are not filtered (-replace " ", " ")
     # 1. Pipeline upstream tool
-    $ffmpegFinalParam = "$($ffmpegParams.FPS) $($ffmpegParams.Input) $($ffmpegParams.CSP)"
+    $ffmpegFinalParam = "$($ffmpegParams.FPS) $($ffmpegParams.Input) $($ffmpegParams.CSP) $($ffmpegParams.LogLevel)"
     $vspipeFinalParam = "$($vspipeParams.Input)"
     $avsyuvFinalParam = "$($avsyuvParams.Input) $($avsyuvParams.CSP)"
     $avsmodFinalParam = "$($avsmodParams.Input) $($avsmodParams.DLLInput)"

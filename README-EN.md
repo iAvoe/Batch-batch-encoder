@@ -73,6 +73,11 @@ Developing these tools wasn't easy. If this tool improve your efficiency, consid
 <p align="center"><img src="bmc_qr.png" alt="Support me -_-"><br><img src="pp_tip_qr.png" alt="Support me =_="></p>
 
 ## Update Information
+**v1.6.5**
+- Step 4:
+  - Prettified console output
+  - Restricted ffmpeg's log level to prevent progress-bar conflicting with encoder's progress bar
+
 **v1.6.4**
 - Step 3: Improved import system
   - Added fuzzy matching for ffprobe located in the script's directory

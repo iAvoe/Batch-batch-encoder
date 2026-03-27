@@ -59,6 +59,7 @@ $ffmpegParams = [PSCustomObject]@{
     Input = ""
     CSP = ""
     FPS = ""
+    LogLevel = "-loglevel warning" # 隱藏進度以避免與編碼器進度條打架
 }
 $vspipeParams = [PSCustomObject]@{
     Input = ""
@@ -1383,7 +1384,7 @@ function Main {
     # 這些字串將直接注入到批處理的 "set 'xxx_params=...'" 中
     # 空參數可能會導致雙空格出現，但路徑、檔案名裡也可能有雙空格，因此不過濾（-replace "  ", " "）
     # 1. 管道上游工具
-    $ffmpegFinalParam = "$($ffmpegParams.FPS) $($ffmpegParams.Input) $($ffmpegParams.CSP)"
+    $ffmpegFinalParam = "$($ffmpegParams.FPS) $($ffmpegParams.Input) $($ffmpegParams.CSP) $($ffmpegParams.LogLevel)"
     $vspipeFinalParam = "$($vspipeParams.Input)"
     $avsyuvFinalParam = "$($avsyuvParams.Input) $($avsyuvParams.CSP)"
     $avsmodFinalParam = "$($avsmodParams.Input) $($avsmodParams.DLLInput)"

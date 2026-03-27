@@ -80,10 +80,16 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 <p align="center"><img src="bmc_qr.png" alt="支持一下 -_-"><br><img src="pp_tip_qr.png" alt="支持一下 =_="></p>
 
 ## 更新信息
+**v1.6.5**
+- 步骤 4：
+  - 美化终端输出信息排版
+  - 限制 ffmpeg log 信息，避免 ffmpeg 进度条与编码器进度条冲突
+
 **v1.6.4**
 - 步骤 3 改良了导入系统
   - 添加了脚本所在目录下的 ffprobe 模糊匹配功能
   - 添加了环境变量的 ffprobe 模糊匹配功能
+
 
 **v1.6.3**
 - 步骤 3 代码优化
