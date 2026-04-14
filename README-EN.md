@@ -73,6 +73,12 @@ Developing these tools wasn't easy. If this tool improve your efficiency, consid
 <p align="center"><img src="bmc_qr.png" alt="Support me -_-"><br><img src="pp_tip_qr.png" alt="Support me =_="></p>
 
 ## Update Information
+**v1.7**
+- Path/folder selection dialog window now appears on top correctly, no more window juggling
+- CLI Window now can be refocused after completing path/folder selection dialog
+  - This fix doesn't support VSCode, though
+- Fixed a bug crashing ffprobe analysis JSON's conversion due tovideo source's file name (temporarily switch to UTF-8 text encoding)
+
 **v1.6.5**
 - Step 4:
   - Prettified console output

@@ -6,7 +6,7 @@
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
-    1.5
+    1.7
 #>
 
 # If both temp_v_info_is_mov.csv and temp_v_info.csv are detected, use the file created latest
@@ -111,22 +111,35 @@ function Get-VideoStreamInfo {
         '-of', 'json', $videoSource
     )
     
-    # Run ffprobe
-    $ffprobeJson = &$ffprobePath @ffprobeArgs 2>$null
+    # Switch to UTF-8 text encoding temporarily to run ffprobe
+    $prevOut = [Console]::OutputEncoding
+    $prevPS = $OutputEncoding
+    try {
+        [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+        $OutputEncoding = [System.Text.Encoding]::UTF8
+        $ffprobeJson = &$ffprobePath @ffprobeArgs 2>$null
+    }
+    finally {
+        [Console]::OutputEncoding = $prevOut
+        $OutputEncoding = $prevPS
+    }
+
     if ($LASTEXITCODE -ne 0 -or -not $ffprobeJson) {
         throw "Get-VideoStreamInfo: ffprobe failed or did not return any valid data"
     }
+
     try {
         $streamInfo = $ffprobeJson | ConvertFrom-Json
     }
     catch {
+        Write-Host $ffprobeJson
         throw "Get-VideoStreamInfo: Invalid JSON returned by ffprobe"
     }
-    
+
     if (-not $streamInfo.streams -or $streamInfo.streams.Count -lt 1) {
         throw "Get-VideoStreamInfo: Could not find video stream data"
     }
-    
+
     return $streamInfo.streams[0]
 }
 

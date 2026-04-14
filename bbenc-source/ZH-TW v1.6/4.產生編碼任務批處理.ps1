@@ -6,7 +6,7 @@
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
-    1.5
+    1.7
 #>
 
 # 載入共用代碼
@@ -544,7 +544,7 @@ function Get-Keyint {
         [switch]$isSVTAV1
     )
     if (($isx264 -and $isx265) -or ($isx264 -and $isSVTAV1) -or ($isx265 -and $isSVTAV1)) {
-        throw "參數異常，一次只能給一個編碼器配置參數"
+        throw "Get-Keyint：參數異常，一次只能給一個編碼器配置參數"
     }
 
     # 注意：值可以是“24000/1001”的字串，需要處理（得到 23.976d）
@@ -768,6 +768,9 @@ function Get-InputResolution {
         [Parameter(Mandatory=$true)][int]$CSVh,
         [bool]$isSVTAV1=$false
     )
+    if ($null -eq $CSVw -or $null -eq $CSVh) {
+        throw "Get-InputResolution：影片元數據缺少幀大小（寬高）資訊"
+    }
     if ($isSVTAV1) {
         return "-w $CSVw -h $CSVh"
     }
@@ -782,6 +785,9 @@ function Get-FPSParam {
         [ValidateSet("ffmpeg","x264","avc","x265","hevc","svtav1","SVT-AV1")]
         [string]$Target
     )
+    if ([string]::IsNullOrWhiteSpace($fpsString)) {
+        throw "Get-FPSParam：影片元數據缺少幀率資訊"
+    }
     # SVT-AV1 特殊處理：使用 --fps-num 和 --fps-denom 分開寫
     if ($Target -in @("svtav1", "SVT-AV1")) {
         if ($fpsString -match '^(\d+)/(\d+)$') {
@@ -819,29 +825,63 @@ function Get-ColorSpaceSEI {
         [Parameter(Mandatory=$true)]$CSVColorMatrix,
         [Parameter(Mandatory=$true)]$CSVTransfer,
         [Parameter(Mandatory=$true)]$CSVPrimaries,
-        [ValidateSet("avc","x264","hevc","x265","av1","svtav1")][string]$Codec
+        [switch]$isx264,
+        [switch]$isx265,
+        [switch]$isSVTAV1
     )
-    $Codec = $Codec.ToLower()
     $result = @()
+    if (($isx264 -and $isx265) -or ($isx264 -and $isSVTAV1) -or ($isx265 -and $isSVTAV1)) {
+        throw "Get-ColorSpaceSEI：參數異常，一次只能給一個編碼器配置參數"
+    }
     
-    # 處理 ColorMatrix
-    if (($Codec -eq 'avc' -or $Codec -eq 'x264')) {
+    if ($isx264) {
+        # Colormatrix
         if (($CSVColorMatrix -eq "unknown") -or ($CSVColorMatrix -eq "bt2020nc")) {
             $result += "--colormatrix undef" # x264 不寫 unknown
         }
         else { # fcc，bt470bg，smpte170m，smpte240m，GBR，YCgCo，bt2020c，smpte2085，chroma-derived-nc，chroma-derived-c，ICtCp
             $result += "--colormatrix $CSVColorMatrix"
         }
+
+        # Transfer
+        if ($CSVTransfer -eq "unknown") {
+            # bt470m，bt470bg，smpte170m，smpte240m，linear，log100，log316，iec61966-2-4，bt1361e，iec61966-2-1，bt2020-10，bt2020-12，smpte2084，smpte428，arib-std-b67
+            $result += "--transfer undef"
+        }
+        else {
+            $result += "--transfer $CSVTransfer"
+        }
+
+        # Color Primaries
+        if (($CSVPrimaries -eq "unknown") -or ($CSVPrimaries -eq "unspec")) {
+            $result += "--colorprim undef"
+        }
+        else {
+            $result += "--colorprim $CSVPrimaries"
+        }
     }
-    elseif (($Codec -eq 'hevc') -or ($Codec -eq 'x265')) {
+    elseif ($isx265) {
+        # Colormatrix
         if ($CSVColorMatrix -eq "bt2020nc") {
             $result += "--colormatrix unknown"
         }
-        else { # 同 x264
+        else { # ==x264
             $result += "--colormatrix $CSVColorMatrix"
         }
+
+        # Transfer
+        $result += "--transfer $CSVTransfer"
+
+        # Color Primaries
+        if (($CSVPrimaries -eq "unknown") -or ($CSVPrimaries -eq "unspec")) {
+            $result += "--colorprim unknown"
+        }
+        else {
+            $result += "--colorprim $CSVPrimaries"
+        }
     }
-    elseif (($Codec -eq "av1") -or ($Codec -eq "svtav1")) {
+    elseif ($isSVTAV1) {
+        # Color Matrix
         $c = switch ($CSVColorMatrix) {
             identity     { 0 }
             bt709        { 1 }
@@ -858,27 +898,13 @@ function Get-ColorSpaceSEI {
             "chroma-cl"  { 13 }
             ictcp        { 14 }
             default { 
-                Show-Warning "未知矩陣格式：$CSVColorMatrix，使用默認（bt709）"
+                Show-Warning "Get-ColorSpaceSEI：未知矩陣格式：$CSVColorMatrix，使用默認（bt709）"
                 1
             }
         }
         $result += "--matrix-coefficients $c"
-    }
-    
-    # 處理 Transfer
-    if (($Codec -eq 'avc' -or $Codec -eq 'x264')) {
-        if ($CSVTransfer -eq "unknown") {
-            # bt470m，bt470bg，smpte170m，smpte240m，linear，log100，log316，iec61966-2-4，bt1361e，iec61966-2-1，bt2020-10，bt2020-12，smpte2084，smpte428，arib-std-b67
-            $result += "--transfer undef"
-        }
-        else {
-            $result += "--transfer $CSVTransfer"
-        }
-    }
-    elseif (($Codec -eq 'hevc') -or ($Codec -eq 'x265')) {
-        $result += "--transfer $CSVTransfer"
-    }
-    elseif (($Codec -eq "av1") -or ($Codec -eq "svtav1")) {
+
+        # Transfer
         $t = switch ($CSVTransfer) {
             bt709           { 1 }
             unspec          { 2 }
@@ -897,34 +923,13 @@ function Get-ColorSpaceSEI {
             smpte428        { 17 }
             hlg             { 18 }
             default { 
-                Show-Warning "未知傳輸特質：$CSVTransfer，使用默認（bt709）"
+                Show-Warning "Get-ColorSpaceSEI：未知傳輸特質：$CSVTransfer，使用默認（bt709）"
                 1
             }
         }
         $result += "--transfer-characteristics $t"
-    }
 
-    # 處理 Color Primaries
-    if (($Codec -eq 'avc') -or ($Codec -eq 'x264')) {
-
-        if (($CSVPrimaries -eq "unknown") -or ($CSVPrimaries -eq "unspec")) {
-            $result += "--colorprim undef"
-        }
-        else {
-            $result += "--colorprim $CSVPrimaries"
-        }
-    }
-    elseif (($Codec -eq 'hevc') -or ($Codec -eq 'x265')) {
-
-        if (($CSVPrimaries -eq "unknown") -or ($CSVPrimaries -eq "unspec")) {
-            $result += "--colorprim unknown"
-        }
-        else {
-            $result += "--colorprim $CSVPrimaries"
-        }
-    }
-    elseif (($Codec -eq "av1") -or ($Codec -eq "svtav1")) {
-
+        # Color Primaries
         $p = switch ($CSVPrimaries) {
             bt709      { 1 }
             unspec     { 2 }
@@ -940,14 +945,17 @@ function Get-ColorSpaceSEI {
             smpte432   { 12 }
             ebu3213    { 22 }
             default {
-                Show-Warning "未知三原色：$CSVPrimaries，使用默認（bt709）"
+                Show-Warning "Get-ColorSpaceSEI：未知三原色：$CSVPrimaries，使用默認（bt709）"
                 1
             }
         }
-
         $result += "--color-primaries $p"
     }
-    
+    else {
+        Show-Warning "Get-ColorSpaceSEI：未指定編碼器，跳過色彩矩陣，傳輸特質與三原色參數配置"
+        return ""
+    }
+
     return ($result -join " ")
 }
 
@@ -1193,7 +1201,7 @@ function Set-InterlacedArgs {
         }
     }
     
-    Show-Debug "Set-InterlacedArgs：隔行掃描：$($script:interlacedArgs.isInterlaced), 上場優先：$($script:interlacedArgs.isTFF)"
+    Show-Debug "Set-InterlacedArgs—隔行掃描：$($script:interlacedArgs.isInterlaced), 上場優先：$($script:interlacedArgs.isTFF)"
 }
 
 #region Main
@@ -1265,10 +1273,10 @@ function Main {
     $x265Params.MERange = Get-x265MERange -CSVw $ffprobeCSV.B -CSVh $ffprobeCSV.C
 
     # Show-Debug "矩陣格式：$($ffprobeCSV.E)；傳輸特質：$($ffprobeCSV.F)；三原色：$($ffprobeCSV.G)"
-    $svtav1Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -Codec svtav1
-    $x265Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -Codec x265
-    $x264Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -Codec x264
-
+    $x264Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -isx264
+    $x265Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -isx265
+    $svtav1Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -isSVTAV1
+    
     # VOB、MOV 格式的幀率資訊位於 I
     if (-not $script:interlacedArgs.isVOB -and -not $script:interlacedArgs.isMOV) {
         $ffmpegParams.FPS = Get-FPSParam -fpsString $ffprobeCSV.H -Target ffmpeg
@@ -1408,10 +1416,10 @@ function Main {
 
     # 生成 ffmpeg, vspipe, avs2yuv, avs2pipemod 編碼任務批處理
     Write-Host ""
-    Show-Info "定位先前腳本生成的 encode_single.bat 模板..."
+    Show-Info "定位先前腳本生成的 encode_template.bat 模板..."
     $templateBatch = $null
     while (-not $templateBatch) {
-        $templateBatch = Select-File -Title "選擇 encode_single.bat 批處理" -BatOnly
+        $templateBatch = Select-File -Title "選擇 encode_template.bat 批處理" -BatOnly
         
         if (-not $templateBatch) {
             if ((Read-Host "未選擇模板文件，按 Enter 重試，輸入 'q' 強制退出") -eq 'q') {
@@ -1506,16 +1514,14 @@ REM svtav1_appendix=$svtav1RawPipeApdx
     
         Show-Success "任務生成成功！"
         Write-Host ""
-
+        
         Write-Host ("─" * 50)
-
+        
         Show-Info "批處理文件使用說明："
         Write-Host "1. 直接運行該 encode_task_final.bat 以開始編碼。"
-        Write-Host "2. 只要編碼工具不變，就可以保留 encode_single.bat，"
-        Write-Host "   以便下次編碼跳過步驟 2，直接在本步驟導入 encode_single.bat"
-        Write-Host "   因此複製工具到此腳本目錄下即可減少手動操作複雜度"
-        Write-Host "3. 若批處理運行後立即退出，則打開 CMD，運行導出錯誤到文本的命令，"
-        Write-Host "   如：`r`n X:\encode_task_final.bat 2>Y:\error.txt"
+        Write-Host "2. 只要編碼工具不變，就可以保留 encode_template.bat，"
+        Write-Host "   以便下次編碼跳過步驟 2，直接在本步驟導入 encode_template.bat"
+        Write-Host "3. 你可以手動更改 encode_template.bat 中的命令來切換上下游編碼工具鏈"
         Write-Host ("─" * 50)
     }
     catch {

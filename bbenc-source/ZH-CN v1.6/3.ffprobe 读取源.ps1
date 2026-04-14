@@ -6,7 +6,7 @@
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
-    1.5
+    1.7
 #>
 
 # 若同时检测到 temp_v_info_is_mov.csv 与 temp_v_info.csv，则使用其中创建日期最新的文件
@@ -94,16 +94,14 @@ function Get-VideoStreamInfo {
         [Parameter(Mandatory=$true)][string]$videoSource,
         [string]$showEntries = "stream"
     )
-    
-    # 参数验证
+
     if (-not (Test-Path -LiteralPath $ffprobePath)) {
         throw "Get-VideoStreamInfo：ffprobe.exe 不存在（$ffprobePath）"
     }
     if (-not (Test-Path -LiteralPath $videoSource)) {
         throw "Get-VideoStreamInfo：输入视频不存在（$videoSource）"
     }
-    
-    # 构建 ffprobe 参数
+
     $ffprobeArgs = @(
         '-v', 'quiet', '-hide_banner',
         '-select_streams', 'v:0',
@@ -111,23 +109,36 @@ function Get-VideoStreamInfo {
         '-show_format',
         '-of', 'json', $videoSource
     )
-    
-    # 执行 ffprobe
-    $ffprobeJson = &$ffprobePath @ffprobeArgs 2>$null
+
+    # 临时切换为 UTF-8 解码 ffprobe 的标准输出
+    $prevOut = [Console]::OutputEncoding
+    $prevPS = $OutputEncoding
+    try {
+        [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+        $OutputEncoding = [System.Text.Encoding]::UTF8
+        $ffprobeJson = &$ffprobePath @ffprobeArgs 2>$null
+    }
+    finally {
+        [Console]::OutputEncoding = $prevOut
+        $OutputEncoding = $prevPS
+    }
+
     if ($LASTEXITCODE -ne 0 -or -not $ffprobeJson) {
         throw "Get-VideoStreamInfo：ffprobe 执行失败或未返回有效数据"
     }
+
     try {
         $streamInfo = $ffprobeJson | ConvertFrom-Json
     }
     catch {
+        Write-Host $ffprobeJson
         throw "Get-VideoStreamInfo：无法解析 ffprobe 返回的 JSON"
     }
-    
+
     if (-not $streamInfo.streams -or $streamInfo.streams.Count -lt 1) {
         throw "Get-VideoStreamInfo：未找到视频流信息"
     }
-    
+
     return $streamInfo.streams[0]
 }
 

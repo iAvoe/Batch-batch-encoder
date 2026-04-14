@@ -153,25 +153,41 @@ function Select-File(
     }
 }
 
-function Select-Folder([string]$Description = "Select folder", [string]$InitialPath = [Environment]::GetFolderPath('Desktop')) {
-    # (Put on top of script) Add-Type -AssemblyName System.Windows.Forms
+function Select-Folder(
+        [string]$Description = "Select folder",
+        [string]$InitialPath = [Environment]::GetFolderPath('Desktop')
+    ) {
+    Write-Host " Selection window may open in the background; Avoid pressing Enter here."
+    # UI.ps1: Add-Type -AssemblyName System.Windows.Forms
     $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
     $dialog.Description = $Description
     $dialog.SelectedPath = $InitialPath
     $dialog.ShowNewFolderButton = $true
 
-    Write-Host " Selection window may open in the background; Avoid pressing Enter here."
-    
+    # Create a hidden TopMost window as form owner
+    $form = New-Object System.Windows.Forms.Form
+    $form.TopMost = $true
+    $form.ShowInTaskbar = $false
+    $form.WindowState = 'Minimized'
+
     while ($true) {
-        if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+        $result = $dialog.ShowDialog($form)
+
+        # Refocus of CLI
+        $hwnd = [WinAPI]::GetConsoleWindow()
+        [WinAPI]::SetForegroundWindow($hwnd) | Out-Null
+
+        if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
             $path = $dialog.SelectedPath
             if (-not $path.EndsWith('\')) { $path += '\' }
             return $path
         }
+
         $choice = Read-Host "No folder selected. Press Enter to retry, input 'q' to force exit"
         if ($choice -eq 'q') { exit 1 }
     }
 }
+
 
 # Generate batch files using Windows (CRLF) and UTF-8 BOM text encoding.
 function Write-TextFile { # Call only after the global variable are defined in Core.ps1

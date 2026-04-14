@@ -6,7 +6,7 @@
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
-    1.5
+    1.7
 #>
 
 # Downstream tools (encoders) must support Y4M pipelines; otherwise, error exit for pipeline mismatch needs should be triggered (not yet implemented since all tools supports it)
@@ -145,7 +145,7 @@ function Main {
     Show-Border
     Write-Host ""
     Show-Info "Usage:"
-    Write-Host "1. Subsequent scripts will generate 'encoding batch' based on this 'pipeline/toolchain batch' (encode_single.bat)."
+    Write-Host "1. Subsequent scripts will generate 'encoding batch' based on this 'pipeline/toolchain batch' (encode_template.bat)."
     Write-Host "   Therefore, once this step fnishes, step 2 can be entirely skipped until new tools needs to be added"
     Write-Host "2. This tool will attempt to search for the tool in the script's local directory, common installation directories, and environment variables."
     Write-Host "   Therefore, copying executables to this script's directory will streamline the configuration"
@@ -163,7 +163,7 @@ function Main {
     }
     while (-not $outputPath)
     
-    $batchFullPath = Join-Path -Path $outputPath -ChildPath "encode_single.bat"
+    $batchFullPath = Join-Path -Path $outputPath -ChildPath "encode_template.bat"
 
     Show-Success "Output file: $batchFullPath"
 

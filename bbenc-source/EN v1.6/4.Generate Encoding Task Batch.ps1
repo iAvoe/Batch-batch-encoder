@@ -6,7 +6,7 @@
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
-    1.5
+    1.7
 #>
 
 # Load globals
@@ -776,6 +776,9 @@ function Get-InputResolution {
         [Parameter(Mandatory=$true)][int]$CSVh,
         [bool]$isSVTAV1=$false
     )
+    if ($null -eq $CSVw -or $null -eq $CSVh) {
+        throw "Get-InputResolution：source video comes without frame size (width-height) metadata"
+    }
     if ($isSVTAV1) {
         return "-w $CSVw -h $CSVh"
     }
@@ -790,6 +793,9 @@ function Get-FPSParam {
         [ValidateSet("ffmpeg","x264","avc","x265","hevc","svtav1","SVT-AV1")]
         [string]$Target
     )
+    if ([string]::IsNullOrWhiteSpace($fpsString)) {
+        throw "Get-FPSParam：source video comes without framerate metadata"
+    }
     # SVT-AV1's case: use --fps-num & --fps-denom instead
     if ($Target -in @("svtav1", "SVT-AV1")) {
         if ($fpsString -match '^(\d+)/(\d+)$') {
@@ -827,29 +833,63 @@ function Get-ColorSpaceSEI {
         [Parameter(Mandatory=$true)]$CSVColorMatrix,
         [Parameter(Mandatory=$true)]$CSVTransfer,
         [Parameter(Mandatory=$true)]$CSVPrimaries,
-        [ValidateSet("avc","x264","hevc","x265","av1","svtav1")][string]$Codec
+        [switch]$isx264,
+        [switch]$isx265,
+        [switch]$isSVTAV1
     )
-    $Codec = $Codec.ToLower()
     $result = @()
-    
-    # ColorMatrix
-    if (($Codec -eq 'avc' -or $Codec -eq 'x264')) {
+    if (($isx264 -and $isx265) -or ($isx264 -and $isSVTAV1) -or ($isx265 -and $isSVTAV1)) {
+        throw "Get-ColorSpaceSEI：Invalid input, please specify one codec at a time"
+    }
+
+    if ($isx264) {
+        # Colormatrix
         if (($CSVColorMatrix -eq "unknown") -or ($CSVColorMatrix -eq "bt2020nc")) {
-            $result += "--colormatrix undef" # x264 uses undef instead of unknown
+            $result += "--colormatrix undef" # x264 不写 unknown
         }
         else { # fcc，bt470bg，smpte170m，smpte240m，GBR，YCgCo，bt2020c，smpte2085，chroma-derived-nc，chroma-derived-c，ICtCp
             $result += "--colormatrix $CSVColorMatrix"
         }
+
+        # Transfer
+        if ($CSVTransfer -eq "unknown") {
+            # bt470m，bt470bg，smpte170m，smpte240m，linear，log100，log316，iec61966-2-4，bt1361e，iec61966-2-1，bt2020-10，bt2020-12，smpte2084，smpte428，arib-std-b67
+            $result += "--transfer undef"
+        }
+        else {
+            $result += "--transfer $CSVTransfer"
+        }
+
+        # Color Primaries
+        if (($CSVPrimaries -eq "unknown") -or ($CSVPrimaries -eq "unspec")) {
+            $result += "--colorprim undef"
+        }
+        else {
+            $result += "--colorprim $CSVPrimaries"
+        }
     }
-    elseif (($Codec -eq 'hevc') -or ($Codec -eq 'x265')) {
+    elseif ($isx265) {
+        # Colormatrix
         if ($CSVColorMatrix -eq "bt2020nc") {
             $result += "--colormatrix unknown"
         }
-        else { # same as x264
+        else { # ==x264
             $result += "--colormatrix $CSVColorMatrix"
         }
+
+        # Transfer
+        $result += "--transfer $CSVTransfer"
+
+        # Color Primaries
+        if (($CSVPrimaries -eq "unknown") -or ($CSVPrimaries -eq "unspec")) {
+            $result += "--colorprim unknown"
+        }
+        else {
+            $result += "--colorprim $CSVPrimaries"
+        }
     }
-    elseif (($Codec -eq "av1") -or ($Codec -eq "svtav1")) {
+    elseif ($isSVTAV1) {
+        # Color Matrix
         $c = switch ($CSVColorMatrix) {
             identity     { 0 }
             bt709        { 1 }
@@ -866,27 +906,13 @@ function Get-ColorSpaceSEI {
             "chroma-cl"  { 13 }
             ictcp        { 14 }
             default { 
-                Show-Warning "Could not match color matrix: $CSVColorMatrix, using default (bt709)"
+                Show-Warning "Get-ColorSpaceSEI：Unknown color matrix: $CSVColorMatrix, using default (bt709)"
                 1
             }
         }
         $result += "--matrix-coefficients $c"
-    }
-    
-    # Transfer
-    if (($Codec -eq 'avc' -or $Codec -eq 'x264')) {
-        if ($CSVTransfer -eq "unknown") {
-            # bt470m，bt470bg，smpte170m，smpte240m，linear，log100，log316，iec61966-2-4，bt1361e，iec61966-2-1，bt2020-10，bt2020-12，smpte2084，smpte428，arib-std-b67
-            $result += "--transfer undef"
-        }
-        else {
-            $result += "--transfer $CSVTransfer"
-        }
-    }
-    elseif (($Codec -eq 'hevc') -or ($Codec -eq 'x265')) {
-        $result += "--transfer $CSVTransfer"
-    }
-    elseif (($Codec -eq "av1") -or ($Codec -eq "svtav1")) {
+
+        # Transfer
         $t = switch ($CSVTransfer) {
             bt709           { 1 }
             unspec          { 2 }
@@ -905,34 +931,13 @@ function Get-ColorSpaceSEI {
             smpte428        { 17 }
             hlg             { 18 }
             default { 
-                Show-Warning "Could not match transfer characteristics: $CSVTransfer, using default (bt709)"
+                Show-Warning "Get-ColorSpaceSEI：Unknown transfer characteristics: $CSVTransfer, using default (bt709)"
                 1
             }
         }
         $result += "--transfer-characteristics $t"
-    }
 
-    # Color Primaries
-    if (($Codec -eq 'avc') -or ($Codec -eq 'x264')) {
-
-        if (($CSVPrimaries -eq "unknown") -or ($CSVPrimaries -eq "unspec")) {
-            $result += "--colorprim undef"
-        }
-        else {
-            $result += "--colorprim $CSVPrimaries"
-        }
-    }
-    elseif (($Codec -eq 'hevc') -or ($Codec -eq 'x265')) {
-
-        if (($CSVPrimaries -eq "unknown") -or ($CSVPrimaries -eq "unspec")) {
-            $result += "--colorprim unknown"
-        }
-        else {
-            $result += "--colorprim $CSVPrimaries"
-        }
-    }
-    elseif (($Codec -eq "av1") -or ($Codec -eq "svtav1")) {
-
+        # Color Primaries
         $p = switch ($CSVPrimaries) {
             bt709      { 1 }
             unspec     { 2 }
@@ -948,14 +953,17 @@ function Get-ColorSpaceSEI {
             smpte432   { 12 }
             ebu3213    { 22 }
             default {
-                Show-Warning "Could not match color primaries: $CSVPrimaries, using default (bt709)"
+                Show-Warning "Get-ColorSpaceSEI：Unknown color primaries: $CSVPrimaries, using default (bt709)"
                 1
             }
         }
-
         $result += "--color-primaries $p"
     }
-    
+    else {
+        Show-Warning "Get-ColorSpaceSEI：No codec specified, skipped colormatrix, trasnfer characteristics and color primaries' configuration"
+        return ""
+    }
+
     return ($result -join " ")
 }
 
@@ -1278,9 +1286,9 @@ function Main {
     $x265Params.MERange = Get-x265MERange -CSVw $ffprobeCSV.B -CSVh $ffprobeCSV.C
 
     # Show-Debug "Color matrix: $($ffprobeCSV.E); Transfer: $($ffprobeCSV.F); Primaries: $($ffprobeCSV.G)"
-    $svtav1Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -Codec svtav1
-    $x265Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -Codec x265
-    $x264Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -Codec x264
+    $x264Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -isx264
+    $x265Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -isx265
+    $svtav1Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -isSVTAV1
 
     # VOB, MOV formats' framerate data is in I
     if (-not $script:interlacedArgs.isVOB -and -not $script:interlacedArgs.isMOV) {
@@ -1423,10 +1431,10 @@ function Main {
 
     #  Generate ffmpeg, vspipe, avs2yuv, avs2pipemod encoding task batch
     Write-Host ""
-    Show-Info "Locate the encode_single.bat template..."
+    Show-Info "Locate the encode_template.bat template..."
     $templateBatch = $null
     while (-not $templateBatch) {
-        $templateBatch = Select-File -Title "Select encode_single.bat" -BatOnly
+        $templateBatch = Select-File -Title "Select encode_template.bat" -BatOnly
         
         if (-not $templateBatch) {
             if ((Read-Host "No file selected. Press Enter to retry, input 'q' to force exit") -eq 'q') {
@@ -1527,9 +1535,9 @@ REM svtav1_appendix=$svtav1RawPipeApdx
         
         Show-Info "Usages for generated batch files："
         Write-Host "1. Run encode_task_final.bat to start encoding"
-        Write-Host "2. Keep encode_single.bat template to skip Step 2 next time,"
-        Write-Host "   as long as tools remain the same"
-        Write-Host "3. You can manually swap different commands in encode_single.bat"
+        Write-Host "2. You may keep encode_template.bat to skip Step 2 in future encodings,"
+        Write-Host "   as long as the tool chain remains the same"
+        Write-Host "3. You can manually swap different commands in encode_template.bat"
         Write-Host "   to switch upstream and downstream encoding tools or routes"
         Write-Host ("─" * 50)
     }

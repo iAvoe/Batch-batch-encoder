@@ -114,7 +114,8 @@ function Select-File(
         [switch]$IniOnly,
         [switch]$BatOnly
     ) {
-    
+    Write-Host " 选窗可能会在本窗口后面打开，这里不要按回车"
+
     # 若是文件路径则取其父目录；如果路径不存在回到 Desktop
     if ($InitialDirectory) {
         if (Test-Path $InitialDirectory -PathType Leaf) {
@@ -142,10 +143,9 @@ function Select-File(
     elseif ($BatOnly) { $dialog.Filter = 'bat Files (*.bat)|*.bat' }
     else { $dialog.Filter = 'All files (*.*)|*.*' }
 
-    Write-Host " 选窗可能会在本窗口后面打开，这里不要按回车"
 
     while ($true) {
-        if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+        if ($dialog.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) {
             return $dialog.FileName
         }
         $choice = Read-Host "未选择文件，按回车重试或输入 'q' 强制退出"
@@ -154,23 +154,37 @@ function Select-File(
 }
 
 function Select-Folder(
-    [string]$Description = "选择文件夹",
-    [string]$InitialPath = [Environment]::GetFolderPath('Desktop')
+        [string]$Description = "选择文件夹",
+        [string]$InitialPath = [Environment]::GetFolderPath('Desktop')
     ) {
-    # (Put on top of script) Add-Type -AssemblyName System.Windows.Forms
+    Write-Host " 选窗可能会在本窗口后面打开，这里不要按回车"
+    # UI.ps1: Add-Type -AssemblyName System.Windows.Forms
     $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
     $dialog.Description = $Description
     $dialog.SelectedPath = $InitialPath
     $dialog.ShowNewFolderButton = $true
 
-    Write-Host " 选窗可能会在本窗口后面打开，这里不要按回车"
-    
+    # 创建一个隐藏的 TopMost 窗口作为 owner
+    $form = New-Object System.Windows.Forms.Form
+    $form.TopMost = $true
+    $form.ShowInTaskbar = $false
+    $form.WindowState = 'Minimized'
+
     while ($true) {
-        if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+        $result = $dialog.ShowDialog($form)
+        # 窗口焦点切回 VSCode
+        Assert-VSCodeWindow
+
+        # 窗口焦点切回 CLI
+        $hwnd = [WinAPI]::GetConsoleWindow()
+        [WinAPI]::SetForegroundWindow($hwnd) | Out-Null
+
+        if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
             $path = $dialog.SelectedPath
             if (-not $path.EndsWith('\')) { $path += '\' }
             return $path
         }
+
         $choice = Read-Host "未选择文件夹，按回车重试或输入 'q' 强制退出"
         if ($choice -eq 'q') { exit 1 }
     }

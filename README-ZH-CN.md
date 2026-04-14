@@ -80,6 +80,11 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 <p align="center"><img src="bmc_qr.png" alt="支持一下 -_-"><br><img src="pp_tip_qr.png" alt="支持一下 =_="></p>
 
 ## 更新信息
+**v1.7**
+- 解决了路径选择窗口没有出现在窗口最上层的问题
+- 可能解决了关闭或完成路径选择窗口时，窗口聚焦不自动切换回 CLI 窗口（无法输入）的问题（仍然不支持 VSCode CLI）
+- 解决了文件名本身触发 ffprobe 分析 JSON 解析崩溃的错误（临时切换到 UTF-8 文本编码）
+
 **v1.6.5**
 - 步骤 4：
   - 美化终端输出信息排版
@@ -89,7 +94,6 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 - 步骤 3 改良了导入系统
   - 添加了脚本所在目录下的 ffprobe 模糊匹配功能
   - 添加了环境变量的 ffprobe 模糊匹配功能
-
 
 **v1.6.3**
 - 步骤 3 代码优化

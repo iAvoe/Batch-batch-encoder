@@ -6,7 +6,7 @@
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
-    1.5
+    1.7
 #>
 
 # 下游工具（編碼器）必須支持 Y4M 管道，否則需要添加管道無法匹配的錯誤退出邏輯（由於所有工具支持因此未創建代碼）
@@ -144,7 +144,7 @@ function Main {
     Show-Border
     Write-Host ""
     Show-Info "使用說明："
-    Write-Host "1. 後續的腳本將基於此‘管線批處理’（encode_single.bat）生成‘編碼批處理’"
+    Write-Host "1. 後續的腳本將基於此‘管線批處理’（encode_template.bat）生成‘編碼批處理’"
     Write-Host "   因此無需每次編碼都要運行此步驟"
     Write-Host "2. 本工具會嘗試在腳本本地目錄，常見安裝目錄和環境變數中搜索工具，"
     Write-Host "   因此複製工具到此腳本目錄下即可減少手動操作複雜度"
@@ -163,7 +163,7 @@ function Main {
     }
     while (-not $outputPath)
     
-    $batchFullPath = Join-Path -Path $outputPath -ChildPath "encode_single.bat"
+    $batchFullPath = Join-Path -Path $outputPath -ChildPath "encode_template.bat"
 
     Show-Success "輸出文件：$batchFullPath"
 
