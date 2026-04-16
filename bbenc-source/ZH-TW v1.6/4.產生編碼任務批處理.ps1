@@ -12,7 +12,7 @@
 # 載入共用代碼
 . "$PSScriptRoot\Common\Core.ps1"
 
-# 需要結合影片數據統計的參數，注意管道參數已經在先前腳本完成，這裡不寫
+# 需要結合影片數據統計的參數，管道參數已經在先前腳本完成，這裡不寫
 $x264Params = [PSCustomObject]@{
     FPS = "" # 丟幀幀率用如 24000/1001 的字串
     Resolution = ""
@@ -191,45 +191,59 @@ function ConvertTo-Fraction {
 # 生成管道上遊程序導入、下遊程序導出命令（管道命令已經在先前腳本中寫完，自動創建目錄）
 function Get-EncodingIOArgument {
     Param (
-        [ValidateSet(
-            'ffmpeg',
-            'vspipe','vs',
-            'avs2yuv','avsy','a2y',
-            'avs2pipemod','avsp','a2p',
-            'svfi','one_line_shot_args','olsarg','olsa','ols',
-            'x264','h264','avc',
-            'x265','h265','hevc',
-            'svt-av1','svtav1','ivf'
-        )][Parameter(Mandatory=$true)]$program,
+        [Parameter(ParameterSetName="ffmpeg")][switch]$isffmpeg,
+        [Parameter(ParameterSetName="vspipe")][switch]$isVsPipe,
+        [Parameter(ParameterSetName="avs2yuv")][switch]$isAvs2Yuv,
+        [Parameter(ParameterSetName="avs2pipemod")][switch]$isAvs2Pipemod,
+        [Parameter(ParameterSetName="svfi")][switch]$isSVFI,
+        [Parameter(ParameterSetName="x264")][switch]$isx264,
+        [Parameter(ParameterSetName="x265")][switch]$isx265,
+        [Parameter(ParameterSetName="svtav1")][switch]$isSVTAV1,
         [string]$source, # 導入路徑到文件（帶或不帶引號）
         [bool]$isImport = $true,
         [string]$outputFilePath, # 導出目錄，不用於導入
         [string]$outputFileName, # 導出檔案名，不用於導入
         [string]$outputExtension
     )
+    # 確保只有一個開關被啟用
+    $switchedOn = @(
+        if ($isffmpeg) { 'ffmpeg' }
+        if ($isvspipe) { 'vspipe' }
+        if ($isavs2yuv) { 'avs2yuv' }
+        if ($isavs2pipemod) { 'avs2pipemod' }
+        if ($issvfi) { 'svfi' }
+        if ($isx264) { 'x264' }
+        if ($isx265) { 'x265' }
+        if ($isSVTAV1) { 'svtav1' }
+    )
+    if ($switchedOn.Count -eq 0) {
+        throw "Get-EncodingIOArgument：必須指定一個程序，如 -isffmpeg"
+    }
+    if ($switchedOn.Count -gt 1) {
+        throw "Get-EncodingIOArgument：最多指定一個程序，當前指定了: $($switchedOn -join ', ')"
+    }
+    $program = $switchedOn[0]
+
     # 隔行掃描相關參數
-    $interlacedArg = ""
+    $iArg = ""
     if ($script:interlacedArgs.isInterlaced) {
         switch ($program) {
-            # avs2pipemod: y4mp (progressive), y4mt (tff), y4mb (bff)
-            { $_ -in @('avs2pipemod', 'avsp', 'a2p') } {
-                $interlacedArg =
+            'avs2pipemod' { # avs2pipemod: y4mp (progressive), y4mt (tff), y4mb (bff)
+                $iArg =
                     if ($script:interlacedArgs.isTFF) { "-y4mt" }
                     else { "-y4mb" }
             }
-            { $_ -in @('x264', 'h264', 'avc') } {
-                # x264: --tff, --bff
-                $interlacedArg =
+            'x264' { # x264: --tff, --bff
+                $iArg =
                     if ($script:interlacedArgs.isTFF) { "--tff" }
                     else { "--bff" }
             }
-            { $_ -in @('x265', 'h265', 'hevc') } {
-                # x265: --interlace 0 (progressive), 1 (tff), 2 (bff)
-                $interlacedArg =
+            'x265' { # x265: --interlace 0 (progressive), 1 (tff), 2 (bff)
+                $iArg =
                     if ($script:interlacedArgs.isTFF) { "--interlace 1" }
                     else { "--interlace 2" }
             }
-            # 其它程序忽略隔行掃描參數
+            # SVT-AV1 與 ffmpeg 不支持隔行，vspipe/avs2yuv/svfi 忽略
         }
     }
 
@@ -271,87 +285,54 @@ function Get-EncodingIOArgument {
     # 生成管道上游導入與下游導出參數
     if ($isImport) { # 導入模式
         switch -Wildcard ($program) {
-            'ffmpeg' { 
-                return "-i $quotedInput"
-            }
-            { $_ -in @('svfi', 'one_line_shot_args', 'ols', 'olsa') } { 
-                return "--input $quotedInput"
-            }
+            'ffmpeg' { return "-i $quotedInput" }
+            'svfi' { return "--input $quotedInput" }
             # $sourceCSV.sourcePath 只有 .vpy 或 .avs 單個源，而先前步驟允許選擇多種上遊程序
             # 因此必然會出現 .vpy 腳本輸入出現在 AVS 程序，或反過來的情況
             # 儘管“自動生成占位腳本”功能會同時提供 .vpy 和 .avs 腳本，但用戶選擇輸入自訂腳本就不會做這一步
             # 這個問題需要透過修改源的副檔名來紓解，但默認修改檔案名後的源一定不存在，此時只警告用戶然後繼續
-            { $_ -in @('vspipe', 'vs') } {
+            'vspipe' {
                 if ($sourceExtension -ne '.vpy') {
                     $newSource = [System.IO.Path]::ChangeExtension($source, ".vpy")
                     Show-Debug "vspipe 線路缺乏 .vpy 腳本源，嘗試匹配新路徑: $(Split-Path $newSource -Leaf)"
                     if (Test-Path -LiteralPath $newSource) {
                         $source = $newSource
                         $quotedInput = Get-QuotedPath $source
-                        if (Show-Success -ErrorAction SilentlyContinue) {
-                            Show-Success "已成功切換源到 $newSource"
-                        }
+                        Show-Success "已成功切換源到 $newSource"
                     }
                     else { Show-Debug "vspipe 線路的導入需手動糾正" }
                 }
                 # 返回輸入路徑和隔行掃描參數
-                #（avs2pipemod 線路下自動提供 $interlacedArg）
-                if ($interlacedArg -ne "") {
-                    return "$quotedInput $interlacedArg"
-                }
-                else { return "$quotedInput" }
+                if ($iArg) { return "$quotedInput $iArg" }
+                else { return $quotedInput }
             }
-            { $_ -in @('avs2yuv', 'avsy', 'a2y', 'avs2pipemod', 'avsp', 'a2p') } {
+            { $_ -in @('avs2yuv', 'avs2pipemod') } {
                 if ($sourceExtension -ne '.avs') {
                     $newSource = [System.IO.Path]::ChangeExtension($source, ".avs")
                     Show-Debug ($_ + " 線路缺乏 .avs 腳本源，嘗試匹配新路徑: $(Split-Path $newSource -Leaf)")
                     if (Test-Path -LiteralPath $newSource) {
                         $source = $newSource
                         $quotedInput = Get-QuotedPath $source
-                        if (Show-Success -ErrorAction SilentlyContinue) {
-                            Show-Success "已成功切換源到 $newSource"
-                        }
+                        Show-Success "已成功切換源到 $newSource"
                     }
                     else { Show-Debug ( $_ + " 線路的導入需手動糾正") }
                 }
                 # 返回輸入路徑和隔行掃描參數
-                if ($interlacedArg -ne "") {
-                    return "$quotedInput $interlacedArg"
-                }
-                else { return "$quotedInput" }
+                if ($iArg) { return "$quotedInput $iArg" }
+                else { return $quotedInput }
             }
-            { $_ -in @('x264', 'h264', 'avc') } {
-                if ($interlacedArg -ne "") {
-                    return "- $interlacedArg"
-                }
-                else { return "-" }
-            }
-            { $_ -in @('x265', 'h265', 'hevc') } {
-                if ($interlacedArg -ne "") {
-                    return "$interlacedArg --input -"
-                }
-                else { return "--input -" }
-            }
-            { $_ -in @('svt-av1', 'svtav1', 'ivf') } { # SVT-AV1 原生不支持隔行
-                return "-i -"
-            }
+            'x264' { if ($iArg) { return "- $iArg" } else { return "-" } }
+            'x265' { if ($iArg) { return "$iArg --input -" } else { return "--input -" } }
+            'svtav1' { return "-i -" } # 原生不支持隔行
         }
         break
     }
     else { # 導出模式
-        switch -Wildcard ($program) {
-            { $_ -in @('x264', 'h264', 'avc') } {
-                return "--output $quotedOutput"
-            }
-            { $_ -in @('x265', 'h265', 'hevc') } {
-                return "--output $quotedOutput"
-            }
-            { $_ -in @('svt-av1', 'svtav1', 'ivf') } {
-                return "-b $($quotedOutput)"
-            }
-            default {
-                throw "未識別的導出程序：$program"
-            }
+        switch ($program) {
+            'x264' { return "--output $quotedOutput" }
+            'x265' { return "--output $quotedOutput" }
+            'svtav1' { return "-b $quotedOutput" }
+            default { throw "未識別的導出程序：$program" }
         }
     }
     throw "無法為程序 $program 生成 IO 參數"
@@ -1359,19 +1340,19 @@ function Main {
     Show-Info "生成管道上下遊程序的 IO 參數 (Input/Output)..."
     # 1. 管道上遊程序輸入
     # 管道連接符由先前腳本生成的批處理控制，這裡不寫
-    $ffmpegParams.Input = Get-EncodingIOArgument -program 'ffmpeg' -isImport $true -source $sourceCSV.SourcePath
-    $vspipeParams.Input = Get-EncodingIOArgument -program 'vspipe' -isImport $true -source $sourceCSV.SourcePath
-    $avsyuvParams.Input = Get-EncodingIOArgument -program 'avs2yuv' -isImport $true -source $sourceCSV.SourcePath
-    $avsmodParams.Input = Get-EncodingIOArgument -program 'avs2pipemod' -isImport $true -source $sourceCSV.SourcePath
-    $olsargParams.Input = Get-EncodingIOArgument -program 'svfi' -isImport $true -source $sourceCSV.SourcePath
+    $ffmpegParams.Input = Get-EncodingIOArgument -isffmpeg -isImport $true -source $sourceCSV.SourcePath
+    $vspipeParams.Input = Get-EncodingIOArgument -isVsPipe -isImport $true -source $sourceCSV.SourcePath
+    $avsyuvParams.Input = Get-EncodingIOArgument -isAvs2Yuv -isImport $true -source $sourceCSV.SourcePath
+    $avsmodParams.Input = Get-EncodingIOArgument -isAvs2Pipemod -isImport $true -source $sourceCSV.SourcePath
+    $olsargParams.Input = Get-EncodingIOArgument -isSVFI -isImport $true -source $sourceCSV.SourcePath
     # 2. 管道下遊程序（編碼器）輸入——需要根據隔行掃描判斷參數，因此必用 Get-EncodingIOArgument
-    $x264Params.Input = Get-EncodingIOArgument -program 'x264' -isImport $true -source $sourceCSV.SourcePath
-    $x265Params.Input = Get-EncodingIOArgument -program 'x265' -isImport $true -source $sourceCSV.SourcePath
-    $svtav1Params.Input = Get-EncodingIOArgument -program 'svtav1' -isImport $true -source $sourceCSV.SourcePath
+    $x264Params.Input = Get-EncodingIOArgument -isx264 -isImport $true -source $sourceCSV.SourcePath
+    $x265Params.Input = Get-EncodingIOArgument -isx265 -isImport $true -source $sourceCSV.SourcePath
+    $svtav1Params.Input = Get-EncodingIOArgument -isSVTAV1 -isImport $true -source $sourceCSV.SourcePath
     # 3. 管道下遊程序輸出
-    $x264Params.Output = Get-EncodingIOArgument -program 'x264' -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $x264Params.OutputExtension
-    $x265Params.Output = Get-EncodingIOArgument -program 'x265' -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $x265Params.OutputExtension
-    $svtav1Params.Output = Get-EncodingIOArgument -program 'svtav1' -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $svtav1Params.OutputExtension
+    $x264Params.Output = Get-EncodingIOArgument -isx264 -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $x264Params.OutputExtension
+    $x265Params.Output = Get-EncodingIOArgument -isx265 -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $x265Params.OutputExtension
+    $svtav1Params.Output = Get-EncodingIOArgument -isSVTAV1 -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $svtav1Params.OutputExtension
 
     Write-Host ("─" * 50)
 
@@ -1453,41 +1434,28 @@ REM svtav1_appendix=$svtav1RawPipeApdx
 
     # 尋找替換錨點
     # 策略：找到 "REM 參數範例" 行，替換為參數塊
-    # 若模板變更，則回退到在 @echo off 後面插入
+    # 若模板變更，則直接停止執行
     $newBatchContent = $batchContent
 
     # 字樣匹配
-    $englishAnchor = '(?msi)^REM\s+Parameter\s+examples\b'
-    $chineseAnchor = '(?msi)^REM\s+參數範例\b'
+    $enAnchor = '(?msi)^REM\s+Parameter\s+examples\b'
+    $zhcnAnchor = '(?msi)^REM\s+參數範例\b'
+    $zhtwAnchor = '(?msi)^REM\s+參數範例\b'
 
-    if ($batchContent -match $englishAnchor -or $batchContent -match $chineseAnchor) {
-        # 順序匹配英文模板、中文模板
-        if ($batchContent -match $englishAnchor) {
-            # 匹配從“REM 參數範例”到（但不包括）“REM 指定命令行”行的內容
-            $pattern = '(?msi)^REM\s+Parameter\s+examples\b.*?^(?=REM\s+Specify\s+commandline\b)'
-        }
-        else {
-            # 中文字樣（保持相容性）
-            $pattern = '(?msi)^REM\s+參數範例\b.*?^(?=REM\s+指定本次所需編碼命令\b)'
-        }
-
-        # 替換操作使用 [regex]::Replace 以確保 .NET 正則表達式的行為。
-        $newBatchContent = [regex]::Replace($batchContent, $pattern, $paramsBlock)
+    if ($batchContent -match $enAnchor) {
+        $pattern = '(?msi)^REM\s+Parameter\s+examples\b.*?^(?=REM\s+Specify\s+commandline\b)'
+    }
+    elseif ($batchContent -notmatch $zhcnAnchor) {
+        $pattern = '(?msi)^REM\s+參數範例\b.*?^(?=REM\s+指定本次所需編碼命令\b)'
+    }
+    elseif ($batchContent -notmatch $zhtwAnchor) {
+        $pattern = '(?msi)^REM\s+參數範例\b.*?^(?=REM\s+指定本次所需編碼命令\b)'
     }
     else {
-        Write-Warning "未在模板中找到參數占位符，將在文件頭部追加參數。"
-        $lines = [System.IO.File]::ReadAllLines($templateBatch, $Global:utf8BOM)
-
-         # 在第3行（通常是 setlocal 之後）插入
-        $insertIndex = 3
-
-        # 使用 CRLF 或 LF 分割 paramsBlock 以安全地獲取行。
-        $paramsLines = [System.Text.RegularExpressions.Regex]::Split($paramsBlock, "\r?\n")
-
-        # 使用插入的參數創建新行
-        $newLines = $lines[0..($insertIndex-1)] + $paramsLines + $lines[$insertIndex..($lines.Count-1)]
-        $newBatchContent = $newLines -join "`r`n"
+        throw "未在步驟 2 生成的模板中找到參數占位符，請重新運行步驟 2 腳本"
     }
+    # 替換操作使用 [regex]::Replace 以確保 .NET 正則表達式的行為。
+    $newBatchContent = [regex]::Replace($batchContent, $pattern, $paramsBlock)
 
     # 保存最終文件
     $finalBatchPath = Join-Path (Split-Path $templateBatch) "encode_task_final.bat"

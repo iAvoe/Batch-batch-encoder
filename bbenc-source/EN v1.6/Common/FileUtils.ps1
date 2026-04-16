@@ -18,11 +18,14 @@ function Confirm-FileDelete {
     if (-not (Test-Path -LiteralPath $Path)) { return }
 
     Show-Warning "Detecting existing file: $Path"
-    $confirm = Read-Host " Delete file to continue? Type 'y' to confirm, Enter to force exit (permanent deletion)."
 
-    if ($confirm -ne 'y') {
-        Show-Info "Exiting script"
-        exit 1
+    while ('y' -ne $confirm) {
+        $confirm = Read-Host " Delete file to continue? Type 'y' to confirm, input 'q' to force quit (permanent deletion)."
+        if ('y' -eq $confirm) { break }
+        elseif ('q' -eq $confirm) {
+            Show-Info "Stopping..."
+            exit 1
+        }
     }
 
     Remove-Item $Path -Force

@@ -189,49 +189,62 @@ function ConvertTo-Fraction {
     throw "Could not parse framerate division string: $fraction"
 }
 
-# Generate upstream program's I and downstream's O commands
-# (Pipe commands are completed by the previous script; auto-create needed directories)
+# Generate upstream & downstream programs' I & O commands (Pipe cmd are done by prev scripts; auto-mkdir configured)
 function Get-EncodingIOArgument {
     Param (
-        [ValidateSet(
-            'ffmpeg',
-            'vspipe','vs',
-            'avs2yuv','avsy','a2y',
-            'avs2pipemod','avsp','a2p',
-            'svfi','one_line_shot_args','olsarg','olsa','ols',
-            'x264','h264','avc',
-            'x265','h265','hevc',
-            'svt-av1','svtav1','ivf'
-        )][Parameter(Mandatory=$true)]$program,
+        [Parameter(ParameterSetName="ffmpeg")][switch]$isffmpeg,
+        [Parameter(ParameterSetName="vspipe")][switch]$isVsPipe,
+        [Parameter(ParameterSetName="avs2yuv")][switch]$isAvs2Yuv,
+        [Parameter(ParameterSetName="avs2pipemod")][switch]$isAvs2Pipemod,
+        [Parameter(ParameterSetName="svfi")][switch]$isSVFI,
+        [Parameter(ParameterSetName="x264")][switch]$isx264,
+        [Parameter(ParameterSetName="x265")][switch]$isx265,
+        [Parameter(ParameterSetName="svtav1")][switch]$isSVTAV1,
         [string]$source, # Import path to file (with or without quotes)
         [bool]$isImport = $true,
         [string]$outputFilePath, # Export directory, not used for import
         [string]$outputFileName, # Export filename, not used for import
         [string]$outputExtension
     )
+    # Ensure only one switch is on
+    $switchedOn = @(
+        if ($isffmpeg) { 'ffmpeg' }
+        if ($isvspipe) { 'vspipe' }
+        if ($isavs2yuv) { 'avs2yuv' }
+        if ($isavs2pipemod) { 'avs2pipemod' }
+        if ($issvfi) { 'svfi' }
+        if ($isx264) { 'x264' }
+        if ($isx265) { 'x265' }
+        if ($isSVTAV1) { 'svtav1' }
+    )
+    if ($switchedOn.Count -eq 0) {
+        throw "Get-EncodingIOArgument: Specify 1 program at least, i.e., -isffmpeg"
+    }
+    if ($switchedOn.Count -gt 1) {
+        throw "Get-EncodingIOArgument：Specify 1 program at most, currently there are: $($switchedOn -join ', ')"
+    }
+    $program = $switchedOn[0]
+
     # Interlaced specifier params
-    $interlacedArg = ""
+    $iArg = ""
     if ($script:interlacedArgs.isInterlaced) {
         switch ($program) {
-            # avs2pipemod: y4mp (progressive), y4mt (tff), y4mb (bff)
-            { $_ -in @('avs2pipemod', 'avsp', 'a2p') } {
-                $interlacedArg =
+            'avs2pipemod' { # avs2pipemod: y4mp (progressive), y4mt (tff), y4mb (bff)
+                $iArg =
                     if ($script:interlacedArgs.isTFF) { "-y4mt" }
                     else { "-y4mb" }
             }
-            { $_ -in @('x264', 'h264', 'avc') } {
-                # x264: --tff, --bff
-                $interlacedArg =
+            'x264' { # x264: --tff, --bff
+                $iArg =
                     if ($script:interlacedArgs.isTFF) { "--tff" }
                     else { "--bff" }
             }
-            { $_ -in @('x265', 'h265', 'hevc') } {
-                # x265: --interlace 0 (progressive), 1 (tff), 2 (bff)
-                $interlacedArg =
+            'x265' { # x265: --interlace 0 (progressive), 1 (tff), 2 (bff)
+                $iArg =
                     if ($script:interlacedArgs.isTFF) { "--interlace 1" }
                     else { "--interlace 2" }
             }
-            # No argument for other programs
+            # SVT-AV1 & ffmpeg don't support interlaced, skip for vspipe/avs2yuv/svfi
         }
     }
 
@@ -273,89 +286,57 @@ function Get-EncodingIOArgument {
     # Generate upstream import and downstream export parameters for pipelines
     if ($isImport) { # Import mode
         switch -Wildcard ($program) {
-            'ffmpeg' { 
-                return "-i $quotedInput"
-            }
-            { $_ -in @('svfi', 'one_line_shot_args', 'ols', 'olsa') } { 
-                return "--input $quotedInput"
-            }
+            'ffmpeg' { return "-i $quotedInput" }
+            'svfi' { return "--input $quotedInput" }
             # $sourceCSV.sourcePath accepts only .vpy/.avs files,
             # but upstream steps may include an toolchain incompatible with script
             # While auto-generated placeholder script source provide both scripts,
             # specifying custom scripts bypasses it.
             # Users can change the source extension as a workaround,
             # though the renamed file won't exist by default—in such cases, just warn and continue
-            { $_ -in @('vspipe', 'vs') } {
+            'vspipe' {
                 if ($sourceExtension -ne '.vpy') {
                     $newSource = [System.IO.Path]::ChangeExtension($source, ".vpy")
                     Show-Debug "vspipe route without .vpy script source, trying to match: $(Split-Path $newSource -Leaf)"
                     if (Test-Path -LiteralPath $newSource) {
                         $source = $newSource
                         $quotedInput = Get-QuotedPath $source
-                        if (Show-Success -ErrorAction SilentlyContinue) {
-                            Show-Success "Successfully switched to $newSource"
-                        }
+                        Show-Success "Successfully switched to $newSource"
                     }
                     else { Show-Debug "vspipe route needs manual correction" }
                 }
                 # Return input path and interlaced specifier params
-                # (avs2pipemod route has $interlacedArg provided)
-                if ($interlacedArg -ne "") {
-                    return "$quotedInput $interlacedArg"
-                }
-                else { return "$quotedInput" }
+                # (avs2pipemod route has $iArg provided)
+                if ($iArg) { return "$quotedInput $iArg" }
+                else { return $quotedInput }
             }
-            { $_ -in @('avs2yuv', 'avsy', 'a2y', 'avs2pipemod', 'avsp', 'a2p') } {
+            { $_ -in @('avs2yuv', 'avs2pipemod') } {
                 if ($sourceExtension -ne '.avs') {
                     $newSource = [System.IO.Path]::ChangeExtension($source, ".avs")
                     Show-Debug ($_ + " route without .avs script source, trying to match: $(Split-Path $newSource -Leaf)")
                     if (Test-Path -LiteralPath $newSource) {
                         $source = $newSource
                         $quotedInput = Get-QuotedPath $source
-                        if (Show-Success -ErrorAction SilentlyContinue) {
-                            Show-Success "Successfully switched to $newSource"
-                        }
+                        Show-Success "Successfully switched to $newSource"
                     }
                     else { Show-Debug ($_ + " route needs manual correction") }
                 }
                 # Return input path and interlaced specifier params
-                if ($interlacedArg -ne "") {
-                    return "$quotedInput $interlacedArg"
-                }
-                else { return "$quotedInput" }
+                if ($iArg) { return "$quotedInput $iArg" }
+                else { return $quotedInput }
             }
-            { $_ -in @('x264', 'h264', 'avc') } {
-                if ($interlacedArg -ne "") {
-                    return "- $interlacedArg"
-                }
-                else { return "-" }
-            }
-            { $_ -in @('x265', 'h265', 'hevc') } {
-                if ($interlacedArg -ne "") {
-                    return "$interlacedArg --input -"
-                }
-                else { return "--input -" }
-            }
-            { $_ -in @('svt-av1', 'svtav1', 'ivf') } { # SVT-AV1 natively doesn't support interlaced
-                return "-i -"
-            }
+            'x264' { if ($iArg) { return "- $iArg" } else { return "-" } }
+            'x265' { if ($iArg) { return "$iArg --input -" } else { return "--input -" } }
+            'svtav1' { return "-i -" } # SVT-AV1 natively doesn't support interlaced
         }
         break
     }
     else { # Export mode
         switch -Wildcard ($program) {
-            { $_ -in @('x264', 'h264', 'avc') } {
-                return "--output $quotedOutput"
-            }
-            { $_ -in @('x265', 'h265', 'hevc') } {
-                return "--output $quotedOutput"
-            }
-            { $_ -in @('svt-av1', 'svtav1', 'ivf') } {
-                return "-b $($quotedOutput)"
-            }
-            default {
-                throw "Unidentified program: $program"
-            }
+            'x264' { return "--output $quotedOutput" }
+            'x265' { return "--output $quotedOutput" }
+            'svtav1' { return "-b $quotedOutput" }
+            default { throw "Unidentified program: $program" }
         }
     }
     throw "Could not generate IO parameter for: $program"
@@ -487,7 +468,7 @@ function Get-svtav1BaseParam {
         }
         helpen {
             Write-Host ""
-            Write-Host " Select a custom preset for SVT-AV1——[a: HQ | b: High compression | c: High speed]" -ForegroundColor Yellow
+            Write-Host " Select a custom preset for SVT-AV1——[a: Ultra HQ |y b: High compression | c: Fast]" -ForegroundColor Yellow
             return
         }
         default {
@@ -1374,20 +1355,20 @@ function Main {
     # 1. Upstream Program Input of the Pipe
     # The pipe connector is controlled by the batch generated by the previous script,
     # and is not specified here.
-    $ffmpegParams.Input = Get-EncodingIOArgument -program 'ffmpeg' -isImport $true -source $sourceCSV.SourcePath
-    $vspipeParams.Input = Get-EncodingIOArgument -program 'vspipe' -isImport $true -source $sourceCSV.SourcePath
-    $avsyuvParams.Input = Get-EncodingIOArgument -program 'avs2yuv' -isImport $true -source $sourceCSV.SourcePath
-    $avsmodParams.Input = Get-EncodingIOArgument -program 'avs2pipemod' -isImport $true -source $sourceCSV.SourcePath
-    $olsargParams.Input = Get-EncodingIOArgument -program 'svfi' -isImport $true -source $sourceCSV.SourcePath
+    $ffmpegParams.Input = Get-EncodingIOArgument -isffmpeg -isImport $true -source $sourceCSV.SourcePath
+    $vspipeParams.Input = Get-EncodingIOArgument -isVsPipe -isImport $true -source $sourceCSV.SourcePath
+    $avsyuvParams.Input = Get-EncodingIOArgument -isAvs2Yuv -isImport $true -source $sourceCSV.SourcePath
+    $avsmodParams.Input = Get-EncodingIOArgument -isAvs2Pipemod -isImport $true -source $sourceCSV.SourcePath
+    $olsargParams.Input = Get-EncodingIOArgument -isSVFI -isImport $true -source $sourceCSV.SourcePath
     # 2. Downstream program (encoder) input
     # requires interlaced specifier parameters, using Get-EncodingIOArgument is mandatory
-    $x264Params.Input = Get-EncodingIOArgument -program 'x264' -isImport $true -source $sourceCSV.SourcePath
-    $x265Params.Input = Get-EncodingIOArgument -program 'x265' -isImport $true -source $sourceCSV.SourcePath
-    $svtav1Params.Input = Get-EncodingIOArgument -program 'svtav1' -isImport $true -source $sourceCSV.SourcePath
+    $x264Params.Input = Get-EncodingIOArgument -isx264 -isImport $true -source $sourceCSV.SourcePath
+    $x265Params.Input = Get-EncodingIOArgument -isx265 -isImport $true -source $sourceCSV.SourcePath
+    $svtav1Params.Input = Get-EncodingIOArgument -isSVTAV1 -isImport $true -source $sourceCSV.SourcePath
     # 3. Pipe downstream program output
-    $x264Params.Output = Get-EncodingIOArgument -program 'x264' -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $x264Params.OutputExtension
-    $x265Params.Output = Get-EncodingIOArgument -program 'x265' -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $x265Params.OutputExtension
-    $svtav1Params.Output = Get-EncodingIOArgument -program 'svtav1' -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $svtav1Params.OutputExtension
+    $x264Params.Output = Get-EncodingIOArgument -isx264 -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $x264Params.OutputExtension
+    $x265Params.Output = Get-EncodingIOArgument -isx265 -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $x265Params.OutputExtension
+    $svtav1Params.Output = Get-EncodingIOArgument -isSVTAV1 -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $svtav1Params.OutputExtension
 
     Write-Host ("─" * 50)
 
@@ -1470,41 +1451,30 @@ REM svtav1_appendix=$svtav1RawPipeApdx
 
     # Replacement anchor is keeping Chinese anchor for code simplicity
     # Strategy: find the "REM Parameter examples" block and replace it with $paramsBlock.
-    # If the template changed, fall back to inserting after the file header.
+    # If the template changed, stop script execution
     $newBatchContent = $batchContent
 
     # Patterns to match
-    $englishAnchor = '(?msi)^REM\s+Parameter\s+examples\b'
-    $chineseAnchor = '(?msi)^REM\s+参数示例\b'
+    $enAnchor = '(?msi)^REM\s+Parameter\s+examples\b'
+    $zhcnAnchor = '(?msi)^REM\s+参数示例\b'
+    $zhtwAnchor = '(?msi)^REM\s+參數範例\b'
 
-    if ($batchContent -match $englishAnchor -or $batchContent -match $chineseAnchor) {
-        # Prefer English pattern; if English not present but Chinese present, use Chinese pattern.
-        if ($batchContent -match $englishAnchor) {
-            # Match from "REM Parameter examples" up to (but not including) the "REM Specify commandline" line.
-            $pattern = '(?msi)^REM\s+Parameter\s+examples\b.*?^(?=REM\s+Specify\s+commandline\b)'
-        }
-        else {
-            # Chinese-compatible pattern (keeps compatibility with older templates)
-            $pattern = '(?msi)^REM\s+参数示例\b.*?^(?=REM\s+指定本次所需编码命令\b)'
-        }
-
-        # Perform the replacement. Use [regex]::Replace to ensure .NET regex behavior.
-        $newBatchContent = [regex]::Replace($batchContent, $pattern, $paramsBlock)
+    # Match from "REM Parameter examples" up to (but not including) the "REM Specify commandline" line.
+    # Prefer English pattern; if English not present but Chinese present, use Chinese pattern.
+    if ($batchContent -match $enAnchor) {
+        $pattern = '(?msi)^REM\s+Parameter\s+examples\b.*?^(?=REM\s+Specify\s+commandline\b)'
+    }
+    elseif ($batchContent -notmatch $zhcnAnchor) {
+        $pattern = '(?msi)^REM\s+参数示例\b.*?^(?=REM\s+指定本次所需编码命令\b)'
+    }
+    elseif ($batchContent -notmatch $zhtwAnchor) {
+        $pattern = '(?msi)^REM\s+參數範例\b.*?^(?=REM\s+指定本次所需編碼命令\b)'
     }
     else {
-        Write-Warning "Parameter placeholder not found in template; will append parameters near the file header."
-        $lines = [System.IO.File]::ReadAllLines($templateBatch, $Global:utf8BOM)
-
-        # insertIndex = 3 (same as before: typically after @echo off / chcp / setlocal)
-        $insertIndex = 3
-
-        # Split paramsBlock on either CRLF or LF to get lines safely
-        $paramsLines = [System.Text.RegularExpressions.Regex]::Split($paramsBlock, "\r?\n")
-
-        # Build new lines with inserted params
-        $newLines = $lines[0..($insertIndex-1)] + $paramsLines + $lines[$insertIndex..($lines.Count-1)]
-        $newBatchContent = $newLines -join "`r`n"
+        throw "The placeholder missing in template generated by step 2. Please re-run step 2 script."
     }
+    # Perform the replacement. Use [regex]::Replace to ensure .NET regex behavior.
+    $newBatchContent = [regex]::Replace($batchContent, $pattern, $paramsBlock)
 
     # Save final batch
     $finalBatchPath = Join-Path (Split-Path $templateBatch) "encode_task_final.bat"

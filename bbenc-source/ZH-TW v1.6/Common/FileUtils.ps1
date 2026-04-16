@@ -18,11 +18,13 @@ function Confirm-FileDelete {
     if (-not (Test-Path -LiteralPath $Path)) { return }
 
     Show-Warning "檢測到已存在文件：$Path"
-    $confirm = Read-Host " 是否刪除該文件以繼續？輸入 'y' 確認，其它任意鍵取消（永久刪除）"
-
-    if ($confirm -ne 'y') {
-        Show-Info "用戶取消操作，腳本終止"
-        exit 1
+    while ('y' -ne $confirm) {
+        $confirm = Read-Host " 是否刪除該文件以繼續？輸入 'y' 永久刪除，輸入 'q' 取消"
+        if ('y' -eq $confirm) { break }
+        elseif ('q' -eq $confirm) {
+            Show-Info "取消操作，腳本終止"
+            exit 1
+        }
     }
 
     Remove-Item $Path -Force

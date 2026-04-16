@@ -73,6 +73,10 @@ Developing these tools wasn't easy. If this tool improve your efficiency, consid
 <p align="center"><img src="bmc_qr.png" alt="Support me -_-"><br><img src="pp_tip_qr.png" alt="Support me =_="></p>
 
 ## Update Information
+**v1.7.2**
+- Changed file deletion interaction logic—now: enter 'y' to confirm, 'q' to cancel, Enter loops back
+- Step 4: simplified the code, no functional changes
+
 **v1.7.1**
 - Step 4:
   - Added 12bit source compatibility warning for SVT-AV1

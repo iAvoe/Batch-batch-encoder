@@ -80,6 +80,10 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 <p align="center"><img src="bmc_qr.png" alt="支持一下 -_-"><br><img src="pp_tip_qr.png" alt="支持一下 =_="></p>
 
 ## 更新信息
+**v1.7.2**
+- 文件删除操作交互逻辑变更——输入 y 确认，输入 q 取消，Enter 循环的操作逻辑
+- 步骤 4 简化了代码，无功能性变更
+
 **v1.7.1**
 - 步骤 4:
   - 新增了针对 12bit 位深源视频与 SVT-AV1 不兼容的警告
