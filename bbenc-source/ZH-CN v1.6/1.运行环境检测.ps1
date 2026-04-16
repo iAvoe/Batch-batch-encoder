@@ -245,7 +245,7 @@ function Show-HardwareInformation {
             )
             
             $info | ForEach-Object { Write-Host "  $_" }
-            Write-Host ""
+            Write-Host ''
         }
     }
     catch {
@@ -274,7 +274,7 @@ function Show-HardwareInformation {
             )
             
             $info | ForEach-Object { Write-Host "  $_" }
-            Write-Host ""
+            Write-Host ''
         }
         
         Show-Success "总内存: $totalMemory GB"
@@ -423,7 +423,7 @@ function Main {
         Show-Warning "注意：UAC 当前已禁用，建议在处理完毕后重新启用以提高安全性"
     }
     
-    Write-Host ""
+    Write-Host ''
     Write-Host "按任意键退出..." -ForegroundColor Gray
     $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
 }

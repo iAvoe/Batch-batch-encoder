@@ -475,7 +475,7 @@ function Main {
     Show-Border
     Show-info ("ffprobe 源读取工具，导出 " + $Global:TempFolder + "temp_v_info(_is_mov).csv 以备用")
     Show-Border
-    Write-Host ""
+    Write-Host ''
 
     # 根据管道上游程序选择源类型
     $sourceTypes = @{
@@ -648,7 +648,7 @@ function Main {
         # }"
         # 读取文件并找到 gui_inputs 行，如：
         # gui_inputs="{\"inputs\": [{\"task_id\": \"798_2aa174\", \"input_path\": \"X:\\\\Video\\\\\\u5176\\u5b83-\\u52a8\\u6f2b\\u753b\\u516c\\u79cd\\\\[Airota][Yuru Yuri\\u3001][OVA][BDRip 1080p AVC AAC][CHS].mp4\", \"is_surveillance_folder\": false}]}"
-        Show-Info " 将尝试从 SVFI 渲染配置 INI 中读取视频源路径..."
+        Show-Info "将尝试从 SVFI 渲染配置 INI 中读取视频源路径..."
 
         try { # 读取 INI 并查找 gui_inputs 行
             $iniContent = Get-Content -LiteralPath $OneLineShotArgsINI -Raw -ErrorAction Stop
@@ -867,7 +867,7 @@ function Main {
     }
     catch { throw ("ffprobe 执行失败：" + $_) }
 
-    Write-Host ""
+    Write-Host ''
     Show-Success "脚本执行完成！"
     Read-Host "按 Enter 退出"
 }

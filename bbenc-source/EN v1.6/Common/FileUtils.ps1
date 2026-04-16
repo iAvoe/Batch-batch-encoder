@@ -29,7 +29,7 @@ function Confirm-FileDelete {
     }
 
     Remove-Item $Path -Force
-    Write-Host ""
+    Write-Host ''
     Show-Success "File deleted: $Path"
 }
 

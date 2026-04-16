@@ -113,7 +113,7 @@ function Get-EncodeOutputName {
 
     # 3. 交互循環
     while ($true) {
-        Write-Host ""
+        Write-Host ''
         $inputOp = Read-Host " 指定壓制結果的檔案名——[a：從文件拷貝 | b：手寫 | Enter：$displayPrompt]"
 
         # 3-1：直接 Enter（默認行為）
@@ -342,46 +342,78 @@ function Get-EncodingIOArgument {
 function Get-x264BaseParam {
     Param (
         [Parameter(Mandatory=$true)]$pickOps,
+        [switch]$askUserCRF,
         [switch]$askUserFGO
     )
 
     $isHelp = $pickOps -in @('helpzh', 'helpen')
     $enableFGO = $false
     if ($askUserFGO -and -not $isHelp) {
-        Write-Host ""
-        Write-Host " 少數修改版（Mod）x264 支持基於高頻資訊量的率失真最佳化（Film Grain Optimization）" -ForegroundColor Cyan
-        Write-Host " 用 x264.exe --fullhelp | findstr fgo 檢測 --fgo 參數是否被支援" -ForegroundColor DarkGray
-        if ((Read-Host " 輸入 'y' 以啟用 --fgo（提高畫質），或 Enter 以禁用（不支持或無法確定則禁）") -match '^[Yy]$') {
-            $enableFGO = $true
-            Show-Info "啟用 x264 參數 --fgo"
-        }
-        else { Show-Info "不用 x264 參數 --fgo" }
+        Write-Host ("─" * 50)
+        Show-Info "修改版（Mod）x264 支持「基於高頻資訊量的率失真最佳化（Film Grain Optimization）」，建議開啟"
+        Write-Host " 用 x264.exe --fullhelp 檢測 --fgo 參數是否存在" -ForegroundColor DarkGray
+        $enableFGO =
+            if ((Read-Host " 輸入 'y' 以啟用 --fgo（提高畫質），或 Enter 以禁用（包括無法確定）") -match '^[Yy]$') {
+                $true
+            }
+            else { $false }
+        Write-Host $(if ($enableFGO) {" 啟用 fgo" } else { " 禁用 fgo" })
+
     }
     elseif (-not $isHelp) {
         Write-Host " 已跳過 --fgo 請柬..."
     }
-    $fgo10 = if ($enableFGO) {" --fgo 10"} else {""}
-    $fgo15 = if ($enableFGO) {" --fgo 15"} else {""}
+    $fgo10 = if ($enableFGO) {" --fgo 10"} else { "" }
+    $fgo15 = if ($enableFGO) {" --fgo 15"} else { "" }
+
+    $crfParam = "--crf 23" # else default
+    if ($askUserCRF -and -not $isHelp) {
+        Write-Host ("─" * 50)
+        Show-Info "配置 x264 碼率調諧常量（CRF）正整數"
+
+        while ($true) {
+            $crf = Read-Host " [13-16：超清 | 18-20：高畫質 | 21-24：串流媒體 | 0：無損 | Enter：x264 默認（23）]"
+
+            if ([string]::IsNullOrEmpty($crf)) {
+                Write-Host " 使用默認 CRF：23"
+                break
+            }
+
+            [int]$crfInt = 0
+            if (-not [int]::TryParse($crf, [ref]$crfInt)) {
+                $choice = Read-Host " 輸入值非正整數，按 Enter 重試或輸入 'q' 強制退出"
+                if ($choice -eq 'q') { exit 1 }
+                continue
+            }
+            elseif ($crfInt -lt 0 -or $crfInt -gt 51) {
+                $choice = Read-Host " 輸入值超出 0-51 範圍，按 Enter 重試或輸入 'q' 強制退出"
+                if ($choice -eq 'q') { exit 1 }
+                continue
+            }
+            $crfParam = "--crf $crf"
+            break
+        }
+    }
 
     $default = if ($script:interlacedArgs.isInterlaced) {
-        ("--bframes 14 --b-adapt 2 --me umh --subme 9 --merange 48 --no-fast-pskip --direct auto --weightp 0 --weightb --min-keyint 5 --ref 3 --crf 18 --chroma-qp-offset -2 --aq-mode 3 --aq-strength 0.7 --trellis 2 --deblock 0:0 --psy-rd 0.77:0.22" + $fgo10)
+        ("--bframes 14 --b-adapt 2 --me umh --subme 9 --merange 48 --no-fast-pskip --direct auto --weightp 0 --weightb --min-keyint 5 --ref 3 $crfParam --chroma-qp-offset -2 --aq-mode 3 --aq-strength 0.7 --trellis 2 --deblock 0:0 --psy-rd 0.77:0.22" + $fgo10)
     }
     else {
-        ("--bframes 14 --b-adapt 2 --me umh --subme 9 --merange 48 --no-fast-pskip --direct auto --weightb --min-keyint 5 --ref 3 --crf 18 --chroma-qp-offset -2 --aq-mode 3 --aq-strength 0.7 --trellis 2 --deblock 0:0 --psy-rd 0.77:0.22" + $fgo10)
+        ("--bframes 14 --b-adapt 2 --me umh --subme 9 --merange 48 --no-fast-pskip --direct auto --weightb --min-keyint 5 --ref 3 $crfParam --chroma-qp-offset -2 --aq-mode 3 --aq-strength 0.7 --trellis 2 --deblock 0:0 --psy-rd 0.77:0.22" + $fgo10)
     }
     
     switch ($pickOps) {
         # 通用 General Purpose，bframes 14
         a {return $default}
         # 素材 Stock Footage，bframes 12
-        b {return ("--partitions all --bframes 12 --b-adapt 2 --me esa --merange 48 --no-fast-pskip --direct auto --weightb --min-keyint 1 --ref 3 --crf 16 --tune grain --trellis 2" + $fgo15)}
+        b {return ("--partitions all --bframes 12 --b-adapt 2 --me esa --merange 48 --no-fast-pskip --direct auto --weightb --min-keyint 1 --ref 3 $crfParam --tune grain --trellis 2" + $fgo15)}
         helpzh {
-            Write-Host ""
+            Write-Host ''
             Write-Host " 選擇 x264 自訂預設——[a：通用 | b：剪輯素材]" -ForegroundColor Yellow
             return
         }
         helpen {
-            Write-Host ""
+            Write-Host ''
             Write-Host " Select a custom preset for x264——[a: general purpose | b: stock footage]" -ForegroundColor Yellow
             return
         }
@@ -394,29 +426,60 @@ function Get-x264BaseParam {
 
 # 獲取基礎參數：ffmpeg.exe -y -i ".\in.mp4" -an -f yuv4mpegpipe -strict -1 - | x265.exe [Get-...] [Get-x265BaseParam] --y4m --input - --output ".\out.hevc"
 function Get-x265BaseParam {
-    Param ([Parameter(Mandatory=$true)]$pickOps)
-    # TODO：添加 DJATOM? Mod 的深度自訂 AQ
-    # $isHelp = $pickOps -in @('helpzh', 'helpen')
+    Param (
+        [Parameter(Mandatory=$true)]$pickOps,
+        [switch]$askUserCRF
+    )
+    $isHelp = $pickOps -in @('helpzh', 'helpen')
     $default = "--high-tier --preset slow --me umh --weightb --aq-mode 4 --bframes 5 --ref 3"
+
+    $crfParam = "--crf 28" # else default
+    if ($askUserCRF -and -not $isHelp) {
+        Write-Host ("─" * 50)
+        Show-Info "配置 x265 碼率調諧常量（CRF）正整數"
+
+        while ($true) {
+            $crf = Read-Host " [17-20：超清 | 21-25：高畫質 | 26-30：串流媒體 | 0：無損 | Enter：x265 默認（28）]"
+
+            if ([string]::IsNullOrEmpty($crf)) {
+                Write-Host " 使用默認 CRF：28"
+                break
+            }
+
+            [int]$crfInt = 0
+            if (-not [int]::TryParse($crf, [ref]$crfInt)) {
+                $choice = Read-Host " 輸入值非正整數，按 Enter 重試或輸入 'q' 強制退出"
+                if ($choice -eq 'q') { exit 1 }
+                continue
+            }
+            elseif ($crfInt -lt 0 -or $crfInt -gt 51) {
+                $choice = Read-Host " 輸入值超出 0-51 範圍，按 Enter 重試或輸入 'q' 強制退出"
+                if ($choice -eq 'q') { exit 1 }
+                continue
+            }
+            $crfParam = "--crf $crf"
+            break
+        }
+    }
 
     switch ($pickOps) {
         # 通用 General Purpose，bframes 5
         a {return $default}
         # 錄影 Movie，bframes 8
-        b {return "--high-tier --ctu 64 --tu-intra-depth 4 --tu-inter-depth 4 --limit-tu 1 --rect --tskip --tskip-fast --me star --weightb --ref 4 --max-merge 5 --no-open-gop --min-keyint 3 --fades --bframes 8 --b-adapt 2 --b-intra --crf 21.8 --crqpoffs -3 --ipratio 1.2 --pbratio 1.5 --rdoq-level 2 --aq-mode 4 --aq-strength 1.1 --qg-size 8 --rd 5 --limit-refs 0 --rskip 0 --deblock 0:-1 --limit-sao --sao-non-deblock --selective-sao 3"} 
+        b {return "--high-tier --ctu 64 --tu-intra-depth 4 --tu-inter-depth 4 --limit-tu 1 --rect --tskip --tskip-fast --me star --weightb --ref 4 --max-merge 5 --no-open-gop --min-keyint 3 --fades --bframes 8 --b-adapt 2 --b-intra $crfParam --crqpoffs -3 --ipratio 1.2 --pbratio 1.5 --rdoq-level 2 --aq-mode 4 --aq-strength 1.1 --qg-size 8 --rd 5 --limit-refs 0 --rskip 0 --deblock 0:-1 --limit-sao --sao-non-deblock --selective-sao 3"} 
         # 素材 Stock Footage，bframes 7
-        c {return "--high-tier --ctu 32 --tskip --me star --max-merge 5 --early-skip --b-intra --no-open-gop --min-keyint 1 --ref 3 --fades --bframes 7 --b-adapt 2 --crf 17 --crqpoffs -3 --cbqpoffs -2 --rd 3 --limit-modes --limit-refs 1 --rskip 1 --splitrd-skip --deblock -1:-1 --tune grain"}
+        c {return "--high-tier --ctu 32 --tskip --me star --max-merge 5 --early-skip --b-intra --no-open-gop --min-keyint 1 --ref 3 --fades --bframes 7 --b-adapt 2 $crfParam --crqpoffs -3 --cbqpoffs -2 --rd 3 --limit-modes --limit-refs 1 --rskip 1 --splitrd-skip --deblock -1:-1 --tune grain"}
         # 動漫 Anime，bframes 16
-        d {return "--high-tier --tu-intra-depth 4 --tu-inter-depth 4 --max-tu-size 16 --tskip --tskip-fast --me umh --weightb --max-merge 5 --early-skip --ref 3 --no-open-gop --min-keyint 5 --fades --bframes 16 --b-adapt 2 --bframe-bias 20 --constrained-intra --b-intra --crf 22 --crqpoffs -4 --cbqpoffs -2 --ipratio 1.6 --pbratio 1.3 --cu-lossless --psy-rdoq 2.3 --rdoq-level 2 --hevc-aq --aq-strength 0.9 --qg-size 8 --rd 3 --limit-modes --limit-refs 1 --rskip 1 --rect --amp --psy-rd 1.5 --splitrd-skip --rdpenalty 2 --deblock -1:0 --limit-sao --sao-non-deblock"}
+        d {return "--high-tier --tu-intra-depth 4 --tu-inter-depth 4 --max-tu-size 16 --tskip --tskip-fast --me umh --weightb --max-merge 5 --early-skip --ref 3 --no-open-gop --min-keyint 5 --fades --bframes 16 --b-adapt 2 --bframe-bias 20 --constrained-intra --b-intra $crfParam --crqpoffs -4 --cbqpoffs -2 --ipratio 1.6 --pbratio 1.3 --cu-lossless --psy-rdoq 2.3 --rdoq-level 2 --hevc-aq --aq-strength 0.9 --qg-size 8 --rd 3 --limit-modes --limit-refs 1 --rskip 1 --rect --amp --psy-rd 1.5 --splitrd-skip --rdpenalty 2 --deblock -1:0 --limit-sao --sao-non-deblock"}
         # 窮舉法 Exhausive
-        e {return "--high-tier --tu-intra-depth 4 --tu-inter-depth 4 --max-tu-size 4 --limit-tu 1 --rect --amp --tskip --me star --weightb --max-merge 5 --ref 3 --no-open-gop --min-keyint 1 --fades --bframes 16 --b-adapt 2 --b-intra --crf 18.1 --crqpoffs -5 --cbqpoffs -2 --ipratio 1.67 --pbratio 1.33 --cu-lossless --psy-rdoq 2.5 --rdoq-level 2 --hevc-aq --aq-strength 1.4 --qg-size 8 --rd 5 --limit-refs 0 --rskip 2 --rskip-edge-threshold 3 --no-cutree --psy-rd 1.5 --rdpenalty 2 --deblock -2:-2 --limit-sao --sao-non-deblock --selective-sao 1"}
+        e {return "--high-tier --tu-intra-depth 4 --tu-inter-depth 4 --max-tu-size 4 --limit-tu 1 --rect --amp --tskip --me star --weightb --max-merge 5 --ref 3 --no-open-gop --min-keyint 1 --fades --bframes 16 --b-adapt 2 --b-intra $crfParam --crqpoffs -5 --cbqpoffs -2 --ipratio 1.67 --pbratio 1.33 --cu-lossless --psy-rdoq 2.5 --rdoq-level 2 --hevc-aq --aq-strength 1.4 --qg-size 8 --rd 5 --limit-refs 0 --rskip 2 --rskip-edge-threshold 3 --no-cutree --psy-rd 1.5 --rdpenalty 2 --deblock -2:-2 --limit-sao --sao-non-deblock --selective-sao 1"}
         helpzh {
-            Write-Host ""
+            Write-Host ''
             Write-Host " 選擇 x265 自訂預設——[a：通用 | b：錄影 | c：剪輯素材 | d：動漫 | e：窮舉法]" -ForegroundColor Yellow
             return
         }
         helpen {
-            Write-Host ""
+            Write-Host ''
             Write-Host " Select a custom preset for x265——[a: general purpose | b: film | c: stock footage | d: anime | e: exhausive]" -ForegroundColor Yellow
             return
         }
@@ -431,41 +494,72 @@ function Get-x265BaseParam {
 function Get-svtav1BaseParam {
     Param (
         [Parameter(Mandatory=$true)]$pickOps,
+        [switch]$askUserCRF,
         [switch]$askUserDLF
     )
-    
     $isHelp = $pickOps -in @('helpzh', 'helpen')
+    
     $enableDLF2 = $false
-    Write-Host ""
+    Write-Host ''
     if ($askUserDLF -and (-not $isHelp) -and ($pickOps -ne 'b')) {
-        Write-Host " Get-svtav1BaseParam：少數修改版 SVT-AV1 編碼器（如 SVT-AV1-Essential）支持高精度去塊濾鏡 --enable-dlf 2"  -ForegroundColor Cyan
-        Write-Host " 用 SvtAv1EncApp.exe --help | findstr enable-dlf 即可檢測`'2`'是否受支援" -ForegroundColor DarkGray
-        if ((Read-Host " 輸入 'y' 以啟用 --enable-dlf 2（提高畫質），或 Enter 使用常規去塊濾鏡（不支持或無法確定則禁）") -match '^[Yy]$') {
-            $enableDLF2 = $true
-            Show-Info "啟用了 SVT-AV1 參數 --enable-dlf 2"
-        }
-        else { Show-Info "啟用 SVT-AV1 參數 --enable-dlf 1" }
+        Write-Host " 修改版 SVT-AV1 編碼器（如 SVT-AV1-Essential）支持高精度去塊濾鏡 --enable-dlf 2"  -ForegroundColor Cyan
+        Write-Host " 用 SvtAv1EncApp.exe --help 檢測值`'2`'是否受支援" -ForegroundColor DarkGray
+        $enableDLF2 =
+            if ((Read-Host " 輸入 'y' 以啟用（提高畫質），或 Enter 以禁用（包括無法確定）") -match '^[Yy]$') {
+                $true
+            }
+            else { $false }
+        Write-Host $(if ($enableDLF2) { " 啟用 dlf2" } else { " 禁用 dlf2" })
     }
     elseif (-not $isHelp) {
         Write-Host " 已跳過 --enable-dlf 2 請柬..."
     }
     $deblock = if ($enableDLF2) {"--enable-dlf 2"} else {"--enable-dlf 1"}
 
-    $default = ("--preset 2 --scd 1 --enable-tf 2 --tf-strength 2 --crf 30 --enable-qm 1 --enable-variance-boost 1 --variance-boost-curve 2 --variance-boost-strength 2 --variance-octile 2 --sharpness 6 --progress 1 " + $deblock)
+    $crfParam = "--crf 35" # else default
+    if ($askUserCRF -and -not $isHelp) {
+        Write-Host ("─" * 50)
+        Show-Info "配置 SVT-AV1 碼率調諧常量（CRF）正整數"
+
+        while ($true) {
+            $crf = Read-Host " [28-32：超清 | 33-36：高畫質 | 37-40：串流媒體 | 1：無損 | Enter：SVT-AV1 默認（35）]"
+
+            if ([string]::IsNullOrEmpty($crf)) {
+                Write-Host " 使用默認 CRF：35"
+                break
+            }
+
+            [int]$crfInt = 0
+            if (-not [int]::TryParse($crf, [ref]$crfInt)) {
+                $choice = Read-Host " 輸入值非正整數，按 Enter 重試或輸入 'q' 強制退出"
+                if ($choice -eq 'q') { exit 1 }
+                continue
+            }
+            elseif ($crfInt -lt 1 -or $crfInt -gt 70) {
+                $choice = Read-Host " 輸入值超出 1-70 範圍，按 Enter 重試或輸入 'q' 強制退出"
+                if ($choice -eq 'q') { exit 1 }
+                continue
+            }
+            $crfParam = "--crf $crf"
+            break
+        }
+    }
+
+    $default = ("--preset 2 --scd 1 --enable-tf 2 --tf-strength 2 $crfParam --enable-qm 1 --enable-variance-boost 1 --variance-boost-curve 2 --variance-boost-strength 2 --variance-octile 2 --sharpness 6 --progress 1 " + $deblock)
     switch ($pickOps) {
         # 畫質 Quality
         a {return $default}
         # 壓縮 Compression
-        b {return ("--preset 2 --scd 1 --enable-tf 2 --tf-strength 2 --crf 30 --sharpness 4 --progress 1 " + $deblock)}
+        b {return ("--preset 2 --scd 1 --enable-tf 2 --tf-strength 2 $crfParam --sharpness 4 --progress 1 " + $deblock)}
         # 速度 Speed
-        c {return "--preset 2 --scd 1 --scm 0 --enable-tf 2 --tf-strength 2 --crf 30 --tune 0 --enable-variance-boost 1 --variance-boost-curve 2 --variance-boost-strength 2 --variance-octile 2 --sharpness 4 --progress 1"}
+        c {return "--preset 2 --scd 1 --scm 0 --enable-tf 2 --tf-strength 2 $crfParam --tune 0 --enable-variance-boost 1 --variance-boost-curve 2 --variance-boost-strength 2 --variance-octile 2 --sharpness 4 --progress 1"}
         helpzh {
-            Write-Host ""
+            Write-Host ''
             Write-Host " 選擇 SVT-AV1 自訂預設——[a：畫質優先 | b：壓縮優先 | c：速度優先]" -ForegroundColor Yellow
             return
         }
         helpen {
-            Write-Host ""
+            Write-Host ''
             Write-Host " Select a custom preset for SVT-AV1——[a: HQ | b: High compression | c: High speed]" -ForegroundColor Yellow
             return
         }
@@ -491,7 +585,7 @@ function Invoke-BaseParamSelection {
         $selection = (Read-Host " 指定一份 $CodecName 自訂預設，輸入 'q' 忽略（沿用編碼器內建默認）").ToLower()
 
         if ($selection -eq 'q') { # $selectedParam = "" # 已經是預設值，不用再賦值
-            break;
+            break
         }
         elseif ($selection -notmatch "^[a-z]$") {
             if ((Read-Host " 無法識別選項，按 Enter 重試，輸入 'q' 強制退出") -eq 'q') {
@@ -534,24 +628,24 @@ function Get-Keyint {
     $userSecond = $null # 用戶指定秒
     if ($askUser) {
         if ($isx264) {
-            Write-Host ""
+            Write-Host ''
             Show-Info "請指定 x264 的最大關鍵幀間隔秒"
-            Write-Host " （正整數，非幀數，如：11 代表 11 秒）"
+            Write-Host " 正整數，非幀數，如：11 代表 11 秒" -ForegroundColor DarkGray
         }
         elseif ($isx265) {
-            Write-Host ""
+            Write-Host ''
             Show-Info "請指定 x265 的最大關鍵幀間隔秒數"
-            Write-Host " （正整數，非幀數，如：12 代表 12 秒）"
+            Write-Host " 正整數，非幀數，如：12 代表 12 秒" -ForegroundColor DarkGray
         }
         elseif ($isSVTAV1) {
-            Write-Host ""
+            Write-Host ''
             Show-Info "請指定 SVT-AV1 的最大關鍵幀間隔秒數"
-            Write-Host " （正整數，非幀數，如：13 代表 13 秒）"
+            Write-Host " 正整數，非幀數，如：13 代表 13 秒" -ForegroundColor DarkGray
         }
         else {
             throw "未指定要配置最大關鍵幀間隔參數的編碼器，無法執行"
         }
-        Write-Host ""
+        Write-Host ''
         
         $userSecond = $null
         do { # 默認多軌剪輯的的解碼占用為關鍵幀間隔取和，但實際情況下，解碼占用取決於硬體解碼器的數量，所以僅設為兩倍
@@ -1201,7 +1295,7 @@ function Main {
     Show-Border
     Write-Host "參數計算與批處理注入工具" -ForegroundColor Cyan
     Show-Border
-    Write-Host ""
+    Write-Host ''
 
     # 1. 自動尋找最新的 ffprobe CSV，並讀取影片資訊
     $ffprobeCsvPath = 
@@ -1227,7 +1321,7 @@ function Main {
     $ffprobeCSV =
         Import-Csv $ffprobeCsvPath -Header A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,AA,AB,AC,AD,AE,AF,AG,AH,AI,AJ
     $sourceCSV =
-        Import-Csv $sourceInfoCsvPath -Header SourcePath,UpstreamCode,Avs2PipeModDllPath,SvfiConfigInput,SvfiTaskId
+        Import-Csv $sourceInfoCsvPath -Header SourcePath,UpstreamCode,Avs2PipeModDllPath,SvfiInputConf,SvfiTaskId
 
     # 驗證 CSV 數據
     if (-not $sourceCSV.SourcePath) { # 直接驗證 CSV 項存在，不需要添加引號
@@ -1281,7 +1375,7 @@ function Main {
     # 獲取並配置色彩空間格式
     $avs2yuvVersionCode = 'a'
     if ($sourceCSV.UpstreamCode -eq 'c') {
-        Write-Host ""
+        Write-Host ''
         Show-Info "選擇使用的 avs2yuv(64).exe 類型："
         $avs2yuvVersionCode = Read-Host " [默認 Enter/a: AviSynth+ (0.30) | b: AviSynth (up to 0.26)]"
     }
@@ -1316,15 +1410,14 @@ function Main {
     $quotedDllPath = Get-QuotedPath $sourceCSV.Avs2PipeModDllPath
     $avsmodParams.DLLInput = "-dll $quotedDllPath"
 
-    # SVFI 需要的設定檔以及 Task ID
-    if (-not [string]::IsNullOrWhiteSpace($sourceCSV.SvfiConfigInput)) {
-        $quotedSvfiConfig = Get-QuotedPath $sourceCSV.SvfiConfigInput
-        $olsargParams.ConfigInput = "--config $quotedSvfiConfig --task-id $($sourceCSV.SvfiTaskId)"
-        Show-Debug "olsargParams.ConfigInput: $($olsargParams.ConfigInput)"
-    }
-    else { $olsargParams.ConfigInput = "" }
+    # SVFI 需要的設定檔及 Task ID
+    $olsargParams.ConfigInput =
+        if (![string]::IsNullOrWhiteSpace($sourceCSV.SvfiInputConf)) {
+            "--config $(Get-QuotedPath $sourceCSV.SvfiInputConf) --task-id $($sourceCSV.SvfiTaskId)"
+        }
+        else { '' }
 
-    Write-Host ""
+    Write-Host ''
     Show-Info "配置編碼結果導出路徑、檔案名..."
     $encodeOutputPath = Select-Folder -Description "選擇壓制結果的導出位置"
     # 1. 獲取源檔案名（用於傳遞給函數）
@@ -1340,7 +1433,7 @@ function Main {
         $program -in @('x265', 'h265', 'hevc', 'svt-av1', 'svtav1', 'ivf')) {
         Show-Info "Get-EncodingIOArgument：SVT-AV1 原生不支持隔行掃描、x265 的隔行掃描編碼是實驗性功能（官方版）"
         Show-Info ("轉逐行與 IVTC 濾鏡教學：" + $script:interlacedArgs.toPFilterTutorial)
-        Write-Host ""
+        Write-Host ''
     }
 
     Show-Info "生成管道上下遊程序的 IO 參數 (Input/Output)..."
@@ -1363,9 +1456,9 @@ function Main {
     Write-Host ("─" * 50)
 
     Show-Info "構建管道下游（編碼器）基礎參數..."
-    $x264Params.BaseParam = Invoke-BaseParamSelection -CodecName "x264" -GetParamFunc ${function:Get-x264BaseParam} -ExtraParams @{ askUserFGO = $true }
-    $x265Params.BaseParam = Invoke-BaseParamSelection -CodecName "x265" -GetParamFunc ${function:Get-x265BaseParam}
-    $svtav1Params.BaseParam = Invoke-BaseParamSelection -CodecName "SVT-AV1" -GetParamFunc ${function:Get-svtav1BaseParam} -ExtraParams @{ askUserDLF = $true }
+    $x264Params.BaseParam = Invoke-BaseParamSelection -CodecName "x264" -GetParamFunc ${function:Get-x264BaseParam} -ExtraParams @{ askUserFGO = $true; askUserCRF = $true }
+    $x265Params.BaseParam = Invoke-BaseParamSelection -CodecName "x265" -GetParamFunc ${function:Get-x265BaseParam} -ExtraParams @{ askUserCRF = $true }
+    $svtav1Params.BaseParam = Invoke-BaseParamSelection -CodecName "SVT-AV1" -GetParamFunc ${function:Get-svtav1BaseParam} -ExtraParams @{ askUserDLF = $true; askUserCRF = $true }
 
     Show-Info "拼接最終參數字串..."
     # 這些字串將直接注入到批處理的 "set 'xxx_params=...'" 中
@@ -1392,7 +1485,7 @@ function Main {
     }
 
     # 生成 ffmpeg, vspipe, avs2yuv, avs2pipemod 編碼任務批處理
-    Write-Host ""
+    Write-Host ''
     Show-Info "定位先前腳本生成的 encode_template.bat 模板..."
     $templateBatch = $null
     while (-not $templateBatch) {
@@ -1464,7 +1557,7 @@ REM svtav1_appendix=$svtav1RawPipeApdx
     # 保存最終文件
     $finalBatchPath = Join-Path (Split-Path $templateBatch) "encode_task_final.bat"
     Show-Debug "輸出文件：$finalBatchPath"
-    Write-Host ""
+    Write-Host ''
     
     try {
         Confirm-FileDelete $finalBatchPath
@@ -1477,7 +1570,7 @@ REM svtav1_appendix=$svtav1RawPipeApdx
         }
     
         Show-Success "任務生成成功！"
-        Write-Host ""
+        Write-Host ''
         
         Write-Host ("─" * 50)
         

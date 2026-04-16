@@ -80,6 +80,11 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 <p align="center"><img src="bmc_qr.png" alt="支持一下 -_-"><br><img src="pp_tip_qr.png" alt="支持一下 =_="></p>
 
 ## 更新信息
+**v1.7.8**
+- 步骤 4:
+  - 为所有编码器新增了多种 CRF 值自定义选项
+  - 简化了代码
+
 **v1.7.2**
 - 文件删除操作交互逻辑变更——输入 y 确认，输入 q 取消，Enter 循环的操作逻辑
 - 步骤 4 简化了代码，无功能性变更

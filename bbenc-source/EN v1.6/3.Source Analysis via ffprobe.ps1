@@ -482,7 +482,7 @@ function Main {
     Show-Border
     Show-info (" ffprobe source analyzer, exports " + $Global:TempFolder + "temp_v_info(_is_mov).csv`r`n for later script to take reference on")
     Show-Border
-    Write-Host ""
+    Write-Host ''
 
     # Select source type based on upstream tool
     $sourceTypes = @{
@@ -873,7 +873,7 @@ function Main {
     }
     catch { throw ("ffprobe execution failed: " + $_) }
 
-    Write-Host ""
+    Write-Host ''
     Show-Success "Script Completed!"
     Read-Host "Press any button to exit"
 }

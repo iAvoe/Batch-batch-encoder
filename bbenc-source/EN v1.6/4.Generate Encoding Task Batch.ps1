@@ -114,7 +114,7 @@ function Get-EncodeOutputName {
 
     # 3. UI loop
     while ($true) {
-        Write-Host ""
+        Write-Host ''
         $inputOp = Read-Host " Specify the output filename——[a: Copy from file | b: Input | Enter: $displayPrompt]"
 
         # 3-1: Enter (default behavior)
@@ -346,14 +346,15 @@ function Get-EncodingIOArgument {
 function Get-x264BaseParam {
     Param (
         [Parameter(Mandatory=$true)]$pickOps,
+        [switch]$askUserCRF,
         [switch]$askUserFGO
     )
 
     $isHelp = $pickOps -in @('helpzh', 'helpen')
     $enableFGO = $false
     if ($askUserFGO -and -not $isHelp) {
-        Write-Host ""
-        Write-Host " Some modified/unofficial x264 support high-frequency information rate-distortion optimization (Film Grain Optimization)." -ForegroundColor Cyan
+        Write-Host ''
+        Write-Host " Some modified x264 supports high-freq rate-distortion opt. (Film Grain Opt.), enabling is recommended" -ForegroundColor Cyan
         Write-Host " Test with 'x264.exe --fullhelp | findstr fgo' to verify if its supported (shows up)" -ForegroundColor DarkGray
         if ((Read-Host " Input 'y' to add '--fgo' for better image, or Enter to disable (disable if unsure / can't confim)") -match '^[Yy]$') {
             $enableFGO = $true
@@ -364,28 +365,57 @@ function Get-x264BaseParam {
     elseif (-not $isHelp) {
         Write-Host " Skipped '--fgo' prompt..."
     }
-    $fgo10 = if ($enableFGO) {" --fgo 10"} else {""}
-    $fgo15 = if ($enableFGO) {" --fgo 15"} else {""}
+    $fgo10 = if ($enableFGO) {" --fgo 10"} else { "" }
+    $fgo15 = if ($enableFGO) {" --fgo 15"} else { "" }
+
+    $crfParam = "--crf 23" # else default
+    if ($askUserCRF -and -not $isHelp) {
+        Write-Host ("─" * 50)
+        Show-Info "Configure x264 constant rate factor (CRF) in positive integer"
+
+        while ($true) {
+            $crf = Read-Host " [13-16：UHQ | 18-20：HQ | 21-24：Stream media | 0：Lossless | Enter：x264 default(23)]"
+
+            if ([string]::IsNullOrEmpty($crf)) {
+                Write-Host " Using default CRF：23"
+                break
+            }
+
+            [int]$crfInt = 0
+            if (-not [int]::TryParse($crf, [ref]$crfInt)) {
+                $choice = Read-Host " Input is not positive integer. Press Enter to retry, input 'q' to force exit"
+                if ($choice -eq 'q') { exit 1 }
+                continue
+            }
+            elseif ($crfInt -lt 0 -or $crfInt -gt 51) {
+                $choice = Read-Host " Input is out of 0-51 range. Press Enter to retry, input 'q' to force exit"
+                if ($choice -eq 'q') { exit 1 }
+                continue
+            }
+            $crfParam = "--crf $crf"
+            break
+        }
+    }
 
     $default = if ($script:interlacedArgs.isInterlaced) {
-        ("--bframes 14 --b-adapt 2 --me umh --subme 9 --merange 48 --no-fast-pskip --direct auto --weightp 0 --weightb --min-keyint 5 --ref 3 --crf 18 --chroma-qp-offset -2 --aq-mode 3 --aq-strength 0.7 --trellis 2 --deblock 0:0 --psy-rd 0.77:0.22" + $fgo10)
+        ("--bframes 14 --b-adapt 2 --me umh --subme 9 --merange 48 --no-fast-pskip --direct auto --weightp 0 --weightb --min-keyint 5 --ref 3 $crfParam --chroma-qp-offset -2 --aq-mode 3 --aq-strength 0.7 --trellis 2 --deblock 0:0 --psy-rd 0.77:0.22" + $fgo10)
     }
     else {
-        ("--bframes 14 --b-adapt 2 --me umh --subme 9 --merange 48 --no-fast-pskip --direct auto --weightb --min-keyint 5 --ref 3 --crf 18 --chroma-qp-offset -2 --aq-mode 3 --aq-strength 0.7 --trellis 2 --deblock 0:0 --psy-rd 0.77:0.22" + $fgo10)
+        ("--bframes 14 --b-adapt 2 --me umh --subme 9 --merange 48 --no-fast-pskip --direct auto --weightb --min-keyint 5 --ref 3 $crfParam --chroma-qp-offset -2 --aq-mode 3 --aq-strength 0.7 --trellis 2 --deblock 0:0 --psy-rd 0.77:0.22" + $fgo10)
     }
 
     switch ($pickOps) {
         # General Purpose，bframes 14
         a {return $default}
         # Stock Footage for Editing，bframes 12
-        b {return ("--partitions all --bframes 12 --b-adapt 2 --me esa --merange 48 --no-fast-pskip --direct auto --weightb --min-keyint 1 --ref 3 --crf 16 --tune grain --trellis 2" + $fgo15)}
+        b {return ("--partitions all --bframes 12 --b-adapt 2 --me esa --merange 48 --no-fast-pskip --direct auto --weightb --min-keyint 1 --ref 3 $crfParam --tune grain --trellis 2" + $fgo15)}
         helpzh {
-            Write-Host ""
+            Write-Host ''
             Write-Host " 选择 x264 自定义预设——[a：通用 | b：剪辑素材]" -ForegroundColor Yellow
             return
         }
         helpen {
-            Write-Host ""
+            Write-Host ''
             Write-Host " Select a custom preset for x264——[a: general purpose | b: stock footage]" -ForegroundColor Yellow
             return
         }
@@ -398,27 +428,60 @@ function Get-x264BaseParam {
 
 # Retrieve basic x265 parametersffmpeg.exe -y -i ".\in.mp4" -an -f yuv4mpegpipe -strict -1 - | x265.exe [Get-...] [Get-x265BaseParam] --y4m --input - --output ".\out.hevc"
 function Get-x265BaseParam {
-    Param ([Parameter(Mandatory=$true)]$pickOps)
-    # TODO: Add DJATOM? Mod's fully customizable AQ
+    Param (
+        [Parameter(Mandatory=$true)]$pickOps,
+        [switch]$askUserCRF
+    )
+    $isHelp = $pickOps -in @('helpzh', 'helpen')
     $default = "--high-tier --preset slow --me umh --weightb --aq-mode 4 --bframes 5 --ref 3"
+
+    $crfParam = "--crf 28" # else default
+    if ($askUserCRF -and -not $isHelp) {
+        Write-Host ("─" * 50)
+        Show-Info "Configure x265 constant rate factor (CRF) in positive integer"
+
+        while ($true) {
+            $crf = Read-Host " [17-20：UHQ | 21-25：HQ | 26-30：Stream media | 0：Lossless | Enter：x265 default (28)]"
+
+            if ([string]::IsNullOrEmpty($crf)) {
+                Write-Host " Using default CRF：28"
+                break
+            }
+
+            [int]$crfInt = 0
+            if (-not [int]::TryParse($crf, [ref]$crfInt)) {
+                $choice = Read-Host " Input is not positive integer. Press Enter to retry, input 'q' to force exit"
+                if ($choice -eq 'q') { exit 1 }
+                continue
+            }
+            elseif ($crfInt -lt 0 -or $crfInt -gt 51) {
+                $choice = Read-Host " Input is out of 0-51 range. Press Enter to retry, input 'q' to force exit"
+                if ($choice -eq 'q') { exit 1 }
+                continue
+            }
+            $crfParam = "--crf $crf"
+            break
+        }
+    }
+
     switch ($pickOps) {
         # General Purpose，bframes 5
         a {return $default}
         # Movie，bframes 8
-        b {return "--high-tier --ctu 64 --tu-intra-depth 4 --tu-inter-depth 4 --limit-tu 1 --rect --tskip --tskip-fast --me star --weightb --ref 4 --max-merge 5 --no-open-gop --min-keyint 3 --fades --bframes 8 --b-adapt 2 --b-intra --crf 21.8 --crqpoffs -3 --ipratio 1.2 --pbratio 1.5 --rdoq-level 2 --aq-mode 4 --aq-strength 1.1 --qg-size 8 --rd 5 --limit-refs 0 --rskip 0 --deblock 0:-1 --limit-sao --sao-non-deblock --selective-sao 3"} 
+        b {return "--high-tier --ctu 64 --tu-intra-depth 4 --tu-inter-depth 4 --limit-tu 1 --rect --tskip --tskip-fast --me star --weightb --ref 4 --max-merge 5 --no-open-gop --min-keyint 3 --fades --bframes 8 --b-adapt 2 --b-intra $crfParam --crqpoffs -3 --ipratio 1.2 --pbratio 1.5 --rdoq-level 2 --aq-mode 4 --aq-strength 1.1 --qg-size 8 --rd 5 --limit-refs 0 --rskip 0 --deblock 0:-1 --limit-sao --sao-non-deblock --selective-sao 3"} 
         # Stock Footage，bframes 7
-        c {return "--high-tier --ctu 32 --tskip --me star --max-merge 5 --early-skip --b-intra --no-open-gop --min-keyint 1 --ref 3 --fades --bframes 7 --b-adapt 2 --crf 17 --crqpoffs -3 --cbqpoffs -2 --rd 3 --limit-modes --limit-refs 1 --rskip 1 --splitrd-skip --deblock -1:-1 --tune grain"}
+        c {return "--high-tier --ctu 32 --tskip --me star --max-merge 5 --early-skip --b-intra --no-open-gop --min-keyint 1 --ref 3 --fades --bframes 7 --b-adapt 2 $crfParam --crqpoffs -3 --cbqpoffs -2 --rd 3 --limit-modes --limit-refs 1 --rskip 1 --splitrd-skip --deblock -1:-1 --tune grain"}
         # Anime，bframes 16
-        d {return "--high-tier --tu-intra-depth 4 --tu-inter-depth 4 --max-tu-size 16 --tskip --tskip-fast --me umh --weightb --max-merge 5 --early-skip --ref 3 --no-open-gop --min-keyint 5 --fades --bframes 16 --b-adapt 2 --bframe-bias 20 --constrained-intra --b-intra --crf 22 --crqpoffs -4 --cbqpoffs -2 --ipratio 1.6 --pbratio 1.3 --cu-lossless --psy-rdoq 2.3 --rdoq-level 2 --hevc-aq --aq-strength 0.9 --qg-size 8 --rd 3 --limit-modes --limit-refs 1 --rskip 1 --rect --amp --psy-rd 1.5 --splitrd-skip --rdpenalty 2 --deblock -1:0 --limit-sao --sao-non-deblock"}
+        d {return "--high-tier --tu-intra-depth 4 --tu-inter-depth 4 --max-tu-size 16 --tskip --tskip-fast --me umh --weightb --max-merge 5 --early-skip --ref 3 --no-open-gop --min-keyint 5 --fades --bframes 16 --b-adapt 2 --bframe-bias 20 --constrained-intra --b-intra $crfParam --crqpoffs -4 --cbqpoffs -2 --ipratio 1.6 --pbratio 1.3 --cu-lossless --psy-rdoq 2.3 --rdoq-level 2 --hevc-aq --aq-strength 0.9 --qg-size 8 --rd 3 --limit-modes --limit-refs 1 --rskip 1 --rect --amp --psy-rd 1.5 --splitrd-skip --rdpenalty 2 --deblock -1:0 --limit-sao --sao-non-deblock"}
         # Exhausive
-        e {return "--high-tier --tu-intra-depth 4 --tu-inter-depth 4 --max-tu-size 4 --limit-tu 1 --rect --amp --tskip --me star --weightb --max-merge 5 --ref 3 --no-open-gop --min-keyint 1 --fades --bframes 16 --b-adapt 2 --b-intra --crf 18.1 --crqpoffs -5 --cbqpoffs -2 --ipratio 1.67 --pbratio 1.33 --cu-lossless --psy-rdoq 2.5 --rdoq-level 2 --hevc-aq --aq-strength 1.4 --qg-size 8 --rd 5 --limit-refs 0 --rskip 2 --rskip-edge-threshold 3 --no-cutree --psy-rd 1.5 --rdpenalty 2 --deblock -2:-2 --limit-sao --sao-non-deblock --selective-sao 1"}
+        e {return "--high-tier --tu-intra-depth 4 --tu-inter-depth 4 --max-tu-size 4 --limit-tu 1 --rect --amp --tskip --me star --weightb --max-merge 5 --ref 3 --no-open-gop --min-keyint 1 --fades --bframes 16 --b-adapt 2 --b-intra $crfParam --crqpoffs -5 --cbqpoffs -2 --ipratio 1.67 --pbratio 1.33 --cu-lossless --psy-rdoq 2.5 --rdoq-level 2 --hevc-aq --aq-strength 1.4 --qg-size 8 --rd 5 --limit-refs 0 --rskip 2 --rskip-edge-threshold 3 --no-cutree --psy-rd 1.5 --rdpenalty 2 --deblock -2:-2 --limit-sao --sao-non-deblock --selective-sao 1"}
         helpzh {
-            Write-Host ""
+            Write-Host ''
             Write-Host " 选择 x265 自定义预设——[a：通用 | b：录像 | c：剪辑素材 | d：动漫 | e：穷举法]" -ForegroundColor Yellow
             return
         }
         helpen {
-            Write-Host ""
+            Write-Host ''
             Write-Host " Select a custom preset for x265——[a: general purpose | b: film | c: stock footage | d: anime | e: exhausive]" -ForegroundColor Yellow
             return
         }
@@ -433,12 +496,13 @@ function Get-x265BaseParam {
 function Get-svtav1BaseParam {
     Param (
         [Parameter(Mandatory=$true)]$pickOps,
+        [switch]$askUserCRF,
         [switch]$askUserDLF
     )
-    
     $isHelp = $pickOps -in @('helpzh', 'helpen')
+
     $enableDLF2 = $false
-    Write-Host ""
+    Write-Host ''
     if ($askUserDLF -and (-not $isHelp) -and ($pickOps -ne 'b')) {
         Write-Host " Some modified/unofficial SVT-AV1 encoder (i.e., SVT-AV1-Essential) supports precise deblocking filter --enable-dlf 2"  -ForegroundColor Cyan
         Write-Host " Test with 'SvtAv1EncApp.exe --help | findstr enable-dlf' to verify if its supported (shows up)" -ForegroundColor DarkGray
@@ -453,22 +517,51 @@ function Get-svtav1BaseParam {
     }
     $deblock = if ($enableDLF2) {"--enable-dlf 2"} else {"--enable-dlf 1"}
 
-    $default = ("--preset 2 --scd 1 --enable-tf 2 --tf-strength 2 --crf 30 --enable-qm 1 --enable-variance-boost 1 --variance-boost-curve 2 --variance-boost-strength 2 --variance-octile 2 --sharpness 6 --progress 1 " + $deblock)
+    $crfParam = "--crf 35" # else default
+    if ($askUserCRF -and -not $isHelp) {
+        Write-Host ("─" * 50)
+        Show-Info "Configure SVT-AV1 constant rate factor (CRF) in positive integer"
+
+        while ($true) {
+            $crf = Read-Host " [28-32：UHQ | 33-36：HQ | 37-40：Stream media | 1：Lossless | Enter：SVT-AV1 default (35)]"
+
+            if ([string]::IsNullOrEmpty($crf)) {
+                Write-Host " Using default CRF：35"
+                break
+            }
+
+            [int]$crfInt = 0
+            if (-not [int]::TryParse($crf, [ref]$crfInt)) {
+                $choice = Read-Host " Input is not positive integer, Press Enter to retry, input 'q' to force exit"
+                if ($choice -eq 'q') { exit 1 }
+                continue
+            }
+            elseif ($crfInt -lt 1 -or $crfInt -gt 70) {
+                $choice = Read-Host "  Input is out of 1-70 range, Press Enter to retry, input 'q' to force exit"
+                if ($choice -eq 'q') { exit 1 }
+                continue
+            }
+            $crfParam = "--crf $crf"
+            break
+        }
+    }
+
+    $default = ("--preset 2 --scd 1 --enable-tf 2 --tf-strength 2 $crfParam --enable-qm 1 --enable-variance-boost 1 --variance-boost-curve 2 --variance-boost-strength 2 --variance-octile 2 --sharpness 6 --progress 1 " + $deblock)
     switch ($pickOps) {
         # 画质 Quality
         a {return $default}
         # 压缩 Compression
-        b {return ("--preset 2 --scd 1 --enable-tf 2 --tf-strength 2 --crf 30 --sharpness 4 --progress 1 " + $deblock)}
+        b {return ("--preset 2 --scd 1 --enable-tf 2 --tf-strength 2 $crfParam --sharpness 4 --progress 1 " + $deblock)}
         # 速度 Speed
-        c {return "--preset 2 --scd 1 --scm 0 --enable-tf 2 --tf-strength 2 --crf 30 --tune 0 --enable-variance-boost 1 --variance-boost-curve 2 --variance-boost-strength 2 --variance-octile 2 --sharpness 4 --progress 1"}
+        c {return "--preset 2 --scd 1 --scm 0 --enable-tf 2 --tf-strength 2 $crfParam --tune 0 --enable-variance-boost 1 --variance-boost-curve 2 --variance-boost-strength 2 --variance-octile 2 --sharpness 4 --progress 1"}
         helpzh {
-            Write-Host ""
+            Write-Host ''
             Write-Host " 选择 SVT-AV1 自定义预设——[a：画质优先 | b：压缩优先 | c：速度优先]" -ForegroundColor Yellow
             return
         }
         helpen {
-            Write-Host ""
-            Write-Host " Select a custom preset for SVT-AV1——[a: Ultra HQ |y b: High compression | c: Fast]" -ForegroundColor Yellow
+            Write-Host ''
+            Write-Host " Select a custom preset for SVT-AV1——[a: HQ | b: High compression | c: Fast]" -ForegroundColor Yellow
             return
         }
         default {
@@ -493,7 +586,7 @@ function Invoke-BaseParamSelection {
         $selection = (Read-Host " Specify a custom present for $CodecName, Input 'q' to skip (use encoder defaults)").ToLower()
 
         if ($selection -eq 'q') { # $selectedParam = "" # No need to specify again
-            break;
+            break
         }
         elseif ($selection -notmatch "^[a-z]$") {
             if ((Read-Host " Could not identify option. Press Enter to retry, input 'q' to force exit") -eq 'q') {
@@ -537,24 +630,24 @@ function Get-Keyint {
     $userSecond = $null # User specified seconds
     if ($askUser) {
         if ($isx264) {
-            Write-Host ""
+            Write-Host ''
             Show-Info "Please specify maximum keyframe interval for x264 in seconds"
-            Write-Host " (positive integer, not frame number, i.e. 11 seconds: 11)"
+            Write-Host " positive integer, not frame count, i.e. 11 seconds: 11" -ForegroundColor DarkGray
         }
         elseif ($isx265) {
-            Write-Host ""
+            Write-Host ''
             Show-Info "Please specify maximum keyframe interval for x265 in seconds"
-            Write-Host " (positive integer, not frame number, i.e. 12 seconds: 12)"
+            Write-Host " positive integer, not frame count, i.e. 12 seconds: 12" -ForegroundColor DarkGray
         }
         elseif ($isSVTAV1) {
-            Write-Host ""
+            Write-Host ''
             Show-Info "Please specify maximum keyframe interval for SVT-AV1 in seconds"
-            Write-Host " (positive integer, not frame number, i.e. 13 seconds: 13)"
+            Write-Host " positive integer, not frame count, i.e. 13 seconds: 13" -ForegroundColor DarkGray
         }
         else {
             throw "Maximum keyframe interval parameter is missing, cannot proceed"
         }
-        Write-Host ""
+        Write-Host ''
         
         $userSecond = $null
         do { # Decoding usage for video editing is the sum of the keyframe interval of all video tracks
@@ -1214,7 +1307,7 @@ function Main {
     Show-Border
     Write-Host "Video encoding task gnerator" -ForegroundColor Cyan
     Show-Border
-    Write-Host ""
+    Write-Host ''
 
     # 1. Locate the latest ffprobe CSV and read the video information
     $ffprobeCsvPath = 
@@ -1240,7 +1333,7 @@ function Main {
     $ffprobeCSV =
         Import-Csv $ffprobeCsvPath -Header A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,AA,AB,AC,AD,AE,AF,AG,AH,AI,AJ
     $sourceCSV =
-        Import-Csv $sourceInfoCsvPath -Header SourcePath,UpstreamCode,Avs2PipeModDllPath,SvfiConfigInput,SvfiTaskId
+        Import-Csv $sourceInfoCsvPath -Header SourcePath,UpstreamCode,Avs2PipeModDllPath,SvfiInputConf,SvfiTaskId
 
     # Validate CSV data
     if (-not $sourceCSV.SourcePath) { # Validate CSV field existance, no quote needed
@@ -1270,7 +1363,7 @@ function Main {
     Write-Host ("─" * 50)
     
     # Calculate and assign to object properties
-    Show-Info "Optimizing encoding parameters (Profile, resolution, merange, etc.)..."
+    Show-Info "Optimizing encoding parameters..."
     # $x265Params.Profile = Get-x265SVTAV1Profile -CSVpixfmt $ffprobeCSV.D -isIntraOnly $false -isSVTAV1 $false
     # $svtav1Params.Profile = Get-x265SVTAV1Profile -CSVpixfmt $ffprobeCSV.D -isIntraOnly $false -isSVTAV1 $true
     $x265Params.Resolution = Get-InputResolution -CSVw $ffprobeCSV.B -CSVh $ffprobeCSV.C
@@ -1281,7 +1374,6 @@ function Main {
     $x264Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -isx264
     $x265Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -isx265
     $svtav1Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -isSVTAV1
-
 
     # VOB format—frame count: J
     $x265Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $false
@@ -1295,7 +1387,7 @@ function Main {
     # Obtain color space format
     $avs2yuvVersionCode = 'a'
     if ($sourceCSV.UpstreamCode -eq 'c') {
-        Write-Host ""
+        Write-Host ''
         Show-Info "Please select the version of avs2yuv(64).exe used:"
         $avs2yuvVersionCode = Read-Host " [Default Enter/a: AviSynth+ (0.30) | b: AviSynth (up to 0.26)]"
     }
@@ -1330,15 +1422,14 @@ function Main {
     $quotedDllPath = Get-QuotedPath $sourceCSV.Avs2PipeModDllPath
     $avsmodParams.DLLInput = "-dll $quotedDllPath"
 
-    # SVFI's required INI file AND Task ID
-    if (-not [string]::IsNullOrWhiteSpace($sourceCSV.SvfiConfigInput)) {
-        $quotedSvfiConfig = Get-QuotedPath $sourceCSV.SvfiConfigInput
-        $olsargParams.ConfigInput = "--config $quotedSvfiConfig --task-id $($sourceCSV.SvfiTaskId)"
-        Show-Debug "olsargParams.ConfigInput: $($olsargParams.ConfigInput)"
-    }
-    else { $olsargParams.ConfigInput = "" }
+    # SVFI's required INI file & Task ID
+    $olsargParams.ConfigInput =
+        if (![string]::IsNullOrWhiteSpace($sourceCSV.SvfiInputConf)) {
+            "--config $(Get-QuotedPath $sourceCSV.SvfiInputConf) --task-id $($sourceCSV.SvfiTaskId)"
+        }
+        else { '' }
 
-    Write-Host ""
+    Write-Host ''
     Show-Info "Configure output path, filename..."
     $encodeOutputPath = Select-Folder -Description "Select output path for encoder file output"
     # 1. Get source filename (pass to selection function as an option)
@@ -1354,7 +1445,7 @@ function Main {
         $program -in @('x265', 'h265', 'hevc', 'svt-av1', 'svtav1', 'ivf')) {
         Show-Info "Get-EncodingIOArgument: SVT-AV1 natively reject interlaced source; x265 interlaced support is experimental (official version)"
         Show-Info ("Deinterlacing & IVTC filtering tutorial: " + $script:interlacedArgs.toPFilterTutorial)
-        Write-Host ""
+        Write-Host ''
     }
 
     Show-Info "Generate IO Parameters (Input/Output)..."
@@ -1379,9 +1470,9 @@ function Main {
     Write-Host ("─" * 50)
 
     Show-Info "Constructing base parameters of the pipe downstream programs..."
-    $x264Params.BaseParam = Invoke-BaseParamSelection -CodecName "x264" -GetParamFunc ${function:Get-x264BaseParam} -ExtraParams @{ askUserFGO = $true }
-    $x265Params.BaseParam = Invoke-BaseParamSelection -CodecName "x265" -GetParamFunc ${function:Get-x265BaseParam}
-    $svtav1Params.BaseParam = Invoke-BaseParamSelection -CodecName "SVT-AV1" -GetParamFunc ${function:Get-svtav1BaseParam} -ExtraParams @{ askUserDLF = $true }
+    $x264Params.BaseParam = Invoke-BaseParamSelection -CodecName "x264" -GetParamFunc ${function:Get-x264BaseParam} -ExtraParams @{ askUserFGO = $true; askUserCRF = $true }
+    $x265Params.BaseParam = Invoke-BaseParamSelection -CodecName "x265" -GetParamFunc ${function:Get-x265BaseParam} -ExtraParams @{ askUserCRF = $true }
+    $svtav1Params.BaseParam = Invoke-BaseParamSelection -CodecName "SVT-AV1" -GetParamFunc ${function:Get-svtav1BaseParam} -ExtraParams @{ askUserDLF = $true; askUserCRF = $true }
 
     Show-Info "Concatenating final parameter string..."
     # These strings will be directly injected into the batch file "set 'xxx_params=...'"
@@ -1408,7 +1499,7 @@ function Main {
     }
 
     #  Generate ffmpeg, vspipe, avs2yuv, avs2pipemod encoding task batch
-    Write-Host ""
+    Write-Host ''
     Show-Info "Locate the encode_template.bat template..."
     $templateBatch = $null
     while (-not $templateBatch) {
@@ -1483,7 +1574,7 @@ REM svtav1_appendix=$svtav1RawPipeApdx
     # Save final batch
     $finalBatchPath = Join-Path (Split-Path $templateBatch) "encode_task_final.bat"
     Show-Debug "Exporting file: $finalBatchPath"
-    Write-Host ""
+    Write-Host ''
     
     try {
         Confirm-FileDelete $finalBatchPath
@@ -1496,7 +1587,7 @@ REM svtav1_appendix=$svtav1RawPipeApdx
         }
     
         Show-Success "Task generated successfully!"
-        Write-Host ""
+        Write-Host ''
 
         Write-Host ("─" * 50)
         

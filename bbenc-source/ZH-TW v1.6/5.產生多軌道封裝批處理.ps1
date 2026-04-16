@@ -182,7 +182,7 @@ function Get-StreamArgs {
                         Write-Host "9. 60" -ForegroundColor Yellow
                         Write-Host "a. 120" -ForegroundColor Yellow
                         Write-Host "b. 144" -ForegroundColor Yellow
-                        Write-Host ""
+                        Write-Host ''
 
                         $presetChoice = Read-Host "選擇預設幀率（1-9，a-b）"
                         $frameRate = switch ($presetChoice.ToLower()) {
@@ -301,7 +301,7 @@ function Main {
             $mapIndex++
         }
         
-        Write-Host ""
+        Write-Host ''
         $continue = Read-Host "繼續添加文件？輸入 'y' 確認，按 Enter 完成"
         if ($continue -ne 'Y' -and $continue -ne 'y') {
             break

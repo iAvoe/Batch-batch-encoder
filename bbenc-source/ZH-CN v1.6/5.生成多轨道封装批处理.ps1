@@ -182,7 +182,7 @@ function Get-StreamArgs {
                         Write-Host "9. 60" -ForegroundColor Yellow
                         Write-Host "a. 120" -ForegroundColor Yellow
                         Write-Host "b. 144" -ForegroundColor Yellow
-                        Write-Host ""
+                        Write-Host ''
 
                         $presetChoice = Read-Host "选择预设帧率（1-9，a-b）"
                         $frameRate = switch ($presetChoice.ToLower()) {
@@ -262,7 +262,7 @@ function Main {
     Show-Border
     Show-Info "基于 ffmpeg 的多轨道封装命令生成器"
     Show-Border
-    Write-Host ""
+    Write-Host ''
     Show-Info "使用说明："
     Write-Host "1. 后续的脚本将基于此‘管线批处理’（encode_final.bat）生成‘编码批处理’"
     Write-Host "   因此无需每次编码都要运行此步骤"
@@ -308,7 +308,7 @@ function Main {
             $mapIndex++
         }
         
-        Write-Host ""
+        Write-Host ''
         $continue = Read-Host "继续添加文件？输入 'y' 确认，按 Enter 完成"
         if ($continue -ne 'Y' -and $continue -ne 'y') {
             break

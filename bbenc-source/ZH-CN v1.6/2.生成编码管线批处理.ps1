@@ -141,7 +141,7 @@ function Main {
     Show-Border
     Write-Host "视频编码工具调用管线生成器" -ForegroundColor Cyan
     Show-Border
-    Write-Host ""
+    Write-Host ''
     Show-Info "使用说明："
     Write-Host "1. 后续的脚本将基于此‘管线批处理’（encode_template.bat）生成‘编码批处理’"
     Write-Host "   因此无需每次编码都要运行此步骤"
@@ -211,7 +211,7 @@ function Main {
 
         # 检测 vspipe API 版本
         if ($tool -eq 'vspipe' -and $upstreamTools[$tool]) {
-            Write-Host ""
+            Write-Host ''
             Show-Info "检测 VapourSynth 管道参数..."
             $vspipeInfo = Get-VSPipeY4MArgument -VSpipePath $upstreamTools[$tool]
             Show-Success $($vspipeInfo.Note)
@@ -286,7 +286,7 @@ function Main {
     }
 
     # 显示可用工具链
-    Write-Host ""
+    Write-Host ''
     Show-Info "可用编码工具链："
     Write-Host ("─" * 60)
 
@@ -330,7 +330,7 @@ function Main {
     }
     else { # 选择工具链
         do {
-            Write-Host ""
+            Write-Host ''
             $inputId = Read-Host "请输入工具链编号（数字）"
 
             if ($inputId -match '^\d+$' -and $presetIdMap.ContainsKey([int]$inputId)) {
@@ -417,7 +417,7 @@ cmd /k
         }
     
         # 显示额外说明
-        Write-Host ""
+        Write-Host ''
         if ($downstream -eq 'x265') {
             Show-Warning "x265 编码器默认输出 .hevc 文件"
             Write-Host " 如需容器，请使用后续脚本或 ffmpeg 封装"
@@ -435,7 +435,7 @@ cmd /k
         exit 1
     }
 
-    Write-Host ""
+    Write-Host ''
     Show-Success "脚本执行完成！"
     Read-Host "按 Enter 退出"
 }

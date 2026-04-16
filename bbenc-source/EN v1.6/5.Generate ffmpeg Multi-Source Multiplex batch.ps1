@@ -183,7 +183,7 @@ function Get-StreamArgs {
                         Write-Host "9. 60" -ForegroundColor Yellow
                         Write-Host "a. 120" -ForegroundColor Yellow
                         Write-Host "b. 144" -ForegroundColor Yellow
-                        Write-Host ""
+                        Write-Host ''
                         
                         $presetChoice = Read-Host "Select a framerate/fps (1-9, a-b)"
                         $frameRate = switch ($presetChoice.ToLower()) {
@@ -302,7 +302,7 @@ function Main {
             $mapIndex++
         }
         
-        Write-Host ""
+        Write-Host ''
         $continue = Read-Host "Add more streams? Input 'y' to add, press Enter to complete import"
         if ($continue -ne 'Y' -and $continue -ne 'y') {
             break

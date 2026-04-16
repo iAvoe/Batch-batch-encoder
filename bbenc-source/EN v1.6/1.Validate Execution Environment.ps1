@@ -249,7 +249,7 @@ function Show-HardwareInformation {
             )
             
             $info | ForEach-Object { Write-Host "  $_" }
-            Write-Host ""
+            Write-Host ''
         }
     }
     catch {
@@ -278,7 +278,7 @@ function Show-HardwareInformation {
             )
             
             $info | ForEach-Object { Write-Host "  $_" }
-            Write-Host ""
+            Write-Host ''
         }
         
         Show-Success "Total Memory: $totalMemory GB"
@@ -421,7 +421,7 @@ function Main {
         Show-Warning "UAC is currently disabled, please consider raise UAC level after using this script suite"
     }
     
-    Write-Host ""
+    Write-Host ''
     Write-Host "Press any button to exit..." -ForegroundColor Gray
     $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
 }

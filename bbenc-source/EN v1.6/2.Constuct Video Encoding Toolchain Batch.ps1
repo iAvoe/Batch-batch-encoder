@@ -143,7 +143,7 @@ function Main {
     Show-Border
     Write-Host "Video encoding toolchain generator" -ForegroundColor Cyan
     Show-Border
-    Write-Host ""
+    Write-Host ''
     Show-Info "Usage:"
     Write-Host "1. Subsequent scripts will generate 'encoding batch' based on this 'pipeline/toolchain batch' (encode_template.bat)."
     Write-Host "   Therefore, once this step fnishes, step 2 can be entirely skipped until new tools needs to be added"
@@ -212,7 +212,7 @@ function Main {
         
         # Detect API version for vspipe
         if ($tool -eq 'vspipe' -and $upstreamTools[$tool]) {
-            Write-Host ""
+            Write-Host ''
             Show-Info "Detecting VapourSynth pipe command..."
             $vspipeInfo = Get-VSPipeY4MArgument -VSpipePath $upstreamTools[$tool]
             Show-Success $($vspipeInfo.Note)
@@ -331,7 +331,7 @@ function Main {
     }
     else { # Select a toolchain
         do {
-            Write-Host ""
+            Write-Host ''
             $inputId = Read-Host "Please enter toolchain number (integer)"
 
             if ($inputId -match '^\d+$' -and $presetIdMap.ContainsKey([int]$inputId)) {
@@ -399,7 +399,7 @@ REM ========================================
 {3}
 
 echo.
-echo Encoding Finished! Input exit to exit...
+echo Encoding Finished, input exit to exit...
 echo.
 
 endlocal
@@ -419,7 +419,7 @@ cmd /k
         }
     
         # Show usages
-        Write-Host ""
+        Write-Host ''
         if ($downstream -eq 'x265') {
             Show-Warning "x265 encoder will export .hevc files"
             Write-Host " To multiplex, please refer to later script steps, or use ffmpeg manually"
@@ -437,7 +437,7 @@ cmd /k
         exit 1
     }
     
-    Write-Host ""
+    Write-Host ''
     Show-Success "Script Completed!"
     Read-Host "Press any button to exit"
 }
