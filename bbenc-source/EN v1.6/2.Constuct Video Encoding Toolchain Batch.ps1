@@ -402,6 +402,7 @@ echo.
 echo Encoding Finished, input exit to exit...
 echo.
 
+timeout /t 1 /nobreak >nul
 endlocal
 cmd /k
 '@ -f (Get-Date -Format 'yyyy-MM-dd HH:mm'), $selectedPreset, $command, $remCommands

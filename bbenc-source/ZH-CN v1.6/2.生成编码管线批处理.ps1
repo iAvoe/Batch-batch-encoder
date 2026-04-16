@@ -400,6 +400,7 @@ echo.
 echo 编码完成！输入 exit 退出...
 echo.
 
+timeout /t 1 /nobreak >nul
 endlocal
 cmd /k
 '@ -f (Get-Date -Format 'yyyy-MM-dd HH:mm'), $selectedPreset, $command, $remCommands

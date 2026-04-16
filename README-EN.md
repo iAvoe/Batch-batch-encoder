@@ -77,6 +77,8 @@ Developing these tools wasn't easy. If this tool improve your efficiency, consid
 - Step 4:
   - Added CRF value customization options for all encoders
   - Simplified code
+- Step 2:
+  - Fixed a bug for batch executing `cmd /k` too early, causing `exit` command goes to the wrong cmd process
 
 **v1.7.2**
 - Changed file deletion interaction logic—now: enter 'y' to confirm, 'q' to cancel, Enter loops back

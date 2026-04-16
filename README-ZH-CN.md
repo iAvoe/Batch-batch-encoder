@@ -84,6 +84,8 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 - 步骤 4:
   - 为所有编码器新增了多种 CRF 值自定义选项
   - 简化了代码
+- 步骤 2：
+  - 修复了批处理部分运行 `cmd /k` 过早，导致 `exit` 命令被输入到错误 cmd 进程的问题
 
 **v1.7.2**
 - 文件删除操作交互逻辑变更——输入 y 确认，输入 q 取消，Enter 循环的操作逻辑
