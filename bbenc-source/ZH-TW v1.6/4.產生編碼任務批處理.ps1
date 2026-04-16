@@ -217,7 +217,7 @@ function Get-EncodingIOArgument {
         if ($isSVTAV1) { 'svtav1' }
     )
     if ($switchedOn.Count -eq 0) {
-        throw "Get-EncodingIOArgument：必須指定一個程序，如 -isffmpeg"
+        throw "Get-EncodingIOArgument：必須指定一個程序，如啟用 -isffmpeg"
     }
     if ($switchedOn.Count -gt 1) {
         throw "Get-EncodingIOArgument：最多指定一個程序，當前指定了: $($switchedOn -join ', ')"
@@ -1190,6 +1190,12 @@ function Set-InterlacedArgs {
     Show-Debug "Set-InterlacedArgs—隔行掃描：$($script:interlacedArgs.isInterlaced), 上場優先：$($script:interlacedArgs.isTFF)"
 }
 
+# 拼接對象中非空的屬性
+function Join-Params ($Object, $PropertyOrder) {
+    $values = foreach ($prop in $PropertyOrder) { $Object.$prop }
+    return ($values -match '\S' -join " ").Trim()
+}
+
 #region Main
 function Main {
     Show-Border
@@ -1365,26 +1371,24 @@ function Main {
     # 這些字串將直接注入到批處理的 "set 'xxx_params=...'" 中
     # 空參數可能會導致雙空格出現，但路徑、檔案名裡也可能有雙空格，因此不過濾（-replace "  ", " "）
     # 1. 管道上游工具
-    $ffmpegFinalParam = "$($ffmpegParams.FPS) $($ffmpegParams.Input) $($ffmpegParams.CSP) $($ffmpegParams.LogLevel)"
-    $vspipeFinalParam = "$($vspipeParams.Input)"
-    $avsyuvFinalParam = "$($avsyuvParams.Input) $($avsyuvParams.CSP)"
-    $avsmodFinalParam = "$($avsmodParams.Input) $($avsmodParams.DLLInput)"
-    $olsargFinalParam = "$($olsargParams.Input) $($olsargParams.ConfigInput)"
-    # 2. x264（Input 必須放在最末尾）
-    $x264FinalParam = "$($x264Params.Keyint) $($x264Params.SEICSP) $($x264Params.BaseParam) $($x264Params.Output) $($x264Params.Input)"
-    # 3. x265
-    $x265FinalParam = "$($x265Params.Keyint) $($x265Params.SEICSP) $($x265Params.RCLookahead) $($x265Params.MERange) $($x265Params.Subme) $($x265Params.PME) $($x265Params.Pools) $($x265Params.BaseParam) $($x265Params.Input) $($x265Params.Output)"
-    # 4. SVT-AV1
-    $svtav1FinalParam = "$($svtav1Params.Keyint) $($svtav1Params.SEICSP) $($svtav1Params.BaseParam) $($svtav1Params.Input) $($svtav1Params.Output)"
-
-    $x264RawPipeApdx = "$($x264Params.FPS) $($x264Params.RAWCSP) $($x264Params.Resolution) $($x264Params.TotalFrames)"
-    $x265RawPipeApdx = "$($x265Params.FPS) $($x265Params.RAWCSP) $($x265Params.Resolution) $($x265Params.TotalFrames)"
-    $svtav1RawPipeApdx = "$($svtav1Params.FPS) $($svtav1Params.RAWCSP) $($svtav1Params.Resolution) $($svtav1Params.TotalFrames)"
-    # N. RAW 管道相容
+    $ffmpegFinalParam = Join-Params $ffmpegParams @('FPS', 'Input', 'CSP', 'LogLevel')
+    $vspipeFinalParam = Join-Params $vspipeParams @('Input')
+    $avsyuvFinalParam = Join-Params $avsyuvParams @('Input', 'CSP')
+    $avsmodFinalParam = Join-Params $avsmodParams @('Input', 'DLLInput')
+    $olsargFinalParam = Join-Params $olsargParams @('Input', 'ConfigInput')
+    # 2. x264（Input 必須在最末尾），x265，SVT-AV1
+    $x264FinalParam = Join-Params $x264Params @('Keyint', 'SEICSP', 'BaseParam', 'Output', 'Input')
+    $x265FinalParam = Join-Params $x265Params @('Keyint', 'SEICSP', 'RCLookahead', 'MERange', 'Subme', 'PME', 'Pools', 'BaseParam', 'Input', 'Output')
+    $svtav1FinalParam = Join-Params $svtav1Params @('Keyint', 'SEICSP', 'BaseParam', 'Input', 'Output')
+    # 3. Raw 管道附加參數
+    $x264RawPipeApdx = Join-Params $x264Params @('FPS', 'RAWCSP', 'Resolution', 'TotalFrames')
+    $x265RawPipeApdx = Join-Params $x265Params @('FPS', 'RAWCSP', 'Resolution', 'TotalFrames')
+    $svtav1RawPipeApdx = Join-Params $svtav1Params @('FPS', 'RAWCSP', 'Resolution', 'TotalFrames')
+    # 4. RAW 管道相容
     if (Get-IsRAWSource -validateUpstreamCode $sourceCSV.UpstreamCode) {
-        $x264FinalParam = $x264RawPipeApdx + " " + $x264FinalParam
-        $x265FinalParam = $x265RawPipeApdx + " " + $x265FinalParam
-        $svtav1FinalParam = $svtav1RawPipeApdx + " " + $svtav1FinalParam
+        $x264FinalParam = "$x264RawPipeApdx $x264FinalParam"
+        $x265FinalParam = "$x265RawPipeApdx $x265FinalParam"
+        $svtav1FinalParam = "$svtav1RawPipeApdx $svtav1FinalParam"
     }
 
     # 生成 ffmpeg, vspipe, avs2yuv, avs2pipemod 編碼任務批處理
@@ -1439,16 +1443,16 @@ REM svtav1_appendix=$svtav1RawPipeApdx
 
     # 字樣匹配
     $enAnchor = '(?msi)^REM\s+Parameter\s+examples\b'
-    $zhcnAnchor = '(?msi)^REM\s+參數範例\b'
+    $zhcnAnchor = '(?msi)^REM\s+参数示例\b'
     $zhtwAnchor = '(?msi)^REM\s+參數範例\b'
 
     if ($batchContent -match $enAnchor) {
         $pattern = '(?msi)^REM\s+Parameter\s+examples\b.*?^(?=REM\s+Specify\s+commandline\b)'
     }
-    elseif ($batchContent -notmatch $zhcnAnchor) {
-        $pattern = '(?msi)^REM\s+參數範例\b.*?^(?=REM\s+指定本次所需編碼命令\b)'
+    elseif ($batchContent -match $zhcnAnchor) {
+        $pattern = '(?msi)^REM\s+参数示例\b.*?^(?=REM\s+指定本次所需编码命令\b)'
     }
-    elseif ($batchContent -notmatch $zhtwAnchor) {
+    elseif ($batchContent -match $zhtwAnchor) {
         $pattern = '(?msi)^REM\s+參數範例\b.*?^(?=REM\s+指定本次所需編碼命令\b)'
     }
     else {

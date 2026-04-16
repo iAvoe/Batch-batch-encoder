@@ -78,7 +78,7 @@ function Find-Tool {
         }
         catch { continue } # Move on from failed match
     }
-    Write-Host " Find-Tool: Cannot find $keyword in the script directory, environment variables, or user-specified additional paths. Manual tool import required"
+    Write-Host " Find-Tool: Cannot find $keyword in script path, env. variables, or user-specified additional paths" -ForegroundColor DarkGray
     return $null
 }
 

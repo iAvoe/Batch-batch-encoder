@@ -76,7 +76,7 @@ function Find-Tool {
         }
         catch { continue } # 忽略無法訪問的目錄
     }
-    Write-Host " Find-Tool：腳本所在位置、環境變數與用戶指定路徑中均未發現 $keyword，需手動導入"
+    Write-Host " Find-Tool：腳本所在位置、環境變數與用戶指定路徑中均未發現 $keyword" -ForegroundColor DarkGray
     return $null
 }
 

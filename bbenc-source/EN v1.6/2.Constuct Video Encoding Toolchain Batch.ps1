@@ -148,7 +148,7 @@ function Main {
     Write-Host "1. Subsequent scripts will generate 'encoding batch' based on this 'pipeline/toolchain batch' (encode_template.bat)."
     Write-Host "   Therefore, once this step fnishes, step 2 can be entirely skipped until new tools needs to be added"
     Write-Host "2. This tool will attempt to search for encoding tools in the script's local directory, common install pathes and environment variables"
-    Write-Host "   You may copy/move encoding tools to the directory this script resides, or configure Common\Core.ps1 to streamline importing process"
+    Write-Host "   You may copy/move encoding tools to this script's current directory, or configure Common\Core.ps1 to streamline importing process"
     Write-Host ("─" * 50)
     
     Show-Info "Select path to export batch file..."

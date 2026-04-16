@@ -1203,6 +1203,12 @@ function Set-InterlacedArgs {
     Show-Debug "Set-InterlacedArgs—Interlaced: $($script:interlacedArgs.isInterlaced), Top-field-first: $($script:interlacedArgs.isTFF)"
 }
 
+# Splice final parame by non-empty apptributes
+function Join-Params ($Object, $PropertyOrder) {
+    $values = foreach ($prop in $PropertyOrder) { $Object.$prop }
+    return ($values -match '\S' -join " ").Trim()
+}
+
 #region Main
 function Main {
     Show-Border
@@ -1381,26 +1387,24 @@ function Main {
     # These strings will be directly injected into the batch file "set 'xxx_params=...'"
     # Empty parameters may result in double spaces, but paths and filenames may also contain double spaces, so they are not filtered (-replace " ", " ")
     # 1. Pipeline upstream tool
-    $ffmpegFinalParam = "$($ffmpegParams.FPS) $($ffmpegParams.Input) $($ffmpegParams.CSP) $($ffmpegParams.LogLevel)"
-    $vspipeFinalParam = "$($vspipeParams.Input)"
-    $avsyuvFinalParam = "$($avsyuvParams.Input) $($avsyuvParams.CSP)"
-    $avsmodFinalParam = "$($avsmodParams.Input) $($avsmodParams.DLLInput)"
-    $olsargFinalParam = "$($olsargParams.Input) $($olsargParams.ConfigInput)"
-    # 2. x264 (Input must be located in the end)
-    $x264FinalParam = "$($x264Params.Keyint) $($x264Params.SEICSP) $($x264Params.BaseParam) $($x264Params.Output) $($x264Params.Input)"
-    # 3. x265
-    $x265FinalParam = "$($x265Params.Keyint) $($x265Params.SEICSP) $($x265Params.RCLookahead) $($x265Params.MERange) $($x265Params.Subme) $($x265Params.PME) $($x265Params.Pools) $($x265Params.BaseParam) $($x265Params.Input) $($x265Params.Output)"
-    # 4. SVT-AV1
-    $svtav1FinalParam = "$($svtav1Params.Keyint) $($svtav1Params.SEICSP) $($svtav1Params.BaseParam) $($svtav1Params.Input) $($svtav1Params.Output)"
-
-    $x264RawPipeApdx = "$($x264Params.FPS) $($x264Params.RAWCSP) $($x264Params.Resolution) $($x264Params.TotalFrames)"
-    $x265RawPipeApdx = "$($x265Params.FPS) $($x265Params.RAWCSP) $($x265Params.Resolution) $($x265Params.TotalFrames)"
-    $svtav1RawPipeApdx = "$($svtav1Params.FPS) $($svtav1Params.RAWCSP) $($svtav1Params.Resolution) $($svtav1Params.TotalFrames)"
-    # N. RAW pipe mode
+    $ffmpegFinalParam = Join-Params $ffmpegParams @('FPS', 'Input', 'CSP', 'LogLevel')
+    $vspipeFinalParam = Join-Params $vspipeParams @('Input')
+    $avsyuvFinalParam = Join-Params $avsyuvParams @('Input', 'CSP')
+    $avsmodFinalParam = Join-Params $avsmodParams @('Input', 'DLLInput')
+    $olsargFinalParam = Join-Params $olsargParams @('Input', 'ConfigInput')
+    # 2. x264 (Input located in the end), x265, SVT-AV1
+    $x264FinalParam = Join-Params $x264Params @('Keyint', 'SEICSP', 'BaseParam', 'Output', 'Input')
+    $x265FinalParam = Join-Params $x265Params @('Keyint', 'SEICSP', 'RCLookahead', 'MERange', 'Subme', 'PME', 'Pools', 'BaseParam', 'Input', 'Output')
+    $svtav1FinalParam = Join-Params $svtav1Params @('Keyint', 'SEICSP', 'BaseParam', 'Input', 'Output')
+    # 3. RAW Pipe Appendix
+    $x264RawPipeApdx = Join-Params $x264Params @('FPS', 'RAWCSP', 'Resolution', 'TotalFrames')
+    $x265RawPipeApdx = Join-Params $x265Params @('FPS', 'RAWCSP', 'Resolution', 'TotalFrames')
+    $svtav1RawPipeApdx = Join-Params $svtav1Params @('FPS', 'RAWCSP', 'Resolution', 'TotalFrames')
+    # 4. RAW pipe mode
     if (Get-IsRAWSource -validateUpstreamCode $sourceCSV.UpstreamCode) {
-        $x264FinalParam = $x264RawPipeApdx + " " + $x264FinalParam
-        $x265FinalParam = $x265RawPipeApdx + " " + $x265FinalParam
-        $svtav1FinalParam = $svtav1RawPipeApdx + " " + $svtav1FinalParam
+        $x264FinalParam = "$x264RawPipeApdx $x264FinalParam"
+        $x265FinalParam = "$x265RawPipeApdx $x265FinalParam"
+        $svtav1FinalParam = "$svtav1RawPipeApdx $svtav1FinalParam"
     }
 
     #  Generate ffmpeg, vspipe, avs2yuv, avs2pipemod encoding task batch
@@ -1464,10 +1468,10 @@ REM svtav1_appendix=$svtav1RawPipeApdx
     if ($batchContent -match $enAnchor) {
         $pattern = '(?msi)^REM\s+Parameter\s+examples\b.*?^(?=REM\s+Specify\s+commandline\b)'
     }
-    elseif ($batchContent -notmatch $zhcnAnchor) {
+    elseif ($batchContent -match $zhcnAnchor) {
         $pattern = '(?msi)^REM\s+参数示例\b.*?^(?=REM\s+指定本次所需编码命令\b)'
     }
-    elseif ($batchContent -notmatch $zhtwAnchor) {
+    elseif ($batchContent -match $zhtwAnchor) {
         $pattern = '(?msi)^REM\s+參數範例\b.*?^(?=REM\s+指定本次所需編碼命令\b)'
     }
     else {
