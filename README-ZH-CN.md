@@ -80,6 +80,11 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 <p align="center"><img src="bmc_qr.png" alt="支持一下 -_-"><br><img src="pp_tip_qr.png" alt="支持一下 =_="></p>
 
 ## 更新信息
+**v1.7.1**
+- 步骤 4:
+  - 新增了针对 12bit 位深源视频与 SVT-AV1 不兼容的警告
+  - 简化了 FPS 相关参数赋值的代码段
+
 **v1.7**
 - 解决了路径选择窗口没有出现在窗口最上层的问题
 - 可能解决了关闭或完成路径选择窗口时，窗口聚焦不自动切换回 CLI 窗口（无法输入）的问题（仍然不支持 VSCode CLI）

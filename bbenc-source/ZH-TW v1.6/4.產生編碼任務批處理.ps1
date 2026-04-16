@@ -1026,6 +1026,11 @@ function Get-RAWCSPBitDepth {
 
     if ($isEncoderInput) {
         if ($isSVTAV1) { # --color-format，--input-depth
+            if ($depth -eq 12) {
+                Show-Warning "Get-RAWCSPBitDepth: 檢測到與 SVT-AV1 不相容的 12bit 源影片位深，若先前指定該編碼器則重做步驟 2"
+                Write-Host ("─" * 50)
+            }
+
             # SVT-AV1 使用數字枚舉的 --color-format
             $svtColorMap = @{
                 'i400' = 0
@@ -1276,40 +1281,6 @@ function Main {
     $x264Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -isx264
     $x265Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -isx265
     $svtav1Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -isSVTAV1
-    
-    # VOB、MOV 格式的幀率資訊位於 I
-    if (-not $script:interlacedArgs.isVOB -and -not $script:interlacedArgs.isMOV) {
-        $ffmpegParams.FPS = Get-FPSParam -fpsString $ffprobeCSV.H -Target ffmpeg
-        $svtav1Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.H -Target svtav1
-        $x265Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.H -Target x265
-        $x264Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.H -Target x264
-
-        $x265Params.Subme = Get-x265SubmotionEstimation -fpsString $ffprobeCSV.H
-        [int]$x265SubmeInt = Get-x265SubmotionEstimation -fpsString $ffprobeCSV.H -stripParameterName
-        $x264Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.H -bframes 250 -askUser -isx264
-        $x265Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.H -bframes $x265SubmeInt -askUser -isx265
-        $svtav1Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.H -bframes 999 -askUser -isSVTAV1
-        $x264Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.H -bframes 250
-        $x265Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.H -bframes $x265SubmeInt
-    }
-    else {
-        $ffmpegParams.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target ffmpeg
-        $svtav1Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target svtav1
-        $x265Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target x265
-        $x264Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target x264
-
-        $x265Params.Subme = Get-x265SubmotionEstimation -fpsString $ffprobeCSV.I
-        [int]$x265SubmeInt = Get-x265SubmotionEstimation -fpsString $ffprobeCSV.I -stripParameterName
-        Show-Debug "MOV/VOB 源的幀率為：$(ConvertTo-Fraction $ffprobeCSV.I)"
-        $x264Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.I -bframes 250 -askUser -isx264
-        $x265Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.I -bframes $x265SubmeInt -askUser -isx265
-        $svtav1Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.I -bframes 999 -askUser -isSVTAV1
-        
-        $x264Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.I -bframes 250 # hack：借 bframes 做出建議最大值
-        $x265Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.I -bframes $x265SubmeInt
-    }
-
-    Write-Host ("─" * 50)
 
     # VOB 的總幀數資訊位於 J
     $x265Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $false
@@ -1332,6 +1303,27 @@ function Main {
     $x265Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
     $x264Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
     $avsyuvParams.CSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $false -isAvs2YuvInput $true -isSVTAV1 $false -isAVSPlus ($avs2yuvVersionCode -eq 'a')
+
+    # VOB、MOV 格式的幀率資訊位於 .I，否則為 .H
+    $ffFpsString =
+        if ($script:interlacedArgs.isVOB -or $script:interlacedArgs.isMOV) { $ffprobeCSV.I }
+        else { $ffprobeCSV.H }
+    # Show-Debug "格式為 VOB：$($script:interlacedArgs.isVOB)"
+    # Show-Debug "格式為 MOV：$($script:interlacedArgs.isMOV)"
+    # Show-Debug "幀率：$ffFpsString"
+    $ffmpegParams.FPS = Get-FPSParam -fpsString $ffFpsString -Target ffmpeg
+    $svtav1Params.FPS = Get-FPSParam -fpsString $ffFpsString -Target svtav1
+    $x265Params.FPS = Get-FPSParam -fpsString $ffFpsString -Target x265
+    $x264Params.FPS = Get-FPSParam -fpsString $ffFpsString -Target x264
+    $x265Params.Subme = Get-x265SubmotionEstimation -fpsString $ffFpsString
+    [int]$x265SubmeInt = Get-x265SubmotionEstimation -fpsString $ffFpsString -stripParameterName
+    $x264Params.Keyint = Get-Keyint -fpsString $ffFpsString -bframes 250 -askUser -isx264
+    $x265Params.Keyint = Get-Keyint -fpsString $ffFpsString -bframes $x265SubmeInt -askUser -isx265
+    $svtav1Params.Keyint = Get-Keyint -fpsString $ffFpsString -bframes 999 -askUser -isSVTAV1
+    $x264Params.RCLookahead = Get-RateControlLookahead -fpsString $ffFpsString -bframes 250
+    $x265Params.RCLookahead = Get-RateControlLookahead -fpsString $ffFpsString -bframes $x265SubmeInt
+
+    Write-Host ("─" * 50)
 
     # Avs2PipeMod 需要的 DLL
     $quotedDllPath = Get-QuotedPath $sourceCSV.Avs2PipeModDllPath

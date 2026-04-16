@@ -579,8 +579,8 @@ function Get-Keyint {
         do { # Decoding usage for video editing is the sum of the keyframe interval of all video tracks
             # However, the real-world decoding capability depends mostly on the # of hardware decoders,
             # so only setting to 2x default
-            Write-Host " 1. Resolutions greater than 2560x1440, pick section to ←"
-            Write-Host " 2. For simple & flat video content, pick section to →"
+            Write-Host " 1. Resolutions greater than 2560x1440, pick | ← |"
+            Write-Host " 2. For simple & flat video content, pick | → |"
             $userSecond =
                 Read-Host " Specify second: [Low Power/Multitrack Editing: 6-7 | 8-10 | High: 11-13+ ]"
             if ($userSecond -notmatch "^\d+$") {
@@ -1034,6 +1034,11 @@ function Get-RAWCSPBitDepth {
 
     if ($isEncoderInput) {
         if ($isSVTAV1) { # --color-format, --input-depth
+            if ($depth -eq 12) {
+                Show-Warning "Get-RAWCSPBitDepth: detecting SVT-AV1-incompatible 12bit source format, re-run step 2 if SVT-AV1 is designated"
+                Write-Host ("─" * 50)
+            }
+
             # SVT-AV1 uses integer --color-format
             $svtColorMap = @{
                 'i400' = 0
@@ -1290,39 +1295,6 @@ function Main {
     $x265Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -isx265
     $svtav1Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -isSVTAV1
 
-    # VOB, MOV formats' framerate data is in I
-    if (-not $script:interlacedArgs.isVOB -and -not $script:interlacedArgs.isMOV) {
-        $ffmpegParams.FPS = Get-FPSParam -fpsString $ffprobeCSV.H -Target ffmpeg
-        $svtav1Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.H -Target svtav1
-        $x265Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.H -Target x265
-        $x264Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.H -Target x264
-
-        $x265Params.Subme = Get-x265SubmotionEstimation -fpsString $ffprobeCSV.H
-        [int]$x265SubmeInt = Get-x265SubmotionEstimation -fpsString $ffprobeCSV.H -stripParameterName
-        $x264Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.H -bframes 250 -askUser -isx264
-        $x265Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.H -bframes $x265SubmeInt -askUser -isx265
-        $svtav1Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.H -bframes 999 -askUser -isSVTAV1
-        $x264Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.H -bframes 250
-        $x265Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.H -bframes $x265SubmeInt
-    }
-    else {
-        $ffmpegParams.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target ffmpeg
-        $svtav1Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target svtav1
-        $x265Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target x265
-        $x264Params.FPS = Get-FPSParam -fpsString $ffprobeCSV.I -Target x264
-
-        $x265Params.Subme = Get-x265SubmotionEstimation -fpsString $ffprobeCSV.I
-        [int]$x265SubmeInt = Get-x265SubmotionEstimation -fpsString $ffprobeCSV.I -stripParameterName
-        Show-Debug "MOV/VOB source framerate: $(ConvertTo-Fraction $ffprobeCSV.I)"
-        $x264Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.I -bframes 250 -askUser -isx264
-        $x265Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.I -bframes $x265SubmeInt -askUser -isx265
-        $svtav1Params.Keyint = Get-Keyint -fpsString $ffprobeCSV.I -bframes 999 -askUser -isSVTAV1
-        
-        $x264Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.I -bframes 250 # hack：借 bframes 做出建议最大值
-        $x265Params.RCLookahead = Get-RateControlLookahead -fpsString $ffprobeCSV.I -bframes $x265SubmeInt
-    }
-
-    Write-Host ("─" * 50)
 
     # VOB format—frame count: J
     $x265Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $false
@@ -1345,6 +1317,27 @@ function Main {
     $x265Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
     $x264Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
     $avsyuvParams.CSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $false -isAvs2YuvInput $true -isSVTAV1 $false -isAVSPlus ($avs2yuvVersionCode -eq 'a')
+
+    # VOB、MOV framerate data is located at .I，otherwise it would be .H
+    $ffFpsString =
+        if ($script:interlacedArgs.isVOB -or $script:interlacedArgs.isMOV) { $ffprobeCSV.I }
+        else { $ffprobeCSV.H }
+    # Show-Debug "Source is VOB mux：$($script:interlacedArgs.isVOB)"
+    # Show-Debug "Source is MOV mux：$($script:interlacedArgs.isMOV)"
+    # Show-Debug "FPS：$ffFpsString"
+    $ffmpegParams.FPS = Get-FPSParam -fpsString $ffFpsString -Target ffmpeg
+    $svtav1Params.FPS = Get-FPSParam -fpsString $ffFpsString -Target svtav1
+    $x265Params.FPS = Get-FPSParam -fpsString $ffFpsString -Target x265
+    $x264Params.FPS = Get-FPSParam -fpsString $ffFpsString -Target x264
+    $x265Params.Subme = Get-x265SubmotionEstimation -fpsString $ffFpsString
+    [int]$x265SubmeInt = Get-x265SubmotionEstimation -fpsString $ffFpsString -stripParameterName
+    $x264Params.Keyint = Get-Keyint -fpsString $ffFpsString -bframes 250 -askUser -isx264
+    $x265Params.Keyint = Get-Keyint -fpsString $ffFpsString -bframes $x265SubmeInt -askUser -isx265
+    $svtav1Params.Keyint = Get-Keyint -fpsString $ffFpsString -bframes 999 -askUser -isSVTAV1
+    $x264Params.RCLookahead = Get-RateControlLookahead -fpsString $ffFpsString -bframes 250
+    $x265Params.RCLookahead = Get-RateControlLookahead -fpsString $ffFpsString -bframes $x265SubmeInt
+
+    Write-Host ("─" * 50)
 
     # Avs2PipeMod's required DLL
     $quotedDllPath = Get-QuotedPath $sourceCSV.Avs2PipeModDllPath

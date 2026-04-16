@@ -157,7 +157,7 @@ function Select-Folder(
         [string]$Description = "選擇文件夾",
         [string]$InitialPath = [Environment]::GetFolderPath('Desktop')
     ) {
-    Write-Host " 選窗可能會在本窗口後面打開，這裡不要按回車"
+    Write-Host " 命令行窗口可能會失焦，點擊命令行窗口以恢復輸入游標"
     # UI.ps1: Add-Type -AssemblyName System.Windows.Forms
     $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
     $dialog.Description = $Description

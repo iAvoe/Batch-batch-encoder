@@ -157,7 +157,7 @@ function Select-Folder(
         [string]$Description = "选择文件夹",
         [string]$InitialPath = [Environment]::GetFolderPath('Desktop')
     ) {
-    Write-Host " 选窗可能会在本窗口后面打开，这里不要按回车"
+    Write-Host " 命令行窗口可能会失焦，点击命令行窗口以恢复输入光标"
     # UI.ps1: Add-Type -AssemblyName System.Windows.Forms
     $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
     $dialog.Description = $Description
@@ -172,9 +172,6 @@ function Select-Folder(
 
     while ($true) {
         $result = $dialog.ShowDialog($form)
-        # 窗口焦点切回 VSCode
-        Assert-VSCodeWindow
-
         # 窗口焦点切回 CLI
         $hwnd = [WinAPI]::GetConsoleWindow()
         [WinAPI]::SetForegroundWindow($hwnd) | Out-Null

@@ -73,6 +73,11 @@ Developing these tools wasn't easy. If this tool improve your efficiency, consid
 <p align="center"><img src="bmc_qr.png" alt="Support me -_-"><br><img src="pp_tip_qr.png" alt="Support me =_="></p>
 
 ## Update Information
+**v1.7.1**
+- Step 4:
+  - Added 12bit source compatibility warning for SVT-AV1
+  - Simplified FPS paramter assignment code block
+
 **v1.7**
 - Path/folder selection dialog window now appears on top correctly, no more window juggling
 - CLI Window now can be refocused after completing path/folder selection dialog

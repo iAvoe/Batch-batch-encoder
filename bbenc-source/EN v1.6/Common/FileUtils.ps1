@@ -157,7 +157,7 @@ function Select-Folder(
         [string]$Description = "Select folder",
         [string]$InitialPath = [Environment]::GetFolderPath('Desktop')
     ) {
-    Write-Host " Selection window may open in the background; Avoid pressing Enter here."
+    Write-Host " Commandline console may lose focus, click on the console to restore input cursor"
     # UI.ps1: Add-Type -AssemblyName System.Windows.Forms
     $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
     $dialog.Description = $Description
