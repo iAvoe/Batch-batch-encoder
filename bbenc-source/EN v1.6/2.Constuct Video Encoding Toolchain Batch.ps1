@@ -178,9 +178,21 @@ function Get-CommandFromPreset([string]$presetName, $tools, $vsAPI, [bool]$Debug
     }
 }
 
+# General path value assignment function
+function Update-ToolMap {
+    param ([System.Collections.IDictionary]$targetMap, $sourceObj)
+    if (-not $sourceObj) { return }
+    foreach ($prop in $sourceObj.psobject.Properties) {
+        if ($prop.Value) {
+            $targetMap[$prop.Name] = $prop.Value
+        }
+    }
+}
+#endregion
+
 #region Main
 function Main {
-    $toolsJson = Join-Path $Global:TempFolder "tools.json"    
+    $toolsJson = Join-Path $Global:TempFolder "tools.json"
 
     # Version of vspipe API and AVS
     $vspipeInfo = $null
@@ -220,30 +232,10 @@ function Main {
     if (Test-NullablePath $toolsJson) {
         try {
             $savedConfig = Read-JsonFile $toolsJson
-            Show-Info "Detecting config file (saved at: $($savedConfig.SaveDate)), loading now..."
-
-            # Upstream，Downstream，Analysis
-            if ($savedConfig.Upstream) {
-                foreach ($prop in $savedConfig.Upstream.psobject.Properties) {
-                    if ($prop.Value) {
-                        $upstreamTools[$prop.Name] = $prop.Value
-                    }
-                }
-            }
-            if ($savedConfig.Downstream) {
-                foreach ($prop in $savedConfig.Downstream.psobject.Properties) {
-                    if ($prop.Value) {
-                        $downstreamTools[$prop.Name] = $prop.Value
-                    }
-                }
-            }
-            if ($savedConfig.Analysis) {
-                foreach ($prop in $savedConfig.Analysis.psobject.Properties) {
-                    if ($prop.Value) {
-                        $analysisTools[$prop.Name] = $prop.Value
-                    }
-                }
-            }
+            Show-Info "Detecting config file ($($savedConfig.SaveDate)), loading now..."
+            Update-ToolMap $upstreamTools   $savedConfig.Upstream
+            Update-ToolMap $downstreamTools $savedConfig.Downstream
+            Update-ToolMap $analysisTools   $savedConfig.Analysis
             # User may up-downgrade VS (old path in new API), therefore we should check every time
         }
         catch { Show-Info "Tool path configuration file corrupted, manual import required" }

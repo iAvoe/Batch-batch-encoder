@@ -1377,7 +1377,7 @@ function Main {
     if (Test-NullablePath $toolsJson) {
         try {
             $savedConfig = Read-JsonFile $toolsJson
-            Show-Info "檢測到設定檔（保存於：$($savedConfig.SaveDate)），正在載入..."
+            Show-Info "檢測到設定檔（$($savedConfig.SaveDate)），正在載入..."
             if ($null -ne $savedConfig.IsAvsPlus) {
                 $isAvsPlus = $savedConfig.IsAvsPlus 
             }

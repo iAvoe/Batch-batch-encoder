@@ -125,6 +125,7 @@ function Get-VSPipeY4MArgument {
     throw "检测不到 vspipe 支持的 y4m 参数。VapourSynth 或 Python 环境异常，请检查安装"
 }
 
+#region Helpers
 # 遍历所有已导入工具组合，从而导出“备用路线”
 function Get-CommandFromPreset([string]$presetName, $tools, $vsAPI, [bool]$DebugMode = $false) {
     if ($DebugMode) {
@@ -175,9 +176,24 @@ function Get-CommandFromPreset([string]$presetName, $tools, $vsAPI, [bool]$Debug
     }
 }
 
+# 通用路径字符串赋值函数
+function Update-ToolMap {
+    param ([System.Collections.IDictionary]$targetMap, $sourceObj)
+    if (-not $sourceObj) { return }
+    foreach ($prop in $sourceObj.psobject.Properties) {
+        if ($prop.Value) {
+            $targetMap[$prop.Name] = $prop.Value
+        }
+    }
+}
+
+# TODO：通用工具路径获取函数
+
+#endregion
+
 #region Main
 function Main {
-    $toolsJson = Join-Path $Global:TempFolder "tools.json"    
+    $toolsJson = Join-Path $Global:TempFolder "tools.json"
 
     # vspipe API 版本与 AVS 版本
     $vspipeInfo = $null
@@ -217,30 +233,10 @@ function Main {
     if (Test-NullablePath $toolsJson) {
         try {
             $savedConfig = Read-JsonFile $toolsJson
-            Show-Info "检测到配置文件（保存于：$($savedConfig.SaveDate)），正在加载..."
-
-            # Upstream，Downstream，Analysis
-            if ($savedConfig.Upstream) {
-                foreach ($prop in $savedConfig.Upstream.psobject.Properties) {
-                    if ($prop.Value) {
-                        $upstreamTools[$prop.Name] = $prop.Value
-                    }
-                }
-            }
-            if ($savedConfig.Downstream) {
-                foreach ($prop in $savedConfig.Downstream.psobject.Properties) {
-                    if ($prop.Value) {
-                        $downstreamTools[$prop.Name] = $prop.Value
-                    }
-                }
-            }
-            if ($savedConfig.Analysis) {
-                foreach ($prop in $savedConfig.Analysis.psobject.Properties) {
-                    if ($prop.Value) {
-                        $analysisTools[$prop.Name] = $prop.Value
-                    }
-                }
-            }
+            Show-Info "检测到配置文件（$($savedConfig.SaveDate)），正在加载..."
+            Update-ToolMap $upstreamTools   $savedConfig.Upstream
+            Update-ToolMap $downstreamTools $savedConfig.Downstream
+            Update-ToolMap $analysisTools   $savedConfig.Analysis
             # 用户可能会使用安装包升级或降级 VS（旧路径新参数），每次调用都应该检查，无法避免重复测试
         }
         catch { Show-Info "工具路径配置文件损坏，需手动导入" }

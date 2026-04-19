@@ -125,6 +125,7 @@ function Get-VSPipeY4MArgument {
     throw "檢測不到 vspipe 支持的 y4m 參數。VapourSynth 或 Python 環境異常，請檢查安裝"
 }
 
+#region Helpers
 # 遍歷所有已導入工具組合，從而導出“備用路線”
 function Get-CommandFromPreset([string]$presetName, $tools, $vsAPI, [bool]$DebugMode = $false) {
     if ($DebugMode) {
@@ -175,9 +176,21 @@ function Get-CommandFromPreset([string]$presetName, $tools, $vsAPI, [bool]$Debug
     }
 }
 
+# 通用路徑字串賦值函數
+function Update-ToolMap {
+    param ([System.Collections.IDictionary]$targetMap, $sourceObj)
+    if (-not $sourceObj) { return }
+    foreach ($prop in $sourceObj.psobject.Properties) {
+        if ($prop.Value) {
+            $targetMap[$prop.Name] = $prop.Value
+        }
+    }
+}
+#endregion
+
 #region Main
 function Main {
-    $toolsJson = Join-Path $Global:TempFolder "tools.json"    
+    $toolsJson = Join-Path $Global:TempFolder "tools.json"
 
     # vspipe API 版本與 AVS 版本
     $vspipeInfo = $null
@@ -217,30 +230,10 @@ function Main {
     if (Test-NullablePath $toolsJson) {
         try {
             $savedConfig = Read-JsonFile $toolsJson
-            Show-Info "檢測到路徑設定檔（保存於：$($savedConfig.SaveDate)），正在載入..."
-
-            # Upstream，Downstream，Analysis
-            if ($savedConfig.Upstream) {
-                foreach ($prop in $savedConfig.Upstream.psobject.Properties) {
-                    if ($prop.Value) {
-                        $upstreamTools[$prop.Name] = $prop.Value
-                    }
-                }
-            }
-            if ($savedConfig.Downstream) {
-                foreach ($prop in $savedConfig.Downstream.psobject.Properties) {
-                    if ($prop.Value) {
-                        $downstreamTools[$prop.Name] = $prop.Value
-                    }
-                }
-            }
-            if ($savedConfig.Analysis) {
-                foreach ($prop in $savedConfig.Analysis.psobject.Properties) {
-                    if ($prop.Value) {
-                        $analysisTools[$prop.Name] = $prop.Value
-                    }
-                }
-            }
+            Show-Info "檢測到路徑設定檔（$($savedConfig.SaveDate)），正在載入..."
+            Update-ToolMap $upstreamTools   $savedConfig.Upstream
+            Update-ToolMap $downstreamTools $savedConfig.Downstream
+            Update-ToolMap $analysisTools   $savedConfig.Analysis
             # 用戶可能會使用安裝包升級或降級 VS（舊路徑新參數），每次調用都應該檢查，無法避免重複測試
         }
         catch { Show-Info "工具路徑設定檔損壞，需手動導入" }
