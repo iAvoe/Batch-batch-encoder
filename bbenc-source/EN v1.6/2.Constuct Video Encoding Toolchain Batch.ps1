@@ -72,6 +72,25 @@ $analysisTools = [ordered]@{
     'ffprobe' = $null
 }
 
+<#
+$toolHintsZHCN = @{
+    'svfi'    = " SVFI（one_line_shot_args.exe）Steam 发布版的路径是 X:\SteamLibrary\steamapps\common\SVFI\"
+    'vspipe'  = " 安装版 VapourSynth 的默认可执行文件路径是 C:\Program Files\VapourSynth\core\vspipe.exe"
+    'avs2yuv' = " 支持 AviSynth（0.26）和 AviSynth+（0.30）的 avs2yuv"
+}
+$toolHintsZHTW = @{
+    'svfi'    = " SVFI（one_line_shot_args.exe）Steam 發布版的路徑是 X:\SteamLibrary\steamapps\common\SVFI\"
+    'vspipe'  = " 安裝版 VapourSynth 的默認可執行文件路徑是 C:\Program Files\VapourSynth\core\vspipe.exe"
+    'avs2yuv' = " 支持 AviSynth（0.26）和 AviSynth+（0.30）的 avs2yuv"
+}
+#>
+$toolHintsEN = @{
+    'svfi'    = " Steam SVFI installation (one_line_shot_args.exe) is at X:\SteamLibrary\steamapps\common\SVFI\"
+    'vspipe'  = " Default install path for VapourSynth: C:\Program Files\VapourSynth\core\vspipe.exe"
+    'avs2yuv' = " Both AviSynth (0.26) & AviSynth+ (0.30) are supported"
+}
+
+#region Helpers
 # Pipe format compatibility map
 function Get-PipeType($upstream) {
     switch ($upstream) {
@@ -84,8 +103,7 @@ function Get-PipeType($upstream) {
     }
 }
 
-# Instead of reading VapourSynth versions and map API to Y4M parameters,
-# simply try a list of commands and find the working one
+# Instead of parsing versionss, just try some commands and find one that triggers deeper error
 function Get-VSPipeY4MArgument {
     param([Parameter(Mandatory=$true)][string]$VSpipePath)
     $tests = @(
@@ -95,7 +113,7 @@ function Get-VSPipeY4MArgument {
     )
 
     foreach ($testArgs in $tests) {
-        Write-Host (" Testing: {0} {1}" -f $VSpipePath, ($testArgs -join " "))
+        Write-Host (" Test: {0} {1}" -f $VSpipePath, ($testArgs -join " "))
         
         # Start-Process: execute on other process, so text encoding in current console stays
         $processInfo = New-Object System.Diagnostics.ProcessStartInfo
@@ -125,7 +143,7 @@ function Get-VSPipeY4MArgument {
             }
         }
     }
-    throw "Could not detect vspipe's Y4M parameter. Either VapourSynth or Python environment corrupted"
+    throw "Could not detect vspipe's Y4M parameter. Either VapourSynth or Python environment is corrupted"
 }
 
 # Traversal all pipe routes imported to create "backup routes"
@@ -137,9 +155,8 @@ function Get-CommandFromPreset([string]$presetName, $tools, $vsAPI, [bool]$Debug
             vsAPI      = $vsAPI
         }
         Show-Debug "`r`nGet-CommandFromPreset" -ForegroundColor Yellow
-        $debugInfo | ConvertTo-Json | Write-Host -ForegroundColor Gray
+        $debugInfo | ConvertTo-Json | Write-Host -ForegroundColor DarkGray
     }
-
     if (-not $presetName) {
         throw "Get-CommandFromPreset：No encoding toolchain selected"
     }
@@ -178,13 +195,71 @@ function Get-CommandFromPreset([string]$presetName, $tools, $vsAPI, [bool]$Debug
     }
 }
 
-# General path value assignment function
+# Generalized path value assignment function
 function Update-ToolMap {
     param ([System.Collections.IDictionary]$targetMap, $sourceObj)
     if (-not $sourceObj) { return }
     foreach ($prop in $sourceObj.psobject.Properties) {
         if ($prop.Value) {
             $targetMap[$prop.Name] = $prop.Value
+        }
+    }
+}
+
+# Generalized too path setter
+function Import-ToolPaths {
+    param (
+        [Parameter(Mandatory=$true)][System.Collections.IDictionary]$ToolsToHave, # Not items in JSON
+        [Parameter(Mandatory=$true)][string]$CategoryName,
+        [Parameter(Mandatory=$true)][string]$ScriptDir,
+        [hashtable]$toolTips,
+        [scriptblock]$PostImportAction = { } # Import logic for specific tools
+    )
+
+    $i = 0
+    $total = $ToolsToHave.Count
+    foreach ($tool in $ToolsToHave.Keys) {
+        $i++
+        $savedPath = $ToolsToHave[$tool] # $upstreamTools is updated by Read-Json before this function runs
+        $isSwapNeeded = $false
+
+        # 1. Ask to swap or add or not
+        if (Test-NullablePath $savedPath) {
+            Write-Host "`r`n Detecting saved path for $tool in $savedPath" -ForegroundColor DarkGray
+            $c = Read-Host Read-Host "`r`n [$CategoryName] ($i/$($upstreamTools.Count)) Replace $tool ? (y=yes，Enter=keep)"
+            if ('y' -eq $c) { $isSwapNeeded = $true }
+        }
+        else {
+            Write-Host "`r`n No path saved for $tool, manual import needed" -ForegroundColor DarkGray
+            $c = Read-Host "`r`n [$CategoryName] ($i/$total) Import $tool executable? (y=yes，Enter=skip)"
+            if ('y' -eq $c) { $isSwapNeeded = $true }
+        }
+
+        # 2. Import logics
+        if ($isSwapNeeded) {
+            $autoPath = Invoke-AutoSearch -ToolName $tool -ScriptDir $ScriptDir
+            if ($autoPath) {
+                Write-Host " $tool found in: $autoPath" -ForegroundColor Green
+                $useAuto = Read-Host "Proceed with this? (Enter=confirm, n=not this one)"
+                if ($useAuto -eq 'n') {
+                    $upstreamTools[$tool] = Select-File -Title "Select $tool executable" -ExeOnly
+                }
+                else { $ToolsToHave[$tool] = $autoPath }
+            }
+            else {
+                Write-Host " Could not find $tool, manual import needed"
+                if ($toolHints.ContainsKey($tool)) {
+                    Write-Host $toolHints[$tool] -ForegroundColor DarkGray
+                }
+                $ToolsToHave[$tool] = Select-File -Title "Select $tool executable" -ExeOnly
+            }
+        }
+
+        # 3. Show results
+        if ($ToolsToHave[$tool]) {
+            Show-Success "$tool imported: $($ToolsToHave[$tool])"
+            # 4. Run post import logics
+            $PostImportAction.Invoke($tool, $ToolsToHave[$tool])
         }
     }
 }
@@ -222,11 +297,8 @@ function Main {
     while (-not $outputPath)
     
     $batchFullPath = Join-Path -Path $outputPath -ChildPath "encode_template.bat"
-
     Show-Success "Output file: $batchFullPath"
-
-    Write-Host ("─" * 60)
-    Show-Info "Importing upstream executable tools..."
+    Write-Host ("─" * 50)
 
     # Attempt to read saved tools.json, but it can be outdated, therefore manual confirmation is required
     if (Test-NullablePath $toolsJson) {
@@ -241,153 +313,39 @@ function Main {
         catch { Show-Info "Tool path configuration file corrupted, manual import required" }
     }
 
-    # Upstream tools import
-    $i=0
-    foreach ($tool in @($upstreamTools.Keys)) {
-        $i++
-        $savedPath = $upstreamTools[$tool]
-        $isSwapNeeded = $true # Mark if tool path is confirmed
-
-        # If there is saved path, select from 'update or import', otherwise 'import or not'
-        if (Test-NullablePath $savedPath) {
-            Write-Host "`r`n Detecting saved path for $tool in $savedPath" -ForegroundColor DarkGray
-            $c = Read-Host "`r`n [Upstream] ($i/$($upstreamTools.Count)) Replace $tool ? (y=swap，Enter=keep)"
-            $isSwapNeeded = if ('y' -eq $c) { $true } else { $false }
-        }
-        else {
-            Write-Host "`r`n No path saved for $tool, manual import needed" -ForegroundColor DarkGray
-            $c = Read-Host "`r`n [Upstream] ($i/$($upstreamTools.Count)) Import $tool executable? (y=yes，Enter=skip)"
-            $isSwapNeeded = if ('y' -eq $c) { $true } else { $false }
-        }
-
-        # Auto path detect with Invoke-AutoSearch
-        if ($isSwapNeeded) {
-            $autoPath = Invoke-AutoSearch -ToolName $tool -ScriptDir $scriptDir
-            if ($autoPath) {
-                Write-Host " $tool found in: $autoPath" -ForegroundColor Green
-                $useAuto = Read-Host "Proceed with this? (Enter=confirm, n=not this one)"
-                if ($useAuto -eq 'n') {
-                    $upstreamTools[$tool] = Select-File -Title "Select $tool executable" -ExeOnly
-                }
-                else {
-                    $upstreamTools[$tool] = $autoPath
-                }
-            }
-            else {
-                Write-Host " Could not find $tool, manual import needed"
-                if ($tool -eq 'svfi') {
-                    Write-Host " Steam installation path of SVFI (one_line_shot_args.exe) is X:\SteamLibrary\steamapps\common\SVFI\"
-                }
-                elseif ($tool -eq 'vspipe') {
-                    Write-Host " Default instal path for VapourSynth: C:\Program Files\VapourSynth\core\vspipe.exe"
-                }
-                elseif ($tool -eq 'avs2yuv') {
-                    Write-Host " Both AviSynth (0.26) & AviSynth+ (0.30) are supported"
-                }
-                $upstreamTools[$tool] = Select-File -Title "Select $tool executable" -ExeOnly
-            }
-        }
-        Show-Success "$tool imported: $($upstreamTools[$tool])"
-        
-        # Detect API version for vspipe, no matter tool swapping is not isn't needed
-        if ($tool -eq 'vspipe' -and $upstreamTools[$tool]) {
+    Show-Info "Importing upstream encoding tools..."
+    Import-ToolPaths -ToolsToHave $upstreamTools -CategoryName "Upstream" -ScriptDir $scriptDir -toolTips $toolHintsEN -PostImportAction {
+        param($tool, $path)
+        # Detect API version for vspipe no matter swapped or not
+        if ($tool -eq 'vspipe') {
             Write-Host ''
-            Show-Info "Detecting VapourSynth pipe command..."
-            $vspipeInfo = Get-VSPipeY4MArgument -VSpipePath $upstreamTools[$tool]
-            Show-Success $($vspipeInfo.Note)
+            Show-Info "Detecting VapourSynth pipe parameters..."
+            $global:vspipeInfo = Get-VSPipeY4MArgument -VSpipePath $path
+            Show-Success $global:vspipeInfo.Note
         }
-        elseif ($tool -eq 'avs2yuv' -and $upstreamTools[$tool]) {
-            # AviSynth is not imported, cannot detect its version, requires manual specification
+        elseif ($tool -eq 'avs2yuv') {
+            # Cannot detect AviSynth version as we don't import it, requires manual specification
             while ($true) {
-                Show-Info "Please select the version of avs2yuv(64).exe used:"
+                Show-Info "Please select the version of avs2yuv(64).exe used: "
                 $avs2yuvVer = Read-Host " [Default Enter/a: AviSynth+ (0.30) | b: AviSynth (up to 0.26)]"
                 if ([string]::IsNullOrWhiteSpace($avs2yuvVer) -or 'a' -eq $avs2yuvVer) {
-                    $isAVSPlus = $true
-                    break
+                    $global:isAvsPlus = $true; break
                 }
                 elseif ('b' -eq $avs2yuvVer) {
-                    $isAvsPlus = $false
-                    break
+                    $global:isAvsPlus = $false; break
                 }
-                Show-Warning "Input value is beyond comprehension, please try again"
+                Show-Warning "Incomprehensible input value, please try again"
             }
         }
     }
     
-    Write-Host ("─" * 60)
+    Write-Host ("─" * 50)
     Show-Info "Importing downstream tools..."
-    $i=0
-    foreach ($tool in @($downstreamTools.Keys)) {
-        $i++
-        $savedPath = $downstreamTools[$tool]
+    Import-ToolPaths -ToolsToHave $downstreamTools -CategoryName "Downstream" -toolTips $toolHintsEN -ScriptDir $scriptDir
 
-        # If there is saved path, select from 'update or import', otherwise 'import or not'
-        if (Test-NullablePath $savedPath) {
-            Write-Host "`r`n Detecting saved path for $tool in $savedPath" -ForegroundColor DarkGray
-            $c = Read-Host "`r`n [Downstream] ($i/$($downstreamTools.Count)) Replace $tool ? (y=swap，Enter=keep)"
-            if ('y' -ne $c) { continue }
-        }
-        else {
-            Write-Host "`r`n No path saved for $tool, manual import needed" -ForegroundColor DarkGray
-            $c = Read-Host "`r`n [Downstream] ($i/$($downstreamTools.Count)) Import $tool executable? (y=yes，Enter=skip)"
-            if ('y' -ne $c) { continue }
-        }
-
-        # Auto path detect with Invoke-AutoSearch
-        $autoPath = Invoke-AutoSearch -ToolName $tool -ScriptDir $scriptDir
-
-        if ($autoPath) {
-            Write-Host " $tool found in: $autoPath" -ForegroundColor Green
-            $useAuto = Read-Host "Proceed with this? (Enter=confirm, n=not this one)"
-            if ($useAuto -eq 'n') {
-                $downstreamTools[$tool] = Select-File -Title "Select $tool executable" -ExeOnly
-            }
-            else { $downstreamTools[$tool] = $autoPath }
-        }
-        else {
-            Write-Host " Could not find $tool, please locate it manually"
-            $downstreamTools[$tool] = Select-File -Title "Select $tool executable" -ExeOnly
-        }
-
-        Show-Success "$tool imported: $($downstreamTools[$tool])"
-    }
-
-    Write-Host ("─" * 60)
+    Write-Host ("─" * 50)
     Show-Info "Importing analysis tools..."
-    $i=0
-    foreach ($tool in @($analysisTools.Keys)) {
-        $i++
-        $savedPath = $analysisTools[$tool]
-
-        # If there is saved path, select from 'update or import', otherwise 'import or not'
-        if (Test-NullablePath $savedPath) {
-            Write-Host "`r`n Detecting saved path for $tool in $savedPath" -ForegroundColor DarkGray
-            $c = Read-Host "`r`n [Analysis] ($i/$($analysisTools.Count)) Replace $tool ? (y=swap，Enter=keep)"
-            if ('y' -ne $c) { continue }
-        }
-        else {
-            Write-Host "`r`n No path saved for $tool, manual import needed, `r`n skipping here makes manual import in step 3 necessary" -ForegroundColor DarkGray
-            $c = Read-Host "`r`n [Analysis] ($i/$($analysisTools.Count)) Import $tool executable? (y=yes，Enter=skip)"
-            if ('y' -ne $c) { continue }
-        }
-
-        # Auto path detect with Invoke-AutoSearch
-        $autoPath = Invoke-AutoSearch -ToolName $tool -ScriptDir $scriptDir
-        if ($autoPath) {
-            Write-Host " $tool found in: $autoPath" -ForegroundColor Green
-            $useAuto = Read-Host "Proceed with this? (Enter=confirm, n=not this one)"
-            if ($useAuto -eq 'n') {
-                $analysisTools[$tool] = Select-File -Title "Select $tool executable" -ExeOnly
-            }
-            else { $analysisTools[$tool] = $autoPath }
-        }
-        else {
-            Write-Host " Could not find $tool, please locate it manually"
-            $analysisTools[$tool] = Select-File -Title "Select $tool executable" -ExeOnly
-        }
-
-        Show-Success "$tool imported: $($analysisTools[$tool])"
-    }
+    Import-ToolPaths -ToolsToHave $analysisTools -CategoryName "Analysis" -toolTips $toolHintsEN -ScriptDir $scriptDir
 
     # Merge all tools (using manual merge to avoid object reference/type issues caused by Clone())
     $tools = @{}
@@ -431,7 +389,7 @@ function Main {
 
     # Show toochains that could work
     Show-Info "Available encoding toolchains:"
-    Write-Host ("─" * 60)
+    Write-Host ("─" * 50)
 
     # Construct “ID → PresetName” map
     $presetIdMap = [ordered]@{}
@@ -446,7 +404,7 @@ function Main {
         Sort-Object { $_.Value.ID }
     
     Write-Host ("{0,-6} {1,-22} {2,-12} {3}" -f "ID", "Preset", "Upstream", "Downstream") -ForegroundColor Yellow
-    Write-Host ("─" * 60)
+    Write-Host ("─" * 50)
     
     foreach ($ap in $availablePresets) {
         $id   = $ap.Value.ID
@@ -461,7 +419,7 @@ function Main {
         Write-Host ("[{0,-2}]  {1,-22} {2,-12} {3}" -f $id, $name, $up, $down)
     }
     
-    Write-Host ("─" * 60)
+    Write-Host ("─" * 50)
 
     $selectedPreset = $null
     if ($presetIdMap.Count -eq 0) {
@@ -492,7 +450,7 @@ function Main {
     # Generate batch processing content and append pipeline specifying commands
     # 1. Generate the currently selected main command
     $command =
-        Get-CommandFromPreset $selectedPreset -tools $tools -vsAPI $vspipeInfo
+        Get-CommandFromPreset $selectedPreset -tools $tools -vsAPI $global:vspipeInfo
 
     # 2. Generate alternate commands for other imported lines (REM write)
     $otherCommands = @()
@@ -504,7 +462,7 @@ function Main {
         if ($presetName -eq $selectedPreset) { continue }
 
         $cmdStr =
-            Get-CommandFromPreset $presetName -tools $tools -vsAPI $vspipeInfo
+            Get-CommandFromPreset $presetName -tools $tools -vsAPI $global:vspipeInfo
         $otherCommands += "REM PRESET[$presetName]: $cmdStr"
     }
     $remCommands = $otherCommands -join "`r`n"

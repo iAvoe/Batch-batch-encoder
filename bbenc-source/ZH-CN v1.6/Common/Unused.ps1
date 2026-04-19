@@ -129,3 +129,157 @@ function Get-x265SVTAV1Profile {
     if ($inputCsp) { $result += " $inputCsp" }
     return $result
 }
+
+    # 优化前的工具导入代码，用于暂存
+    <#
+    $i=0
+    foreach ($tool in @($upstreamTools.Keys)) {
+        $i++
+        $savedPath = $upstreamTools[$tool]
+        $isSwapNeeded = $true # 标记是否已经确定了路径
+
+        # 读取到保存的路径则询问是否更新，否则退回旧选择
+        if (Test-NullablePath $savedPath) {
+            Write-Host "`r`n 检测到已保存的 $tool 路径：$savedPath" -ForegroundColor DarkGray
+            $c = Read-Host "`r`n [上游] ($i/$($upstreamTools.Count)) 是否更换 $tool ？(y=换，Enter 不换)"
+            $isSwapNeeded = if ('y' -eq $c) { $true } else { $false }
+        }
+        else {
+            Write-Host "`r`n 未保存 $tool 的路径，需要手动导入" -ForegroundColor DarkGray
+            $c = Read-Host "`r`n [上游] ($i/$($upstreamTools.Count)) 导入 $tool 可执行文件？（y=是，Enter 跳过）"
+            $isSwapNeeded = if ('y' -eq $c) { $true } else { $false }
+        }
+
+        # 使用 Invoke-AutoSearch 获取自动找到的路径
+        if ($isSwapNeeded) {
+            $autoPath = Invoke-AutoSearch -ToolName $tool -ScriptDir $scriptDir
+            if ($autoPath) {
+                Write-Host "自动检测到 $tool 位于：$autoPath" -ForegroundColor Green
+                if ('n' -eq (Read-Host "是否使用此文件？（Enter=确认, n=手动选择）")) {
+                    $upstreamTools[$tool] = Select-File -Title "选择 $tool 可执行文件" -ExeOnly
+                }
+                else {
+                    $upstreamTools[$tool] = $autoPath
+                }
+            }
+            else {
+                Write-Host " 未自动检测到 $tool，请手动选择"
+                if ($tool -eq 'svfi') {
+                    Write-Host " SVFI（one_line_shot_args.exe）Steam 发布版的路径是 X:\SteamLibrary\steamapps\common\SVFI\"
+                }
+                elseif ($tool -eq 'vspipe') {
+                    Write-Host " 安装版 VapourSynth 的默认可执行文件路径是 C:\Program Files\VapourSynth\core\vspipe.exe"
+                }
+                elseif ($tool -eq 'avs2yuv') {
+                    Write-Host "`r`n 支持 AviSynth（0.26）和 AviSynth+（0.30）的 avs2yuv" -ForegroundColor DarkGray
+                }
+                $upstreamTools[$tool] = Select-File -Title "选择 $tool 可执行文件" -ExeOnly
+            }
+        }
+        Show-Success "$tool 已导入: $($upstreamTools[$tool])"
+
+        # 检测 vspipe API 版本以及 avs2yuv 版本，无论是否切换工具
+        if ($tool -eq 'vspipe' -and $upstreamTools[$tool]) {
+            Write-Host ''
+            Show-Info "检测 VapourSynth 管道参数..."
+            $vspipeInfo = Get-VSPipeY4MArgument -VSpipePath $upstreamTools[$tool]
+            Show-Success $($vspipeInfo.Note)
+        }
+        elseif ($tool -eq 'avs2yuv' -and $upstreamTools[$tool]) {
+            # 不导入 AviSynth，故无法检测版本，需手动指定
+            while ($true) {
+                Show-Info "选择使用的 avs2yuv(64).exe 类型："
+                $avs2yuvVer = Read-Host " [默认 Enter/a: AviSynth+ (0.30) | b: AviSynth (up to 0.26)]"
+                if ([string]::IsNullOrWhiteSpace($avs2yuvVer) -or 'a' -eq $avs2yuvVer) {
+                    $isAVSPlus = $true
+                    break
+                }
+                elseif ('b' -eq $avs2yuvVer) {
+                    $isAvsPlus = $false
+                    break
+                }
+                Show-Warning "输入值超出理解，请重试"
+            }
+        }
+    }
+    #>
+
+    # Write-Host ("─" * 50)
+    # Show-Info "开始导入下游编码工具..."
+    # Import-ToolPaths -ToolsToHave $downstreamTools -CategoryName "下游" -toolTips $toolHintsZHCN -ScriptDir $scriptDir
+    <#
+    $i=0
+    foreach ($tool in @($downstreamTools.Keys)) {
+        $i++
+        $savedPath = $downstreamTools[$tool]
+
+        # 读取到保存的路径则询问是否更新，否则退回旧选择
+        if (Test-NullablePath $savedPath) {
+            Write-Host "`r`n 检测到已保存的 $tool 路径: $savedPath" -ForegroundColor DarkGray
+            $c = Read-Host "`r`n [下游] ($i/$($downstreamTools.Count)) 是否更换 $tool ？(y=换，Enter 不换)"
+            if ('y' -ne $c) { continue }
+        }
+        else {
+            Write-Host "`r`n 未保存 $tool 的路径，需要手动导入" -ForegroundColor DarkGray
+            $c = Read-Host "`r`n [下游] ($i/$($downstreamTools.Count)) 导入 $tool 可执行文件？（y=是，Enter 跳过）"
+            if ('y' -ne $c) { continue }
+        }
+        
+        # 使用 Invoke-AutoSearch 获取自动找到的路径
+        $autoPath = Invoke-AutoSearch -ToolName $tool -ScriptDir $scriptDir
+        if ($autoPath) {
+            Write-Host "自动检测到 $tool 位于：$autoPath" -ForegroundColor Green
+            $useAuto = Read-Host "是否使用此文件？(Enter=确认, n=手动选择)"
+            if ($useAuto -eq 'n') {
+                $downstreamTools[$tool] = Select-File -Title "选择 $tool 可执行文件" -ExeOnly
+            }
+            else { $downstreamTools[$tool] = $autoPath }
+        }
+        else {
+            Write-Host "未自动检测到 $tool，请手动选择。"
+            $downstreamTools[$tool] = Select-File -Title "选择 $tool 可执行文件" -ExeOnly
+        }
+
+        Show-Success "$tool 已导入: $($downstreamTools[$tool])"
+    }
+    #>
+
+    # Write-Host ("─" * 50)
+    # Show-Info "开始导入检测工具..."
+    # Import-ToolPaths -ToolsToHave $analysisTools -CategoryName "检测" -toolTips $toolHintsZHCN -ScriptDir $scriptDir
+    <#
+    $i=0
+    foreach ($tool in @($analysisTools.Keys)) {
+        $i++
+        $savedPath = $analysisTools[$tool]
+
+        # 读取到保存的路径则询问是否更新，否则退回旧选择
+        if (Test-NullablePath $savedPath) {
+            Write-Host "`r`n 检测到已保存的 $tool 路径: $savedPath" -ForegroundColor DarkGray
+            $c = Read-Host "`r`n [检测] ($i/$($analysisTools.Count)) 是否更换 $tool ？(y=换，Enter 不换)"
+            if ('y' -ne $c) { continue }
+        }
+        else {
+            Write-Host "`r`n 未保存 $tool 的路径，需要手动导入，跳过后仍可在步骤 3 导入" -ForegroundColor DarkGray
+            $c = Read-Host "`r`n [检测] ($i/$($analysisTools.Count)) 导入 $tool 可执行文件？（y=是，Enter 跳过）"
+            if ('y' -ne $c) { continue }
+        }
+
+        # 使用 Invoke-AutoSearch 获取自动找到的路径
+        $autoPath = Invoke-AutoSearch -ToolName $tool -ScriptDir $scriptDir
+        if ($autoPath) {
+            Write-Host "自动检测到 $tool 位于：$autoPath" -ForegroundColor Green
+            $useAuto = Read-Host "是否使用此文件？(Enter=确认, n=手动选择)"
+            if ($useAuto -eq 'n') {
+                $analysisTools[$tool] = Select-File -Title "选择 $tool 可执行文件" -ExeOnly
+            }
+            else { $analysisTools[$tool] = $autoPath }
+        }
+        else {
+            Write-Host "未自动检测到 $tool，请手动选择。"
+            $analysisTools[$tool] = Select-File -Title "选择 $tool 可执行文件" -ExeOnly
+        }
+
+        Show-Success "$tool 已导入: $($analysisTools[$tool])"
+    }
+    #>

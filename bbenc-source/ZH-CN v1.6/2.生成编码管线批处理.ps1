@@ -71,6 +71,25 @@ $analysisTools = [ordered]@{
     'ffprobe' = $null
 }
 
+$toolHintsZHCN = @{
+    'svfi'    = " SVFI（one_line_shot_args.exe）Steam 发布版的路径是 X:\SteamLibrary\steamapps\common\SVFI\"
+    'vspipe'  = " 安装版 VapourSynth 的默认可执行文件路径是 C:\Program Files\VapourSynth\core\vspipe.exe"
+    'avs2yuv' = " 支持 AviSynth（0.26）和 AviSynth+（0.30）的 avs2yuv"
+}
+<#
+$toolHintsZHTW = @{
+    'svfi'    = " SVFI（one_line_shot_args.exe）Steam 發布版的路徑是 X:\SteamLibrary\steamapps\common\SVFI\"
+    'vspipe'  = " 安裝版 VapourSynth 的默認可執行文件路徑是 C:\Program Files\VapourSynth\core\vspipe.exe"
+    'avs2yuv' = " 支持 AviSynth（0.26）和 AviSynth+（0.30）的 avs2yuv"
+}
+$toolHintsEN = @{
+    'svfi'    = " Steam SVFI installation (one_line_shot_args.exe) is at X:\SteamLibrary\steamapps\common\SVFI\"
+    'vspipe'  = " Default install path for VapourSynth: C:\Program Files\VapourSynth\core\vspipe.exe"
+    'avs2yuv' = " Both AviSynth (0.26) & AviSynth+ (0.30) are supported"
+}
+#>
+
+#region Helpers
 # 不同工具支持的管道格式
 function Get-PipeType($upstream) {
     switch ($upstream) {
@@ -125,7 +144,6 @@ function Get-VSPipeY4MArgument {
     throw "检测不到 vspipe 支持的 y4m 参数。VapourSynth 或 Python 环境异常，请检查安装"
 }
 
-#region Helpers
 # 遍历所有已导入工具组合，从而导出“备用路线”
 function Get-CommandFromPreset([string]$presetName, $tools, $vsAPI, [bool]$DebugMode = $false) {
     if ($DebugMode) {
@@ -135,9 +153,8 @@ function Get-CommandFromPreset([string]$presetName, $tools, $vsAPI, [bool]$Debug
             vsAPI      = $vsAPI
         }
         Show-Debug "`r`nGet-CommandFromPreset" -ForegroundColor Yellow
-        $debugInfo | ConvertTo-Json | Write-Host -ForegroundColor Gray
+        $debugInfo | ConvertTo-Json | Write-Host -ForegroundColor DarkGray
     }
-    
     if (-not $presetName) {
         throw "Get-CommandFromPreset：未选择任何编码工具链"
     }
@@ -187,8 +204,63 @@ function Update-ToolMap {
     }
 }
 
-# TODO：通用工具路径获取函数
+# 通用工具路径获取函数
+function Import-ToolPaths {
+    param (
+        [Parameter(Mandatory=$true)][System.Collections.IDictionary]$ToolsToHave, # 这不是 JSON 里的项目，而是待导入的工具
+        [Parameter(Mandatory=$true)][string]$CategoryName,
+        [Parameter(Mandatory=$true)][string]$ScriptDir,
+        [hashtable]$toolTips,
+        [scriptblock]$PostImportAction = { } # 给特定工具准备导入后逻辑（如版本检测）
+    )
 
+    $i = 0
+    $total = $ToolsToHave.Count
+    foreach ($tool in $ToolsToHave.Keys) {
+        $i++
+        $savedPath = $ToolsToHave[$tool] # 运行此函数前，$upstreamTools 已被 Read-Json 更新
+        $isSwapNeeded = $false
+
+        # 1. 询问是否需要导入/更换
+        if (Test-NullablePath $savedPath) {
+            Write-Host "`r`n 检测到已保存的 $tool 路径：$savedPath" -ForegroundColor DarkGray
+            $c = Read-Host "`r`n [$CategoryName] ($i/$total) 是否更换 $tool ？(y=换，Enter 不换)"
+            if ('y' -eq $c) { $isSwapNeeded = $true }
+        }
+        else {
+            Write-Host "`r`n 未保存 $tool 的路径，需要手动导入" -ForegroundColor DarkGray
+            $c = Read-Host "`r`n [$CategoryName] ($i/$total) 导入 $tool 可执行文件？（y=是，Enter 跳过）"
+            if ('y' -eq $c) { $isSwapNeeded = $true }
+        }
+
+        # 2. 执行导入逻辑
+        if ($isSwapNeeded) {
+            $autoPath = Invoke-AutoSearch -ToolName $tool -ScriptDir $ScriptDir
+            if ($autoPath) {
+                Write-Host "自动检测到 $tool 位于：$autoPath" -ForegroundColor Green
+                $useAuto = Read-Host "是否使用此文件？（Enter=确认, n=手动选择）"
+                if ('n' -eq $useAuto) {
+                    $ToolsToHave[$tool] = Select-File -Title "选择 $tool 可执行文件" -ExeOnly
+                }
+                else { $ToolsToHave[$tool] = $autoPath }
+            }
+            else {
+                Write-Host " 未自动检测到 $tool，请手动选择"
+                if ($toolHints.ContainsKey($tool)) {
+                    Write-Host $toolHints[$tool] -ForegroundColor DarkGray
+                }
+                $ToolsToHave[$tool] = Select-File -Title "选择 $tool 可执行文件" -ExeOnly
+            }
+        }
+
+        # 3. 打印结果
+        if ($ToolsToHave[$tool]) {
+            Show-Success "$tool 已导入: $($ToolsToHave[$tool])"
+            # 4. 执行特定工具的后续操作 (如 vspipe 版本检测)
+            $PostImportAction.Invoke($tool, $ToolsToHave[$tool])
+        }
+    }
+}
 #endregion
 
 #region Main
@@ -224,11 +296,9 @@ function Main {
     while (-not $outputPath)
     
     $batchFullPath = Join-Path -Path $outputPath -ChildPath "encode_template.bat"
-
     Show-Success "输出文件：$batchFullPath"
-
-    Write-Host ("─" * 60)
-    Show-Info "开始导入上游编码工具..."
+    Write-Host ("─" * 50)
+    
     # 尝试读取保存的 tools.json，但可能已经过时，因此后续步骤仍需手动确认
     if (Test-NullablePath $toolsJson) {
         try {
@@ -242,151 +312,38 @@ function Main {
         catch { Show-Info "工具路径配置文件损坏，需手动导入" }
     }
 
-    # 上游工具
-    $i=0
-    foreach ($tool in @($upstreamTools.Keys)) {
-        $i++
-        $savedPath = $upstreamTools[$tool]
-        $isSwapNeeded = $true # 标记是否已经确定了路径
-
-        # 读取到保存的路径则询问是否更新，否则退回旧选择
-        if (Test-NullablePath $savedPath) {
-            Write-Host "`r`n 检测到已保存的 $tool 路径：$savedPath" -ForegroundColor DarkGray
-            $c = Read-Host "`r`n [上游] ($i/$($upstreamTools.Count)) 是否更换 $tool ？(y=换，Enter 不换)"
-            $isSwapNeeded = if ('y' -eq $c) { $true } else { $false }
-        }
-        else {
-            Write-Host "`r`n 未保存 $tool 的路径，需要手动导入" -ForegroundColor DarkGray
-            $c = Read-Host "`r`n [上游] ($i/$($upstreamTools.Count)) 导入 $tool 可执行文件？（y=是，Enter 跳过）"
-            $isSwapNeeded = if ('y' -eq $c) { $true } else { $false }
-        }
-
-        # 使用 Invoke-AutoSearch 获取自动找到的路径
-        if ($isSwapNeeded) {
-            $autoPath = Invoke-AutoSearch -ToolName $tool -ScriptDir $scriptDir
-            if ($autoPath) {
-                Write-Host "自动检测到 $tool 位于：$autoPath" -ForegroundColor Green
-                if ('n' -eq (Read-Host "是否使用此文件？（Enter=确认, n=手动选择）")) {
-                    $upstreamTools[$tool] = Select-File -Title "选择 $tool 可执行文件" -ExeOnly
-                }
-                else {
-                    $upstreamTools[$tool] = $autoPath
-                }
-            }
-            else {
-                Write-Host " 未自动检测到 $tool，请手动选择"
-                if ($tool -eq 'svfi') {
-                    Write-Host " SVFI（one_line_shot_args.exe）Steam 发布版的路径是 X:\SteamLibrary\steamapps\common\SVFI\"
-                }
-                elseif ($tool -eq 'vspipe') {
-                    Write-Host " 安装版 VapourSynth 的默认可执行文件路径是 C:\Program Files\VapourSynth\core\vspipe.exe"
-                }
-                elseif ($tool -eq 'avs2yuv') {
-                    Write-Host "`r`n 支持 AviSynth（0.26）和 AviSynth+（0.30）的 avs2yuv" -ForegroundColor DarkGray
-                }
-                $upstreamTools[$tool] = Select-File -Title "选择 $tool 可执行文件" -ExeOnly
-            }
-        }
-        Show-Success "$tool 已导入: $($upstreamTools[$tool])"
-
-        # 检测 vspipe API 版本以及 avs2yuv 版本，无论是否切换工具
-        if ($tool -eq 'vspipe' -and $upstreamTools[$tool]) {
+    Show-Info "开始导入上游编码工具..."
+    Import-ToolPaths -ToolsToHave $upstreamTools -CategoryName "上游" -ScriptDir $scriptDir -toolTips $toolHintsZHCN -PostImportAction {
+        param($tool, $path)
+        # 无论是否更换 vspipe 都检测其 API 版本
+        if ($tool -eq 'vspipe') {
             Write-Host ''
             Show-Info "检测 VapourSynth 管道参数..."
-            $vspipeInfo = Get-VSPipeY4MArgument -VSpipePath $upstreamTools[$tool]
-            Show-Success $($vspipeInfo.Note)
+            $global:vspipeInfo = Get-VSPipeY4MArgument -VSpipePath $path
+            Show-Success $global:vspipeInfo.Note
         }
-        elseif ($tool -eq 'avs2yuv' -and $upstreamTools[$tool]) {
-            # 不导入 AviSynth，故无法检测版本，需手动指定
+        elseif ($tool -eq 'avs2yuv') {
             while ($true) {
                 Show-Info "选择使用的 avs2yuv(64).exe 类型："
                 $avs2yuvVer = Read-Host " [默认 Enter/a: AviSynth+ (0.30) | b: AviSynth (up to 0.26)]"
                 if ([string]::IsNullOrWhiteSpace($avs2yuvVer) -or 'a' -eq $avs2yuvVer) {
-                    $isAVSPlus = $true
-                    break
+                    $global:isAvsPlus = $true; break
                 }
                 elseif ('b' -eq $avs2yuvVer) {
-                    $isAvsPlus = $false
-                    break
+                    $global:isAvsPlus = $false; break
                 }
                 Show-Warning "输入值超出理解，请重试"
             }
         }
     }
 
-    Write-Host ("─" * 60)
+    Write-Host ("─" * 50)
     Show-Info "开始导入下游编码工具..."
-    $i=0
-    foreach ($tool in @($downstreamTools.Keys)) {
-        $i++
-        $savedPath = $downstreamTools[$tool]
+    Import-ToolPaths -ToolsToHave $downstreamTools -CategoryName "下游" -toolTips $toolHintsZHCN -ScriptDir $scriptDir
 
-        # 读取到保存的路径则询问是否更新，否则退回旧选择
-        if (Test-NullablePath $savedPath) {
-            Write-Host "`r`n 检测到已保存的 $tool 路径: $savedPath" -ForegroundColor DarkGray
-            $c = Read-Host "`r`n [下游] ($i/$($downstreamTools.Count)) 是否更换 $tool ？(y=换，Enter 不换)"
-            if ('y' -ne $c) { continue }
-        }
-        else {
-            Write-Host "`r`n 未保存 $tool 的路径，需要手动导入" -ForegroundColor DarkGray
-            $c = Read-Host "`r`n [下游] ($i/$($downstreamTools.Count)) 导入 $tool 可执行文件？（y=是，Enter 跳过）"
-            if ('y' -ne $c) { continue }
-        }
-        
-        # 使用 Invoke-AutoSearch 获取自动找到的路径
-        $autoPath = Invoke-AutoSearch -ToolName $tool -ScriptDir $scriptDir
-        if ($autoPath) {
-            Write-Host "自动检测到 $tool 位于：$autoPath" -ForegroundColor Green
-            $useAuto = Read-Host "是否使用此文件？(Enter=确认, n=手动选择)"
-            if ($useAuto -eq 'n') {
-                $downstreamTools[$tool] = Select-File -Title "选择 $tool 可执行文件" -ExeOnly
-            }
-            else { $downstreamTools[$tool] = $autoPath }
-        }
-        else {
-            Write-Host "未自动检测到 $tool，请手动选择。"
-            $downstreamTools[$tool] = Select-File -Title "选择 $tool 可执行文件" -ExeOnly
-        }
-
-        Show-Success "$tool 已导入: $($downstreamTools[$tool])"
-    }
-
-    Write-Host ("─" * 60)
+    Write-Host ("─" * 50)
     Show-Info "开始导入检测工具..."
-    $i=0
-    foreach ($tool in @($analysisTools.Keys)) {
-        $i++
-        $savedPath = $analysisTools[$tool]
-
-        # 读取到保存的路径则询问是否更新，否则退回旧选择
-        if (Test-NullablePath $savedPath) {
-            Write-Host "`r`n 检测到已保存的 $tool 路径: $savedPath" -ForegroundColor DarkGray
-            $c = Read-Host "`r`n [检测] ($i/$($analysisTools.Count)) 是否更换 $tool ？(y=换，Enter 不换)"
-            if ('y' -ne $c) { continue }
-        }
-        else {
-            Write-Host "`r`n 未保存 $tool 的路径，需要手动导入，跳过后仍可在步骤 3 导入" -ForegroundColor DarkGray
-            $c = Read-Host "`r`n [检测] ($i/$($analysisTools.Count)) 导入 $tool 可执行文件？（y=是，Enter 跳过）"
-            if ('y' -ne $c) { continue }
-        }
-
-        # 使用 Invoke-AutoSearch 获取自动找到的路径
-        $autoPath = Invoke-AutoSearch -ToolName $tool -ScriptDir $scriptDir
-        if ($autoPath) {
-            Write-Host "自动检测到 $tool 位于：$autoPath" -ForegroundColor Green
-            $useAuto = Read-Host "是否使用此文件？(Enter=确认, n=手动选择)"
-            if ($useAuto -eq 'n') {
-                $analysisTools[$tool] = Select-File -Title "选择 $tool 可执行文件" -ExeOnly
-            }
-            else { $analysisTools[$tool] = $autoPath }
-        }
-        else {
-            Write-Host "未自动检测到 $tool，请手动选择。"
-            $analysisTools[$tool] = Select-File -Title "选择 $tool 可执行文件" -ExeOnly
-        }
-
-        Show-Success "$tool 已导入: $($analysisTools[$tool])"
-    }
+    Import-ToolPaths -ToolsToHave $analysisTools -CategoryName "检测" -toolTips $toolHintsZHCN -ScriptDir $scriptDir
 
     # 合并工具（手动合并以避免 Clone() 带来的对象引用/类型问题）
     $tools = @{}
@@ -431,7 +388,7 @@ function Main {
     # 显示可用工具链
     Write-Host ''
     Show-Info "可用编码工具链："
-    Write-Host ("─" * 60)
+    Write-Host ("─" * 50)
 
     # 构建“ID → PresetName”的映射表
     $presetIdMap = [ordered]@{}
@@ -446,7 +403,7 @@ function Main {
         Sort-Object { $_.Value.ID }
     
     Write-Host ("{0,-6} {1,-22} {2,-12} {3}" -f "ID", "Preset", "Upstream", "Downstream") -ForegroundColor Yellow
-    Write-Host ("─" * 60)
+    Write-Host ("─" * 50)
     
     foreach ($ap in $availablePresets) {
         $id   = $ap.Value.ID
@@ -461,7 +418,7 @@ function Main {
         Write-Host ("[{0,-2}]  {1,-22} {2,-12} {3}" -f $id, $name, $up, $down)
     }
     
-    Write-Host ("─" * 60)
+    Write-Host ("─" * 50)
 
     $selectedPreset = $null
     if ($presetIdMap.Count -eq 0) {
@@ -492,7 +449,7 @@ function Main {
     # 生成批处理内容，追加管道指定命令
     # 1. 生成当前选定的主命令
     $command =
-        Get-CommandFromPreset $selectedPreset -tools $tools -vsAPI $vspipeInfo
+        Get-CommandFromPreset $selectedPreset -tools $tools -vsAPI $global:vspipeInfo
 
     # 2. 生成其它已导入线路的备用命令 (REM 写入)
     $otherCommands = @()
@@ -504,7 +461,7 @@ function Main {
         if ($presetName -eq $selectedPreset) { continue }
 
         $cmdStr =
-            Get-CommandFromPreset $presetName -tools $tools -vsAPI $vspipeInfo
+            Get-CommandFromPreset $presetName -tools $tools -vsAPI $global:vspipeInfo
         $otherCommands += "REM PRESET[$presetName]: $cmdStr"
     }
     $remCommands = $otherCommands -join "`r`n"
