@@ -1,0 +1,6 @@
+# Delete directory: C:\Users\<username>\bbenc
+# 删除文件夹：C:\Users\<用户名>\bbenc
+# 刪除資料夾：C:\Users\<使用者名稱>\bbenc
+
+# PowerShell
+Remove-Item ($env:USERPROFILE + "\bbenc") -Recurse
