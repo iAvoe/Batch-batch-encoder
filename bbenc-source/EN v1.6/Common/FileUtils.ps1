@@ -1,4 +1,24 @@
-﻿# Verify if the filename conforms to Windows naming rules.
+﻿# Before calling Test-Path, make sure path is not null
+function Test-NullablePath {
+    param([string]$Path)
+    if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
+    try { return Test-Path -LiteralPath $Path }
+    catch { return $false }
+}
+
+# UTF-8 JSON Read write
+function Read-JsonFile {
+    param([string]$Path)
+    Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
+}
+function Write-JsonFile {
+    param([string]$Path, $Object)
+    $json = $Object | ConvertTo-Json -Depth 10
+    $utf8 = [System.Text.UTF8Encoding]::new($true) # 带 BOM
+    [System.IO.File]::WriteAllText($Path, $json, $utf8)
+}
+
+# Verify if the filename conforms to Windows naming rules.
 function Test-FilenameValid {
     param([string]$Filename)
     $invalid = [IO.Path]::GetInvalidFileNameChars()
@@ -107,6 +127,7 @@ function Invoke-AutoSearch {
     return Find-Tool -Keyword $ToolName -SearchPaths $searchPaths -IncludePathEnv
 }
 
+# General file selection logic
 function Select-File(
         [string]$Title = "Select File",
         [string]$InitialDirectory = [Environment]::GetFolderPath('Desktop'),
@@ -117,7 +138,8 @@ function Select-File(
         [switch]$IniOnly,
         [switch]$BatOnly
     ) {
-    
+    Write-Host " Commandline console may lose focus, click on the console to restore input cursor" -ForegroundColor DarkGray
+
     # If it is a file path, its parent directory is used; if the path does not exist, it returns to Desktop.
     if ($InitialDirectory) {
         if (Test-Path $InitialDirectory -PathType Leaf) {
@@ -127,9 +149,7 @@ function Select-File(
             $InitialDirectory = [Environment]::GetFolderPath('Desktop')
         }
     }
-    else {
-        $InitialDirectory = [Environment]::GetFolderPath('Desktop')
-    }
+    else { $InitialDirectory = [Environment]::GetFolderPath('Desktop') }
 
     $dialog = New-Object System.Windows.Forms.OpenFileDialog
     $dialog.Title = $Title
@@ -145,14 +165,22 @@ function Select-File(
     elseif ($BatOnly) { $dialog.Filter = 'bat Files (*.bat)|*.bat' }
     else { $dialog.Filter = 'All files (*.*)|*.*' }
 
-    Write-Host " Selection window may open in the background; Avoid pressing Enter here."
-    
+    # Create a hidden TopMost window as form owner
+    $form = New-Object System.Windows.Forms.Form
+    $form.TopMost = $true
+    $form.ShowInTaskbar = $false
+    $form.WindowState = 'Minimized'
+
     while ($true) {
-        if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+        if ($dialog.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) {
             return $dialog.FileName
         }
-        $choice = Read-Host "No file selected. Press Enter to retry, input 'q' to force exit"
-        if ($choice -eq 'q') { exit 1 }
+        
+        # Refocus of CLI (ineffective on VSCode)
+        $hwnd = [WinAPI]::GetConsoleWindow()
+        [WinAPI]::SetForegroundWindow($hwnd) | Out-Null
+
+        if ('q' -eq (Read-Host "No file selected. Press Enter to retry, input 'q' to force exit")) { exit 1 }
     }
 }
 
@@ -160,7 +188,7 @@ function Select-Folder(
         [string]$Description = "Select folder",
         [string]$InitialPath = [Environment]::GetFolderPath('Desktop')
     ) {
-    Write-Host " Commandline console may lose focus, click on the console to restore input cursor"
+    Write-Host " Commandline console may lose focus, click on the console to restore input cursor" -ForegroundColor DarkGray
     # UI.ps1: Add-Type -AssemblyName System.Windows.Forms
     $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
     $dialog.Description = $Description
@@ -176,7 +204,7 @@ function Select-Folder(
     while ($true) {
         $result = $dialog.ShowDialog($form)
 
-        # Refocus of CLI
+        # Refocus of CLI (ineffective on VSCode)
         $hwnd = [WinAPI]::GetConsoleWindow()
         [WinAPI]::SetForegroundWindow($hwnd) | Out-Null
 
@@ -190,7 +218,6 @@ function Select-Folder(
         if ($choice -eq 'q') { exit 1 }
     }
 }
-
 
 # Generate batch files using Windows (CRLF) and UTF-8 BOM text encoding.
 function Write-TextFile { # Call only after the global variable are defined in Core.ps1
@@ -261,7 +288,7 @@ function Test-TextFileFormat {
         return $isValid
     }
     catch {
-        Show-Error "File validation failed: $_" -ForegroundColor Red
+        Show-Error "File validation failed: $_"
         return $false
     }
 }
@@ -286,8 +313,8 @@ function Get-StreamMetadata {
     
     try { # Build ffprobe parameters
         $streamSelector = switch ($StreamType.ToLower()) {
-            "v" { "v" }  # video stream
-            "a" { "a" }  # audio stream
+            "v" { "v" }  # video
+            "a" { "a" }  # audio
             "s" { "s" }  # subtitle
             "t" { "t" }  # font
             default { $StreamType }

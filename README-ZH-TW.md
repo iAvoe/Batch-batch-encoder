@@ -80,6 +80,10 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 <p align="center"><img src="bmc_qr.png" alt="支持一下 -_-"><br><img src="pp_tip_qr.png" alt="支持一下 =_="></p>
 
 ## 更新信息
+**v1.7.9**
+- 步驟 2:
+  - 為程序路徑添加了新的設定檔讀寫功能
+  
 **v1.7.8**
 - 步驟 4:
   - 為所有編碼器新增了多種 CRF 值自訂選項

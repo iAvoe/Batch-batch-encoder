@@ -5,7 +5,9 @@ if (-not ("System.Windows.Forms.Form" -as [type])) {
     Add-Type -AssemblyName System.Windows.Forms
 }
 
-# 高 DPI 支持（只注册一次）、高 DPI 支持（只註冊一次）、High-DPI support (register once)
+# 高 DPI 支持（只注册一次）
+# 高 DPI 支持（只註冊一次）
+# High-DPI support (register once)
 if (-not ("DpiHelper" -as [type])) {
     Add-Type @"
 using System.Runtime.InteropServices;

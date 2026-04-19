@@ -1,4 +1,25 @@
-﻿# 檢測檔案名是否符合 Windows 命名規則
+﻿
+# 調用 Test-Path 前先確保變數名非空或 null
+function Test-NullablePath {
+    param([string]$Path)
+    if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
+    try { return Test-Path -LiteralPath $Path }
+    catch { return $false }
+}
+
+# UTF-8 JSON 讀寫實現
+function Read-JsonFile {
+    param([string]$Path)
+    Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
+}
+function Write-JsonFile {
+    param([string]$Path, $Object)
+    $json = $Object | ConvertTo-Json -Depth 10
+    $utf8 = [System.Text.UTF8Encoding]::new($true) # 帶 BOM
+    [System.IO.File]::WriteAllText($Path, $json, $utf8)
+}
+
+# 檢測檔案名是否符合 Windows 命名規則
 function Test-FilenameValid {
     param([string]$Filename)
     $invalid = [IO.Path]::GetInvalidFileNameChars()
@@ -116,7 +137,7 @@ function Select-File(
         [switch]$IniOnly,
         [switch]$BatOnly
     ) {
-    Write-Host " 選窗可能會在本窗口後面打開，這裡不要按回車"
+    Write-Host " 命令行窗口可能會失焦，點擊命令行窗口以恢復輸入游標" -ForegroundColor DarkGray
 
     # 若是文件路徑則取其父目錄；如果路徑不存在回到 Desktop
     if ($InitialDirectory) {
@@ -127,9 +148,7 @@ function Select-File(
             $InitialDirectory = [Environment]::GetFolderPath('Desktop')
         }
     }
-    else {
-        $InitialDirectory = [Environment]::GetFolderPath('Desktop')
-    }
+    else { $InitialDirectory = [Environment]::GetFolderPath('Desktop') }
 
     $dialog = New-Object System.Windows.Forms.OpenFileDialog
     $dialog.Title = $Title
@@ -146,10 +165,21 @@ function Select-File(
     else { $dialog.Filter = 'All files (*.*)|*.*' }
 
 
+    # 創建一個隱藏的 TopMost 窗口作為 owner
+    $form = New-Object System.Windows.Forms.Form
+    $form.TopMost = $true
+    $form.ShowInTaskbar = $false
+    $form.WindowState = 'Minimized'
+
     while ($true) {
         if ($dialog.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) {
             return $dialog.FileName
         }
+
+        # 恢復控制台焦點（VSCode 無效）
+        $hwnd = [WinAPI]::GetConsoleWindow()
+        [WinAPI]::SetForegroundWindow($hwnd) | Out-Null
+
         $choice = Read-Host "未選擇文件，按回車重試或輸入 'q' 強制退出"
         if ($choice -eq 'q') { exit 1 }
     }
@@ -159,7 +189,7 @@ function Select-Folder(
         [string]$Description = "選擇文件夾",
         [string]$InitialPath = [Environment]::GetFolderPath('Desktop')
     ) {
-    Write-Host " 命令行窗口可能會失焦，點擊命令行窗口以恢復輸入游標"
+    Write-Host " 命令行窗口可能會失焦，點擊命令行窗口以恢復輸入游標" -ForegroundColor DarkGray
     # UI.ps1: Add-Type -AssemblyName System.Windows.Forms
     $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
     $dialog.Description = $Description
@@ -174,8 +204,8 @@ function Select-Folder(
 
     while ($true) {
         $result = $dialog.ShowDialog($form)
-
-        # 窗口焦點切回 CLI
+        
+        # 恢復控制台焦點（VSCode 無效）
         $hwnd = [WinAPI]::GetConsoleWindow()
         [WinAPI]::SetForegroundWindow($hwnd) | Out-Null
 
@@ -258,7 +288,7 @@ function Test-TextFileFormat {
         return $isValid
     }
     catch {
-        Show-Error "驗證失敗：$_" -ForegroundColor Red
+        Show-Error "驗證失敗：$_"
         return $false
     }
 }

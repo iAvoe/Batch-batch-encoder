@@ -759,7 +759,6 @@ function Main {
         while (-not (Test-Path -LiteralPath $ffprobePath))
     }
     
-
     Write-Host ("─" * 50)
 
     $streamInfo = Get-VideoStreamInfo -ffprobePath $ffprobePath -videoSource $videoSource `

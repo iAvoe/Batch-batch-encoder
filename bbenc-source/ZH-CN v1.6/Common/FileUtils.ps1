@@ -1,4 +1,24 @@
-﻿# 检测文件名是否符合 Windows 命名规则
+﻿# 调用 Test-Path 前先确保变量名非空或 null
+function Test-NullablePath {
+    param([string]$Path)
+    if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
+    try { return Test-Path -LiteralPath $Path }
+    catch { return $false }
+}
+
+# UTF-8 JSON 读写实现
+function Read-JsonFile {
+    param([string]$Path)
+    Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
+}
+function Write-JsonFile {
+    param([string]$Path, $Object)
+    $json = $Object | ConvertTo-Json -Depth 10
+    $utf8 = [System.Text.UTF8Encoding]::new($true) # 带 BOM
+    [System.IO.File]::WriteAllText($Path, $json, $utf8)
+}
+
+# 检测文件名是否符合 Windows 命名规则
 function Test-FilenameValid {
     param([string]$Filename)
     $invalid = [IO.Path]::GetInvalidFileNameChars()
@@ -116,7 +136,7 @@ function Select-File(
         [switch]$IniOnly,
         [switch]$BatOnly
     ) {
-    Write-Host " 选窗可能会在本窗口后面打开，这里不要按回车"
+    Write-Host " 命令行窗口可能会失焦，点击命令行窗口以恢复输入光标" -ForegroundColor DarkGray
 
     # 若是文件路径则取其父目录；如果路径不存在回到 Desktop
     if ($InitialDirectory) {
@@ -127,9 +147,7 @@ function Select-File(
             $InitialDirectory = [Environment]::GetFolderPath('Desktop')
         }
     }
-    else {
-        $InitialDirectory = [Environment]::GetFolderPath('Desktop')
-    }
+    else { $InitialDirectory = [Environment]::GetFolderPath('Desktop') }
 
     $dialog = New-Object System.Windows.Forms.OpenFileDialog
     $dialog.Title = $Title
@@ -145,13 +163,22 @@ function Select-File(
     elseif ($BatOnly) { $dialog.Filter = 'bat Files (*.bat)|*.bat' }
     else { $dialog.Filter = 'All files (*.*)|*.*' }
 
+    # 创建一个隐藏的 TopMost 窗口作为 owner
+    $form = New-Object System.Windows.Forms.Form
+    $form.TopMost = $true
+    $form.ShowInTaskbar = $false
+    $form.WindowState = 'Minimized'
 
     while ($true) {
         if ($dialog.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) {
             return $dialog.FileName
         }
-        $choice = Read-Host "未选择文件，按回车重试或输入 'q' 强制退出"
-        if ($choice -eq 'q') { exit 1 }
+
+        # 恢复控制台焦点（VSCode 无效）
+        $hwnd = [WinAPI]::GetConsoleWindow()
+        [WinAPI]::SetForegroundWindow($hwnd) | Out-Null
+
+        if ('q' -eq (Read-Host "未选择文件，按回车重试或输入 'q' 强制退出")) { exit 1 }
     }
 }
 
@@ -159,7 +186,7 @@ function Select-Folder(
         [string]$Description = "选择文件夹",
         [string]$InitialPath = [Environment]::GetFolderPath('Desktop')
     ) {
-    Write-Host " 命令行窗口可能会失焦，点击命令行窗口以恢复输入光标"
+    Write-Host " 命令行窗口可能会失焦，点击命令行窗口以恢复输入光标" -ForegroundColor DarkGray
     # UI.ps1: Add-Type -AssemblyName System.Windows.Forms
     $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
     $dialog.Description = $Description
@@ -174,7 +201,8 @@ function Select-Folder(
 
     while ($true) {
         $result = $dialog.ShowDialog($form)
-        # 窗口焦点切回 CLI
+        
+        # 恢复控制台焦点（VSCode 无效）
         $hwnd = [WinAPI]::GetConsoleWindow()
         [WinAPI]::SetForegroundWindow($hwnd) | Out-Null
 
@@ -257,7 +285,7 @@ function Test-TextFileFormat {
         return $isValid
     }
     catch {
-        Show-Error "验证失败：$_" -ForegroundColor Red
+        Show-Error "验证失败：$_"
         return $false
     }
 }

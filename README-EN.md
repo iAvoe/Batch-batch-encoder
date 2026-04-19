@@ -73,6 +73,10 @@ Developing these tools wasn't easy. If this tool improve your efficiency, consid
 <p align="center"><img src="bmc_qr.png" alt="Support me -_-"><br><img src="pp_tip_qr.png" alt="Support me =_="></p>
 
 ## Update Information
+**v1.7.9**
+- Step 2:
+  - Added new file save-load mechanism for tool path configurations, import process is now much easier
+
 **v1.7.8**
 - Step 4:
   - Added CRF value customization options for all encoders
