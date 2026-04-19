@@ -1292,6 +1292,8 @@ function Join-Params ($Object, $PropertyOrder) {
 
 #region Main
 function Main {
+    $toolsJson = Join-Path $Global:TempFolder "tools.json"   
+
     Show-Border
     Write-Host "参数计算与批处理注入工具" -ForegroundColor Cyan
     Show-Border
@@ -1372,18 +1374,25 @@ function Main {
     $x265Params.PME = Get-x265PME
     $x265Params.Pools = Get-x265ThreadPool
 
-    # 获取并配置色彩空间格式
-    $avs2yuvVersionCode = 'a'
-    if ($sourceCSV.UpstreamCode -eq 'c') {
-        Write-Host ''
-        Show-Info "选择使用的 avs2yuv(64).exe 类型："
-        $avs2yuvVersionCode = Read-Host " [默认 Enter/a: AviSynth+ (0.30) | b: AviSynth (up to 0.26)]"
+    # avs2yuv 设置
+    $isAvsPlus = $true
+    if (Test-NullablePath $toolsJson) {
+        try {
+            $savedConfig = Read-JsonFile $toolsJson
+            Show-Info "检测到配置文件（保存于：$($savedConfig.SaveDate)），正在加载..."
+            if ($null -ne $savedConfig.IsAvsPlus) {
+                $isAvsPlus = $savedConfig.IsAvsPlus 
+            }
+        }
+        catch { Show-Info "配置文件损坏或不存在，将使用默认值（AviSynth+）作为 avs2yuv 的运行环境，建议重新运行步骤 2 脚本" }
     }
+    
+    # 获取并配置色彩空间格式
     $ffmpegParams.CSP = Get-ffmpegCSP -CSVpixfmt $ffprobeCSV.D
     $svtav1Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $true
     $x265Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
     $x264Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
-    $avsyuvParams.CSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $false -isAvs2YuvInput $true -isSVTAV1 $false -isAVSPlus ($avs2yuvVersionCode -eq 'a')
+    $avsyuvParams.CSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $false -isAvs2YuvInput $true -isSVTAV1 $false -isAVSPlus $isAvsPlus
 
     # VOB、MOV 格式的帧率信息位于 .I，否则为 .H
     $ffFpsString =

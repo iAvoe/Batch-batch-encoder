@@ -83,6 +83,10 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 **v1.7.9**
 - 步骤 2:
   - 为程序路径添加了新的配置文件读写功能
+- 步骤 3:
+  - 连接了步骤 2 的配置文件——简化了 ffprobe 导入步骤
+- 步骤 4:
+  - 连接了步骤 2 的配置文件——简化了 avs2yuv 的 AviSynth 版本类型提问步骤
 
 **v1.7.8**
 - 步骤 4:

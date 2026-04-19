@@ -1384,18 +1384,25 @@ function Main {
     $x265Params.PME = Get-x265PME
     $x265Params.Pools = Get-x265ThreadPool
 
-    # Obtain color space format
-    $avs2yuvVersionCode = 'a'
-    if ($sourceCSV.UpstreamCode -eq 'c') {
-        Write-Host ''
-        Show-Info "Please select the version of avs2yuv(64).exe used:"
-        $avs2yuvVersionCode = Read-Host " [Default Enter/a: AviSynth+ (0.30) | b: AviSynth (up to 0.26)]"
+    # Config avs2yuv
+    $isAvsPlus = $true
+    if (Test-NullablePath $toolsJson) {
+        try {
+            $savedConfig = Read-JsonFile $toolsJson
+            Show-Info "Detecting config file (saved at: $($savedConfig.SaveDate)), loading now..."
+            if ($null -ne $savedConfig.IsAvsPlus) {
+                $isAvsPlus = $savedConfig.IsAvsPlus 
+            }
+        }
+        catch { Show-Info "Config file is missing or corrupted, assuming (AviSynth+) as the envionment of avs2yuv," }
     }
+    
+    # Obtain color space format
     $ffmpegParams.CSP = Get-ffmpegCSP -CSVpixfmt $ffprobeCSV.D
     $svtav1Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $true
     $x265Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
     $x264Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
-    $avsyuvParams.CSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $false -isAvs2YuvInput $true -isSVTAV1 $false -isAVSPlus ($avs2yuvVersionCode -eq 'a')
+    $avsyuvParams.CSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $false -isAvs2YuvInput $true -isSVTAV1 $false -isAVSPlus $isAvsPlus
 
     # VOB、MOV framerate data is located at .I，otherwise it would be .H
     $ffFpsString =

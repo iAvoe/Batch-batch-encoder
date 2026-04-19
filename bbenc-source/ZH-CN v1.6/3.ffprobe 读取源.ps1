@@ -95,10 +95,10 @@ function Get-VideoStreamInfo {
         [string]$showEntries = "stream"
     )
 
-    if (-not (Test-Path -LiteralPath $ffprobePath)) {
+    if (-not (Test-NullablePath $ffprobePath)) {
         throw "Get-VideoStreamInfo：ffprobe.exe 不存在（$ffprobePath）"
     }
-    if (-not (Test-Path -LiteralPath $videoSource)) {
+    if (-not (Test-NullablePath $videoSource)) {
         throw "Get-VideoStreamInfo：输入视频不存在（$videoSource）"
     }
 
@@ -147,7 +147,6 @@ function Get-VFRWarning {
         [Parameter(Mandatory=$true)]$ffprobeStreamInfo,
         [double]$RelativeTolerance = 0.000000001
     )
-    
     Show-Info "Get-VFRWarning：正在检测视频是否为可变帧率..."
     
     try { # 调用 Set-FpsParams 更新基础帧率、平均帧率
@@ -472,6 +471,8 @@ src.set_output()
 
 #region Main
 function Main {
+    $toolsJson = Join-Path $Global:TempFolder "tools.json"
+
     Show-Border
     Show-info ("ffprobe 源读取工具，导出 " + $Global:TempFolder + "temp_v_info(_is_mov).csv 以备用")
     Show-Border
@@ -557,7 +558,6 @@ function Main {
         }
         default       { $upstreamCode = 'a' }
     }
-
     Write-Host ("─" * 50)
 
     # 定义 IO 变量
@@ -580,9 +580,7 @@ function Main {
             $mode = Read-Host "输入 'y' 导入自定义脚本，输入 'n' 或 Enter 为视频源生成无滤镜脚本"
         
             if ($mode -eq 'y') { # 导入自定义脚本
-                Show-Warning "由于脚本支持的导入源路径的种类繁多，如先定义路径变量或直接写入、"
-                Write-Host " 不同解析器、多种字面意义符搭配不同字符串引号、多视频源等条件组合过于复杂，" -ForegroundColor Yellow
-                Write-Host " 因此请自行检查脚本中的视频源是否真实存在`r`n" -ForegroundColor Yellow
+                Show-Warning "由于脚本支持的导入源路径的种类繁多，条件组合过于复杂，无法验证；请自行检查视频源是否真实存在"
                 do {
                     $scriptSource = Select-File -Title "定位脚本文件（.avs/.vpy...）"
                     if (-not $scriptSource) {
@@ -608,9 +606,16 @@ function Main {
             }
             # 生成无滤镜脚本
             elseif ([string]::IsNullOrWhiteSpace($mode) -or $mode -eq 'n') {
-                Show-Warning "AviSynth(+) 默认不自带 LSMASHSource.dll（视频导入滤镜）请保证该文件存在，"
-                Write-Host " AVS 安装路径为：C:\Program Files (x86)\AviSynth+\plugins64+\" -ForegroundColor Yellow
-                Write-Host " 下载并解压 64bit 版：https://github.com/HomeOfAviSynthPlusEvolution/L-SMASH-Works/releases`r`n" -ForegroundColor Magenta
+                if (Test-NullablePath 'C:\Program Files (x86)\AviSynth+\plugins64+\LSMASHSource.dll') {
+                    Show-Success "检测到 C:\Program Files (x86)\AviSynth+\plugins64+\ 下已有 LSMASHSource.dll，无需配置"
+                }
+                else {
+                    Show-Warning "未在 C:\Program Files (x86)\AviSynth+\plugins64+\ 下发现 LSMASHSource.dll（解码器）"
+                    Write-Host " 缺少该文件会导致大量 AVS 脚本，包括本工具自动生成的脚本无法执行"
+                    Write-Host " 下载并解压 64bit 版：https://github.com/HomeOfAviSynthPlusEvolution/L-SMASH-Works/releases`r`n" -ForegroundColor Magenta
+                }
+                Write-Host ("─" * 50)
+                
                 $placeholderScript = Get-BlankAVSVSScript -videoSource $videoSource
                 if (-not $placeholderScript) { 
                     Show-Error "生成无滤镜脚本失败，请重试"
@@ -647,7 +652,7 @@ function Main {
         #     }]
         # }"
         # 读取文件并找到 gui_inputs 行，如：
-        # gui_inputs="{\"inputs\": [{\"task_id\": \"798_2aa174\", \"input_path\": \"X:\\\\Video\\\\\\u5176\\u5b83-\\u52a8\\u6f2b\\u753b\\u516c\\u79cd\\\\[Airota][Yuru Yuri\\u3001][OVA][BDRip 1080p AVC AAC][CHS].mp4\", \"is_surveillance_folder\": false}]}"
+        # gui_inputs="{\"inputs\": [{\"task_id\": \"798_2aa174\", \"input_path\": \"X:\\\\Video\\\\\\u5176\\u5b83-\\u52a8\\u6f2b\\u753b\\u516c\\u79cd\\\\[Airota][Yuru Yuri\\u3001][OVA][BDRip 1080p].mp4\", \"is_surveillance_folder\": false}]}"
         Show-Info "将尝试从 SVFI 渲染配置 INI 中读取视频源路径..."
 
         try { # 读取 INI 并查找 gui_inputs 行
@@ -732,31 +737,41 @@ function Main {
 
         $encodeImportSourcePath = $videoSource
     }
-
     Write-Host ("─" * 50)
 
     Show-Info "定位 ffprobe.exe..."
-    # 使用 Invoke-AutoSearch 定位 ffprobe 程序
-    $ffprobePath = Invoke-AutoSearch -ToolName 'ffprobe' -ScriptDir $scriptDir
-    if ($ffprobePath) {
-        Show-Success "将直接使用自动检测到的 ffprobe.exe：$ffprobePath"
-        # $useAuto = Read-Host "是否使用此文件？（Enter=确认, n=手动选择）"
-        # if ($useAuto -eq 'n') {
-        #     $upstreamTools[$tool] = Select-File -Title "选择 $tool 可执行文件" -ExeOnly
-        # }
-        # else {
-        #     $upstreamTools[$tool] = $autoPath
-        # }
-    }
-    else {
-        do {
-            $ffprobePath =
-                Select-File -Title "定位 ffprobe.exe" -InitialDirectory ([Environment]::GetFolderPath('ProgramFiles')) -ExeOnly
-            if (-not (Test-Path -LiteralPath $ffprobePath)) {
-                Show-Warning "找不到 ffprobe 可执行文件，请重试"
+    $ffprobePath = $null
+    $isSavedPathValid = $false
+    if (Test-NullablePath $toolsJson) {
+        try {
+            $savedConfig = Read-JsonFile $toolsJson
+            Show-Info "检测到配置文件（保存于：$($savedConfig.SaveDate)），正在加载..."
+            if ($savedConfig.Analysis) {
+                $ffprobePath = $savedConfig.Analysis.ffprobe
+                Show-Debug ("路径：" + $ffprobePath)
+                if (Test-NullablePath $ffprobePath) { $isSavedPathValid = $true }
+                else { Show-Info "配置文件指向的路径不存在，建议重新执行步骤 2 脚本" }
             }
         }
-        while (-not (Test-Path -LiteralPath $ffprobePath))
+        catch { Show-Info "配置文件损坏，需要手动导入；建议重新执行步骤 2 脚本" }
+    }
+    
+    # 使用 Invoke-AutoSearch 定位 ffprobe 程序
+    if (-not $isSavedPathValid) {
+        $ffprobePath = Invoke-AutoSearch -ToolName 'ffprobe' -ScriptDir $scriptDir
+        if ($ffprobePath) {
+            Show-Success "将直接使用自动检测到的 ffprobe.exe：$ffprobePath"
+        }
+        else {
+            do {
+                $ffprobePath =
+                    Select-File -Title "定位 ffprobe.exe" -InitialDirectory ([Environment]::GetFolderPath('ProgramFiles')) -ExeOnly
+                if (-not (Test-Path -LiteralPath $ffprobePath)) {
+                    Show-Warning "找不到 ffprobe 可执行文件，请重试"
+                }
+            }
+            while (-not (Test-Path -LiteralPath $ffprobePath))
+        }
     }
     
     Write-Host ("─" * 50)

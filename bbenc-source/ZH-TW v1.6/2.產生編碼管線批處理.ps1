@@ -216,7 +216,7 @@ function Main {
     # 嘗試讀取保存的 tools.json，但可能已經過時，因此後續步驟仍需手動確認
     if (Test-NullablePath $toolsJson) {
         try {
-            $savedConfig = Get-Content $toolsJson -Raw -Encoding UTF8 | ConvertFrom-Json
+            $savedConfig = Read-JsonFile $toolsJson
             Show-Info "檢測到路徑設定檔（保存於：$($savedConfig.SaveDate)），正在載入..."
 
             # Upstream，Downstream，Analysis

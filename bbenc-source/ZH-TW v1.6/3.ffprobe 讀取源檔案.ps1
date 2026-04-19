@@ -95,10 +95,10 @@ function Get-VideoStreamInfo {
         [string]$showEntries = "stream"
     )
 
-    if (-not (Test-Path -LiteralPath $ffprobePath)) {
+    if (-not (Test-NullablePath $ffprobePath)) {
         throw "Get-VideoStreamInfo：ffprobe.exe 不存在（$ffprobePath）"
     }
-    if (-not (Test-Path -LiteralPath $videoSource)) {
+    if (-not (Test-NullablePath $videoSource)) {
         throw "Get-VideoStreamInfo：輸入影片不存在（$videoSource）"
     }
 
@@ -147,7 +147,6 @@ function Get-VFRWarning {
         [Parameter(Mandatory=$true)]$ffprobeStreamInfo,
         [double]$RelativeTolerance = 0.000000001
     )
-    
     Show-Info "Get-VFRWarning：正在檢測影片是否為可變幀率..."
     
     try { # 調用 Set-FpsParams 更新基礎幀率、平均幀率
@@ -472,6 +471,8 @@ src.set_output()
 
 #region Main
 function Main {
+    $toolsJson = Join-Path $Global:TempFolder "tools.json"
+
     Show-Border
     Show-info ("ffprobe 源讀取工具，導出 " + $Global:TempFolder + "temp_v_info(_is_mov).csv 以備用")
     Show-Border
@@ -557,7 +558,6 @@ function Main {
         }
         default       { $upstreamCode = 'a' }
     }
-
     Write-Host ("─" * 50)
 
     # 定義 IO 變數
@@ -580,9 +580,7 @@ function Main {
             $mode = Read-Host "輸入 'y' 導入自訂腳本，輸入 'n' 或 Enter 為影片源生成無濾鏡腳本"
         
             if ($mode -eq 'y') { # 導入自訂腳本
-                Show-Warning "由於腳本支持的導入源路徑的種類繁多，如先定義路徑變數或直接寫入、"
-                Write-Host " 不同解析器、多種字面意義符搭配不同字串引號、多影片源等條件組合過於複雜，" -ForegroundColor Yellow
-                Write-Host " 因此請自行檢查腳本中的影片源是否真實存在`r`n" -ForegroundColor Yellow
+                Show-Warning "由於腳本支持的導入源路徑的種類繁多，條件組合過於複雜，無法驗證；請自行檢查影片源是否真實存在"
                 do {
                     $scriptSource = Select-File -Title "定位腳本文件（.avs/.vpy...）"
                     if (-not $scriptSource) {
@@ -608,9 +606,16 @@ function Main {
             }
             # 生成無濾鏡腳本
             elseif ([string]::IsNullOrWhiteSpace($mode) -or $mode -eq 'n') {
-                Show-Warning "AviSynth(+) 默認不自帶 LSMASHSource.dll（影片導入濾鏡）請保證該文件存在，"
-                Write-Host " AVS 安裝路徑為：C:\Program Files (x86)\AviSynth+\plugins64+\" -ForegroundColor Yellow
-                Write-Host " 下載並解壓 64bit 版：https://github.com/HomeOfAviSynthPlusEvolution/L-SMASH-Works/releases`r`n" -ForegroundColor Magenta
+                if (Test-NullablePath 'C:\Program Files (x86)\AviSynth+\plugins64+\LSMASHSource.dll') {
+                    Show-Success "檢測到 C:\Program Files (x86)\AviSynth+\plugins64+\ 下已有 LSMASHSource.dll，無需配置"
+                }
+                else {
+                    Show-Warning "未在 C:\Program Files (x86)\AviSynth+\plugins64+\ 下發現 LSMASHSource.dll（解碼器）"
+                    Write-Host " 缺少該文件會導致大量 AVS 腳本，包括本工具自動生成的腳本無法執行"
+                    Write-Host " 下載並解壓 64bit 版：https://github.com/HomeOfAviSynthPlusEvolution/L-SMASH-Works/releases`r`n" -ForegroundColor Magenta
+                }
+                Write-Host ("─" * 50)
+                
                 $placeholderScript = Get-BlankAVSVSScript -videoSource $videoSource
                 if (-not $placeholderScript) { 
                     Show-Error "生成無濾鏡腳本失敗，請重試"
@@ -647,7 +652,7 @@ function Main {
         #     }]
         # }"
         # 讀取文件並找到 gui_inputs 行，如：
-        # gui_inputs="{\"inputs\": [{\"task_id\": \"798_2aa174\", \"input_path\": \"X:\\\\Video\\\\\\u5176\\u5b83-\\u52a8\\u6f2b\\u753b\\u516c\\u79cd\\\\[Airota][Yuru Yuri\\u3001][OVA][BDRip 1080p AVC AAC][CHS].mp4\", \"is_surveillance_folder\": false}]}"
+        # gui_inputs="{\"inputs\": [{\"task_id\": \"798_2aa174\", \"input_path\": \"X:\\\\Video\\\\\\u5176\\u5b83-\\u52a8\\u6f2b\\u753b\\u516c\\u79cd\\\\[Airota][Yuru Yuri\\u3001][OVA][BDRip 1080p].mp4\", \"is_surveillance_folder\": false}]}"
         Show-Info "將嘗試從 SVFI 渲染配置 INI 中讀取影片源路徑..."
 
         try { # 讀取 INI 並尋找 gui_inputs 行
@@ -732,34 +737,43 @@ function Main {
 
         $encodeImportSourcePath = $videoSource
     }
-
     Write-Host ("─" * 50)
 
     Show-Info "定位 ffprobe.exe..."
-    # 使用 Invoke-AutoSearch 定位 ffprobe 程序
-    $ffprobePath = Invoke-AutoSearch -ToolName 'ffprobe' -ScriptDir $scriptDir
-    if ($ffprobePath) {
-        Show-Success "將直接使用自動檢測到的 ffprobe.exe：$ffprobePath"
-        # $useAuto = Read-Host "是否使用此文件？（Enter=確認, n=手動選擇）"
-        # if ($useAuto -eq 'n') {
-        #     $upstreamTools[$tool] = Select-File -Title "選擇 $tool 可執行文件" -ExeOnly
-        # }
-        # else {
-        #     $upstreamTools[$tool] = $autoPath
-        # }
-    }
-    else {
-        do {
-            $ffprobePath =
-                Select-File -Title "定位 ffprobe.exe" -InitialDirectory ([Environment]::GetFolderPath('ProgramFiles')) -ExeOnly
-            if (-not (Test-Path -LiteralPath $ffprobePath)) {
-                Show-Warning "找不到 ffprobe 可執行文件，請重試"
+    $ffprobePath = $null
+    $isSavedPathValid = $false
+    if (Test-NullablePath $toolsJson) {
+        try {
+            $savedConfig = Read-JsonFile $toolsJson
+            Show-Info "檢測到設定檔（保存於：$($savedConfig.SaveDate)），正在載入..."
+            if ($savedConfig.Analysis) {
+                $ffprobePath = $savedConfig.Analysis.ffprobe
+                Show-Debug ("路徑：" + $ffprobePath)
+                if (Test-NullablePath $ffprobePath) { $isSavedPathValid = $true }
+                else { Show-Info "設定檔指向的路徑不存在，建議重新執行步驟 2 腳本" }
             }
         }
-        while (-not (Test-Path -LiteralPath $ffprobePath))
+        catch { Show-Info "設定檔損壞，需要手動導入；建議重新執行步驟 2 腳本" }
     }
     
-
+    # 使用 Invoke-AutoSearch 定位 ffprobe 程序
+    if (-not $isSavedPathValid) {
+        $ffprobePath = Invoke-AutoSearch -ToolName 'ffprobe' -ScriptDir $scriptDir
+        if ($ffprobePath) {
+            Show-Success "將直接使用自動檢測到的 ffprobe.exe：$ffprobePath"
+        }
+        else {
+            do {
+                $ffprobePath =
+                    Select-File -Title "定位 ffprobe.exe" -InitialDirectory ([Environment]::GetFolderPath('ProgramFiles')) -ExeOnly
+                if (-not (Test-Path -LiteralPath $ffprobePath)) {
+                    Show-Warning "找不到 ffprobe 可執行文件，請重試"
+                }
+            }
+            while (-not (Test-Path -LiteralPath $ffprobePath))
+        }
+    }
+    
     Write-Host ("─" * 50)
 
     $streamInfo = Get-VideoStreamInfo -ffprobePath $ffprobePath -videoSource $videoSource `

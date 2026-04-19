@@ -216,8 +216,8 @@ function Main {
     # 尝试读取保存的 tools.json，但可能已经过时，因此后续步骤仍需手动确认
     if (Test-NullablePath $toolsJson) {
         try {
-            $savedConfig = Get-Content $toolsJson -Raw -Encoding UTF8 | ConvertFrom-Json
-            Show-Info "检测到路径配置文件（保存于：$($savedConfig.SaveDate)），正在加载..."
+            $savedConfig = Read-JsonFile $toolsJson
+            Show-Info "检测到配置文件（保存于：$($savedConfig.SaveDate)），正在加载..."
 
             # Upstream，Downstream，Analysis
             if ($savedConfig.Upstream) {

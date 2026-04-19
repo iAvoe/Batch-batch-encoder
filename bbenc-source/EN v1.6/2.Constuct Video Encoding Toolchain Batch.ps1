@@ -219,8 +219,8 @@ function Main {
     # Attempt to read saved tools.json, but it can be outdated, therefore manual confirmation is required
     if (Test-NullablePath $toolsJson) {
         try {
-            $savedConfig = Get-Content $toolsJson -Raw -Encoding UTF8 | ConvertFrom-Json
-            Show-Info "Detecting path configuration file (saved at: $($savedConfig.SaveDate)), loading now..."
+            $savedConfig = Read-JsonFile $toolsJson
+            Show-Info "Detecting config file (saved at: $($savedConfig.SaveDate)), loading now..."
 
             # Upstream，Downstream，Analysis
             if ($savedConfig.Upstream) {

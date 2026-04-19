@@ -69,8 +69,7 @@ function Set-FpsParams {
     }
 }
 
-# Detecting whether an integer is similar to a prime number
-# credit：buttondown.com/behind-the-powershell-pipeline/archive/a-prime-scripting-solution
+# Detecting whether an integer is similar to a prime number，credit：buttondown.com/behind-the-powershell-pipeline/archive/a-prime-scripting-solution
 function Test-IsLikePrime {
     param (
         [Parameter(Mandatory=$true)][int]$number,
@@ -96,14 +95,13 @@ function Get-VideoStreamInfo {
         [Parameter(Mandatory=$true)][string]$videoSource,
         [string]$showEntries = "stream"
     )
-    if (-not (Test-Path -LiteralPath $ffprobePath)) {
+    if (-not (Test-NullablePath $ffprobePath)) {
         throw "Get-VideoStreamInfo: ffprobe.exe missing ($ffprobePath)"
     }
-    if (-not (Test-Path -LiteralPath $videoSource)) {
-        throw "Get-VideoStreamInfo: File not found ($videoSource)"
+    if (-not (Test-NullablePath $videoSource)) {
+        throw "Get-VideoStreamInfo: Video source missing ($videoSource)"
     }
     
-    # ffprobe parameters
     $ffprobeArgs = @(
         '-v', 'quiet', '-hide_banner',
         '-select_streams', 'v:0',
@@ -111,7 +109,7 @@ function Get-VideoStreamInfo {
         '-of', 'json', $videoSource
     )
     
-    # Switch to UTF-8 text encoding temporarily to run ffprobe
+    # Switch to UTF-8 text encoding temporarily to capture ffprobe output
     $prevOut = [Console]::OutputEncoding
     $prevPS = $OutputEncoding
     try {
@@ -148,7 +146,6 @@ function Get-VFRWarning {
         [Parameter(Mandatory=$true)]$ffprobeStreamInfo,
         [double]$RelativeTolerance = 0.000000001
     )
-    
     Show-Info "Get-VFRWarning: Validating if video frame rate is variable..."
     
     try { # Call Set-FpsParams to update the base frame rate and average frame rate
@@ -271,12 +268,9 @@ function Get-VFRWarning {
         #     cfr_reasons    = $cReasons
         # }
         if ($score -gt 0) {
-            Show-Warning "Source $mode. This program does not support VFR alignment"
-            Write-Host " (Force encoding may result in incorrect video length, " -ForegroundColor Yellow 
-            Write-Host " and accumulative audio desynchronization during playback)" -ForegroundColor Yellow 
+            Show-Warning "Source $mode. This program does not support VFR alignment (Force encoding may leads to duration misalign inbetween video & audio as video progresses)"
             $vReasons | ForEach-Object { Write-Host ("   - " + $_) -ForegroundColor Yellow }
-            Write-Host " Recommending to re-render to constant frame rate (CFR) before proceed," -ForegroundColor Yellow
-            Write-Host " or add ffmpeg/VS/AVS filters to correct" -ForegroundColor Yellow
+            Write-Host " Recommending to re-render to constant frame rate (CFR) before proceed, or ffmpeg/VS/AVS filters" -ForegroundColor Yellow
             $quotedVideoSource = Get-QuotedPath $videoSource
             $rNum = $script:fpsParams.rNumerator
             $rDnm = $script:fpsParams.rDenumerator
@@ -286,7 +280,7 @@ function Get-VFRWarning {
             Write-Host "   - ffmpeg -i $quotedVideoSource -vf vfrdet -an -f null -" -ForegroundColor Magenta
             Write-Host "   - When finished, identify with [Parsed_vfrdet_0 @ 0000012a34b5cd00] VFR:0.x (y/z). " -ForegroundColor Magenta
             Write-Host "   - y：Frames with unmatching display durations" -ForegroundColor Magenta
-            Read-Host " Press any button to continue..."
+            Read-Host " Press any key to continue..."
         }
         else {
             Show-Success "Source $mode"
@@ -479,6 +473,8 @@ src.set_output()
 
 #region Main
 function Main {
+    $toolsJson = Join-Path $Global:TempFolder "tools.json"
+    
     Show-Border
     Show-info (" ffprobe source analyzer, exports " + $Global:TempFolder + "temp_v_info(_is_mov).csv`r`n for later script to take reference on")
     Show-Border
@@ -523,8 +519,7 @@ function Main {
         'avs2pipemod' {
             $upstreamCode = 'd'
             Show-Info "Locating the path to AviSynth.dll..."
-            Write-Host " To get avisynth.dll: downloaded from AviSynth+ repository"
-            Write-Host " (https://github.com/AviSynth/AviSynthPlus/releases)"
+            Write-Host " Get avisynth.dll: download from AviSynth+ repo (https://github.com/AviSynth/AviSynthPlus/releases)"
             Write-Host " and extract AviSynthPlus_x.x.x_yyyymmdd-filesonly.7z"
             do {
                 $Avs2PipeModDLL = Select-File -Title "Select avisynth.dll" -InitialDirectory ([Environment]::GetFolderPath('System')) -DllOnly
@@ -565,7 +560,6 @@ function Main {
         }
         default       { $upstreamCode = 'a' }
     }
-
     Write-Host ("─" * 50)
     
     # Define IO Variables
@@ -589,7 +583,7 @@ function Main {
             $mode = Read-Host " Input 'y' to import a custom script; 'n'/Enter to generate a filter-less script"
         
             if ($mode -eq 'y') { # Custom script
-                Show-Warning "AVS/VS script supports a wide variety of source path formats,`r`n such as define-variable first or directly-specify in import,`r`n different parsers, literal path symbol usages, different string quotes,`r`n and multiple video sources, resulting a complicated combination.`r`n `r`n Therefore, please manually check if the video source pathes are correct `r`n"
+                Show-Warning "Due to the wide variety of import source paths supported by the script, the conditions are too complex to validate, please check whether source video exists manually."
                 do {
                     $scriptSource = Select-File -Title "Locate the script file (.avs/.vpy...)"
                     if (-not $scriptSource) {
@@ -615,9 +609,16 @@ function Main {
             }
             # Generate filter-less script
             elseif ([string]::IsNullOrWhiteSpace($mode) -or $mode -eq 'n') {
-                Show-Warning "AviSynth(+) does not come with LSMASHSource.dll (video import library),"
-                Write-Host " Ensure this libaray is present in C:\Program Files (x86)\AviSynth+\plugins64+\ folder" -ForegroundColor Yellow
-                Write-Host " Download and extract 64bit version:`r`n    https://github.com/HomeOfAviSynthPlusEvolution/L-SMASH-Works/releases" -ForegroundColor Yellow
+                if (Test-NullablePath 'C:\Program Files (x86)\AviSynth+\plugins64+\LSMASHSource.dll') {
+                    Show-Success "LSMASHSource.dll is detected under C:\Program Files (x86)\AviSynth+\plugins64+\, all set"
+                }
+                else {
+                    Show-Warning "Half-baked environment?: LSMASHSource.dll is missing under C:\Program Files (x86)\AviSynth+\plugins64+\ (decoder)"
+                    Write-Host " Missing of this file can result in high quantity of AVS scripts to fail"
+                    Write-Host " Download and extract 64bit version：https://github.com/HomeOfAviSynthPlusEvolution/L-SMASH-Works/releases`r`n" -ForegroundColor Magenta
+                }
+                Write-Host ("─" * 50)
+
                 $placeholderScript = Get-BlankAVSVSScript -videoSource $videoSource
                 if (-not $placeholderScript) { 
                     Show-Error "Failed to create filter-less script, please try again."
@@ -654,7 +655,7 @@ function Main {
         #     }]
         # }"
         # Read and find line starts with gui_inputs, i.e.:
-        # gui_inputs="{\"inputs\": [{\"task_id\": \"798_2aa174\", \"input_path\": \"X:\\\\Video\\\\\\u5176\\u5b83-\\u52a8\\u6f2b\\u753b\\u516c\\u79cd\\\\[Airota][Yuru Yuri\\u3001][OVA][BDRip 1080p AVC AAC][CHS].mp4\", \"is_surveillance_folder\": false}]}"
+        # gui_inputs="{\"inputs\": [{\"task_id\": \"798_2aa174\", \"input_path\": \"X:\\\\Video\\\\\\u5176\\u5b83-\\u52a8\\u6f2b\\u753b\\u516c\\u79cd\\\\[Airota][Yuru Yuri\\u3001][OVA][BDRip 1080p].mp4\", \"is_surveillance_folder\": false}]}"
         Show-Info "Attempting to get source video path from SVFI render configuration INI file..."
 
         try { # Read INI & locate gui_inputs line
@@ -744,27 +745,38 @@ function Main {
     Write-Host ("─" * 50)
 
     Show-Info "Locating ffprobe.exe..."
-    # Auto path detect with Invoke-AutoSearch
-    $ffprobePath = Invoke-AutoSearch -ToolName 'ffprobe' -ScriptDir $scriptDir
-    if ($ffprobePath) {
-        Show-Success "Going directly with found ffprobe.exe: $ffprobePath"
-        # $useAuto = Read-Host "Use this one? (Enter=confirm, n=not this one)"
-        # if ($useAuto -eq 'n') {
-        #     $upstreamTools[$tool] = Select-File -Title "Select $tool executable" -ExeOnly
-        # }
-        # else {
-        #     $upstreamTools[$tool] = $autoPath
-        # }
-    }
-    else {
-        do {
-            $ffprobePath =
-                Select-File -Title "Open ffprobe.exe" -InitialDirectory ([Environment]::GetFolderPath('ProgramFiles')) -ExeOnly
-            if (-not (Test-Path -LiteralPath $ffprobePath)) {
-                Show-Warning "Could not locate ffprobe executable, please retry"
+    $ffprobePath = $null
+    $isSavedPathValid = $false
+    if (Test-NullablePath $toolsJson) {
+        try {
+            $savedConfig = Read-JsonFile $toolsJson
+            Show-Info "Detecting config file (saved at: $($savedConfig.SaveDate)), loading now..."
+            if ($savedConfig.Analysis) {
+                $ffprobePath = $savedConfig.Analysis.ffprobe
+                Show-Debug ("ffprobe path: " + $ffprobePath)
+                if (Test-NullablePath $ffprobePath) { $isSavedPathValid = $true }
+                else { Show-Info "Path to ffprobe leads to nowhere, recommended to re-exec step 2 script" }
             }
         }
-        while (-not (Test-Path -LiteralPath $ffprobePath))
+        catch { Show-Info "Config file is missing or corrupted, manual import required; Recommended to re-exec step 2 script" }
+    }
+
+    # Auto path detect with Invoke-AutoSearch
+    if (-not $isSavedPathValid) {
+        $ffprobePath = Invoke-AutoSearch -ToolName 'ffprobe' -ScriptDir $scriptDir
+        if ($ffprobePath) {
+            Show-Success "Going directly with found ffprobe.exe: $ffprobePath"
+        }
+        else {
+            do {
+                $ffprobePath =
+                    Select-File -Title "Open ffprobe.exe" -InitialDirectory ([Environment]::GetFolderPath('ProgramFiles')) -ExeOnly
+                if (-not (Test-Path -LiteralPath $ffprobePath)) {
+                    Show-Warning "Could not locate ffprobe executable, please retry"
+                }
+            }
+            while (-not (Test-Path -LiteralPath $ffprobePath))
+        }
     }
 
     Write-Host ("─" * 50)

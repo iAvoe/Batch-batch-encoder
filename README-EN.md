@@ -75,7 +75,11 @@ Developing these tools wasn't easy. If this tool improve your efficiency, consid
 ## Update Information
 **v1.7.9**
 - Step 2:
-  - Added new file save-load mechanism for tool path configurations, import process is now much easier
+  - Added config file mechanism for tool path configurations, import process is now much easier
+- Step 3:
+  - Connected to step 2's saved config file and automated ffprobe import
+- Step 4:
+  - Connected to step 2's saved config file and automated avs2yuv AviSynth API type questionare
 
 **v1.7.8**
 - Step 4:

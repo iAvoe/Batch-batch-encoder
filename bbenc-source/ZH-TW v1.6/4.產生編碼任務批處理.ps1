@@ -1372,18 +1372,25 @@ function Main {
     $x265Params.PME = Get-x265PME
     $x265Params.Pools = Get-x265ThreadPool
 
-    # 獲取並配置色彩空間格式
-    $avs2yuvVersionCode = 'a'
-    if ($sourceCSV.UpstreamCode -eq 'c') {
-        Write-Host ''
-        Show-Info "選擇使用的 avs2yuv(64).exe 類型："
-        $avs2yuvVersionCode = Read-Host " [默認 Enter/a: AviSynth+ (0.30) | b: AviSynth (up to 0.26)]"
+    # avs2yuv 設置
+    $isAvsPlus = $true
+    if (Test-NullablePath $toolsJson) {
+        try {
+            $savedConfig = Read-JsonFile $toolsJson
+            Show-Info "檢測到設定檔（保存於：$($savedConfig.SaveDate)），正在載入..."
+            if ($null -ne $savedConfig.IsAvsPlus) {
+                $isAvsPlus = $savedConfig.IsAvsPlus 
+            }
+        }
+        catch { Show-Info "設定檔損壞或不存在，將使用預設值（AviSynth+）作為 avs2yuv 的運行環境，建議重新運行步驟 2 腳本" }
     }
+    
+    # 獲取並配置色彩空間格式
     $ffmpegParams.CSP = Get-ffmpegCSP -CSVpixfmt $ffprobeCSV.D
     $svtav1Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $true
     $x265Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
     $x264Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
-    $avsyuvParams.CSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $false -isAvs2YuvInput $true -isSVTAV1 $false -isAVSPlus ($avs2yuvVersionCode -eq 'a')
+    $avsyuvParams.CSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $false -isAvs2YuvInput $true -isSVTAV1 $false -isAVSPlus $isAvsPlus
 
     # VOB、MOV 格式的幀率資訊位於 .I，否則為 .H
     $ffFpsString =
