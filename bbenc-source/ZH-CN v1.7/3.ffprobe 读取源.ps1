@@ -180,6 +180,7 @@ function Get-VFRWarning {
 
         # 判断视频为 VFR 的理由和可能性，只要大于零则咎
         $vReasons = @()
+        $cReasons = @()
         $score = 0
 
         # 1. 比较基础帧率与平均帧率

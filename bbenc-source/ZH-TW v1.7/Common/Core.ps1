@@ -48,7 +48,6 @@ $Global:TempFolder = $env:USERPROFILE + "\bbenc\"
 if (-not (Test-Path -PathType Container $Global:TempFolder)) {
     New-Item -ItemType Directory -Force -Path $Global:TempFolder
 }
-Clear-Host
 
 # 載入子模組
 $base = $PSScriptRoot

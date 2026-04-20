@@ -409,7 +409,7 @@ function Main {
     while ($choice.ToUpper() -notin @('A', 'B', 'C', 'Q'))
     
     # Show Hardware details
-    Show-Info "System hardware information" -ForegroundColor
+    Show-Info "System hardware information"
     
     Show-HardwareInformation
     

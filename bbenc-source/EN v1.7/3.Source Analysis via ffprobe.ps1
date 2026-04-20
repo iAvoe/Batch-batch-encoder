@@ -179,6 +179,7 @@ function Get-VFRWarning {
 
         # Reasons and possibility score for determining if a video is VFR
         $vReasons = @()
+        $cReasons = @()
         $score = 0
 
         # 1. Compare base fps to average fps

@@ -226,7 +226,7 @@ function Import-ToolPaths {
         # 1. Ask to swap or add or not
         if (Test-NullablePath $savedPath) {
             Write-Host "`r`n Detecting saved path for $tool in $savedPath" -ForegroundColor DarkGray
-            $c = Read-Host Read-Host "`r`n [$CategoryName] ($i/$($upstreamTools.Count)) Replace $tool ? (y=yes，Enter=keep)"
+            $c = Read-Host "`r`n [$CategoryName] ($i/$($upstreamTools.Count)) Replace $tool ? (y=yes，Enter=keep)"
             if ('y' -eq $c) { $isSwapNeeded = $true }
         }
         else {

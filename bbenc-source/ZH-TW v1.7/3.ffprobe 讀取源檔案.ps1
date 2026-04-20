@@ -180,6 +180,7 @@ function Get-VFRWarning {
 
         # 判斷影片為 VFR 的理由和可能性，只要大於零則咎
         $vReasons = @()
+        $cReasons = @()
         $score = 0
 
         # 1. 比較基礎幀率與平均幀率

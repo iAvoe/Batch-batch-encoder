@@ -73,7 +73,7 @@ function Find-Tool {
     if ($IncludePathEnv) {
         $envPaths = $env:Path -split ';'
         foreach ($p in $envPaths) {
-            if ([string]::IsNullOrWhiteSpace($P)) { continue }
+            if ([string]::IsNullOrWhiteSpace($p)) { continue }
             $p = $p.trim()
             if (Test-Path -LiteralPath $p -PathType Container) {
                 [void]$allPaths.Add($p)
