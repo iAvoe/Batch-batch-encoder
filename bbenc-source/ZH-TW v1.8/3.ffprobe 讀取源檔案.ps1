@@ -128,36 +128,56 @@ function Get-VideoStreamInfo {
     }
 
     try {
-        $streamInfo = $ffprobeJson | ConvertFrom-Json
+        $info = $ffprobeJson | ConvertFrom-Json
     }
     catch {
         Write-Host $ffprobeJson
         throw "Get-VideoStreamInfo：無法解析 ffprobe 返回的 JSON"
     }
 
-    if (-not $streamInfo.streams -or $streamInfo.streams.Count -lt 1) {
+    if (-not $info.streams -or $info.streams.Count -lt 1) {
         throw "Get-VideoStreamInfo：未找到影片串流資訊"
     }
 
-    return $streamInfo.streams[0]
+    return $info.streams[0]
 }
 
-function Get-VFRWarning {
+# 檢測並警告可變幀率以及非方形象素變寬比存在，並提供修復建議
+function Test-VideoWarnings {
     param (
         [Parameter(Mandatory=$true)]$ffprobeStreamInfo,
         [double]$RelativeTolerance = 0.000000001,
         [Parameter(Mandatory=$true)][string]$quotedVideoSource
     )
-    Show-Info "Get-VFRWarning：正在檢測影片是否為可變幀率..."
-    
-    try { # 調用 Set-FpsParams 更新基礎幀率、平均幀率
+
+    function Write-NoticeBlock {
+        param(
+            [Parameter(Mandatory=$true)][string]$Title,
+            [Parameter(Mandatory=$true)][object[]]$Lines
+        )
+
+        Show-Warning $Title
+        foreach ($line in $Lines) {
+            if ($line -is [hashtable]) {
+                Write-Host $line.Text -ForegroundColor $line.Color
+            }
+            else {
+                Write-Host $line -ForegroundColor Yellow
+            }
+        }
+    }
+
+    try {
+        $warningBlocks = @()
+
+        # 1) 先更新幀率參數
         try {
             Set-FpsParams `
                 -rFpsString ([string]$ffprobeStreamInfo.r_frame_rate).Trim() `
                 -aFpsString ([string]$ffprobeStreamInfo.avg_frame_rate).Trim()
         }
         catch {
-            Show-Warning "Get-VFRWarning：影片幀率數據為空或損壞，幀率無從得知"
+            Show-Warning "影片幀率數據為空或損壞，幀率無從得知"
         }
 
         $rFps = $script:fpsParams.rDouble
@@ -170,45 +190,39 @@ function Get-VFRWarning {
             $duration = [double]$ffprobeStreamInfo.duration.Trim()
         }
         catch {
-            Show-Info "Get-VFRWarning：影片總幀數、時長元數據缺失，編碼器將不顯示 ETA"
+            Show-Info "影片總幀數、時長元數據缺失，編碼器將不顯示 ETA"
         }
 
-        # 估計幀率
         $eFps = $null
-        if ($nbFrames -and $duration -and $duration -gt 0) {
+        if ($nbFrames -gt 0 -and $duration -gt 0) {
             $eFps = $nbFrames / $duration
         }
 
-        # 判斷影片為 VFR 的理由和可能性，只要大於零則咎
+        # 2) VFR 判定
         $vReasons = @()
         $score = 0
 
-        # 1. 比較基礎幀率與平均幀率
         if ($rFps -gt 0 -and $aFps -gt 0) {
-            $relDiff =
-                [math]::Abs($rFps-$aFps) / [math]::Max(1e-9, [math]::Max($rFps, $aFps))
+            $relDiff = [math]::Abs($rFps - $aFps) / [math]::Max(1e-9, [math]::Max($rFps, $aFps))
             if ($relDiff -gt $RelativeTolerance) {
                 $score += 1
                 $vReasons += "基礎幀率（$rFps）與平均幀率（$aFps）不同"
             }
         }
 
-        # 2. 比較估計幀率與平均幀率
-        if ($eFps -and $aFps -gt 0) {
-            $relDiff2 = [math]::Abs($eFps-$aFps) / [math]::Max($eFps, $aFps)
+        if ($null -ne $eFps -and $aFps -gt 0) {
+            $relDiff2 = [math]::Abs($eFps - $aFps) / [math]::Max(1e-9, [math]::Max($eFps, $aFps))
             if ($relDiff2 -gt $RelativeTolerance) {
                 $score += 2
                 $vReasons += "估計幀率（$eFps）與平均幀率（$aFps）不同"
             }
         }
 
-        # 3. 特殊值（據說常見於 VFR）
         if ($ffprobeStreamInfo.r_frame_rate -eq "90000/1") {
             $score += 3
             $vReasons += "特徵 r_frame_rate（90000）為 VFR 容器標記"
         }
 
-        # 4. 接近質數的大分母
         $aDnm = $script:fpsParams.aDenumerator
         if ($aDnm -gt 50000) {
             if (Test-IsLikePrime -number $aDnm) {
@@ -216,87 +230,76 @@ function Get-VFRWarning {
                 $vReasons += "平均幀率分母值較大（$aDnm）且接近質數"
             }
             else {
-                $score++
+                $score += 1
                 $vReasons += "平均幀率分母值較大（$aDnm）"
             }
         }
 
-        # 最終判定映射
         $mode = "「確定」是恆定幀率（CFR）"
-        # $confidence = "高"
-        if ($score -ge 5) { $mode = "「確定」是可變幀率（VFR）" } # $confidence = "確認"
-        if ($score -ge 4) { $mode = "「高機率」是可變幀率（VFR）" } # $confidence = "高"
-        elseif ($score -ge 2) { $mode = "「應該」是可變幀率（VFR）" } # $confidence = "中"
-        elseif ($score -gt 0) { $mode = "「有跡象」是可變幀率（VFR）" } # $confidence = "低"
-        # else {
-        #     $mode = "是恆定幀率（CFR）"
-        #     $confidence = "高"
-        # }
-        # return [PSCustomObject]@{
-        #     Mode           = $mode
-        #     Confidence     = $confidence
-        #     Score          = $score
-        #     r_frame_rate   = $ffprobeStreamInfo.r_frame_rate
-        #     r_fps          = if ($rFps) {$rFps} else {"N/A"}
-        #     avg_frame_rate = $ffprobeStreamInfo.avg_frame_rate
-        #     avg_fps        = if ($aFps) {$aFps} else {"N/A"}
-        #     computed_fps   = if ($eFps) {$eFps} else {"N/A"}
-        #     vfr_reasons    = $vReasons
-        # }
+        if ($score -ge 5)     { $mode = "「確定」是可變幀率（VFR）" }
+        elseif ($score -ge 4) { $mode = "「高機率」是可變幀率（VFR）" }
+        elseif ($score -ge 2) { $mode = "「應該」是可變幀率（VFR）" }
+        elseif ($score -gt 0) { $mode = "「有跡象」是可變幀率（VFR）" }
+
         if ($score -gt 0) {
             $rNum = $script:fpsParams.rNumerator
             $rDnm = $script:fpsParams.rDenumerator
 
-            Show-Warning "源$mode，本程式暫無對策（強行編碼可能會導致影片時長錯誤，隨播放與音訊失聯）"
-            $vReasons | ForEach-Object { Write-Host ("   - " + $_) -ForegroundColor Yellow }
-            Write-Host " 建議重新渲染為恆定幀率（CFR）再繼續，或在對應線路添加 ffmpeg/VS/AVS 濾鏡組矯正" -ForegroundColor Yellow
-            Write-Host " 例：渲染並編碼為 FFV1 無損影片："
-            Write-Host "   - ffmpeg -i $quotedVideoSource -r $rNum/$rDnm -c:v ffv1 -level 3 -context 1 -g 180 -c:a copy output.mkv" -ForegroundColor Magenta
-            Write-Host " 例：測量影片幀以確定 VFR："
-            Write-Host "   - ffmpeg -i $quotedVideoSource -vf vfrdet -an -f null -" -ForegroundColor Magenta
-            Write-Host "   - 結束後根據 [Parsed_vfrdet_0 @ 0000012a34b5cd00] VFR:0.xxx (yyy/zzz) 字樣即可確定"
-            Write-Host "   - yyy：顯示時長對不上幀率幀的總數" -ForegroundColor Magenta
-            Read-Host " 按任意鍵繼續..."
+            $lines = @()
+            $lines += ($vReasons | ForEach-Object { "   - $_" })
+            $lines += " 建議重新渲染為恆定幀率（CFR）再繼續，或在對應線路添加 ffmpeg/VS/AVS 濾鏡組矯正"
+            $lines += " 例：渲染並編碼為 FFV1 無損影片："
+            $lines += @{ Text = "   - ffmpeg -i $quotedVideoSource -r $rNum/$rDnm -c:v ffv1 -level 3 -context 1 -g 180 -c:a copy output.mkv"; Color = "Magenta" }
+            $lines += " 例：測量影片幀以確定 VFR："
+            $lines += @{ Text = "   - ffmpeg -i $quotedVideoSource -vf vfrdet -an -f null -"; Color = "Magenta" }
+            $lines += @{ Text = "   - 結束後根據 [Parsed_vfrdet_0 @ 0000012a34b5cd00] VFR:0.xxx (yyy/zzz) 字樣即可確定"; Color = "Yellow" }
+            $lines += @{ Text = "   - yyy：顯示時長對不上幀率幀的總數"; Color = "Magenta" }
+
+            $warningBlocks += [PSCustomObject]@{
+                Title = "源$mode，本程式暫無對策（強行編碼可能會導致影片時長錯誤，隨播放與音訊失聯）"
+                Lines = $lines
+            }
         }
-        else { Show-Success "源$mode" }
-    }
-    catch { throw ("Get-VFRWarning：" + $_) }
-}
 
-function Get-NonSquarePixelWarning {
-    param (
-        [Parameter(Mandatory=$true)]$ffprobeStreamInfo,
-        [string]$videoSource,
-        [string]$quotedVideoSource
-    )
-
-    try {
+        # 3) SAR 判定
         $sampleAspectRatio = "1:1"
         try {
-            $sampleAspectRatio = $ffprobeStreamInfo.sample_aspect_ratio.Trim()
+            $sampleAspectRatio = ([string]$ffprobeStreamInfo.sample_aspect_ratio).Trim()
         }
         catch {
-            Show-Warning "Get-NonSquarePixelWarning：源的變寬比（SAR）數據損壞，將預設為 1:1"
+            Show-Warning "Test-VideoWarnings：源的變寬比（SAR）數據損壞，將預設為 1:1"
         }
-        
-        if ($sampleAspectRatio -notlike "1:1" -and $sampleAspectRatio -ne "0:1") {
-            Show-Warning "源的變寬比（SAR）为 $sampleAspectRatio （非 1:1 方形象素）"
-            Write-Host " 本程式暫無對策（強行編碼會恢復到方形象素，致畫面縮寬），" -ForegroundColor Yellow
-            Write-Host " 手動矯正方法："
-            $e = @(
-                " 1. ffmpeg -i $quotedVideoSource -c copy -aspect $sampleAspectRatio output.mkv",
-                " 2. MP4Box -par 1=$sampleAspectRatio $quotedVideoSource -out output.mp4",
-                " 3. moviepy:",
-                "    from moviepy.editor import VideoFileClip",
-                "    clip = VideoFileClip($quotedVideoSource)",
-                "    clip.aspect_ratio = $sampleAspectRatio",
-                "    clip.write_videofile('output.mp4')"
-            )
-            $e | ForEach-Object { Write-Host $_ }
-            Read-Host " 按任意鍵繼續..."
+
+        if ($sampleAspectRatio -notin @("1:1", "0:1")) {
+            $warningBlocks += [PSCustomObject]@{
+                Title = "源的變寬比（SAR）為 $sampleAspectRatio（非 1:1 方形象素）"
+                Lines = @(
+                    " 本程式暫無對策（強行編碼會恢復到方形象素，致畫面縮寬）",
+                    " 手動矯正方法：",
+                    " 1. ffmpeg -i $quotedVideoSource -c copy -aspect $sampleAspectRatio output.mkv",
+                    " 2. MP4Box -par 1=$sampleAspectRatio $quotedVideoSource -out output.mp4",
+                    " 3. moviepy:",
+                    "    from moviepy.editor import VideoFileClip",
+                    "    clip = VideoFileClip($quotedVideoSource)",
+                    "    clip.aspect_ratio = $sampleAspectRatio",
+                    "    clip.write_videofile('output.mp4')"
+                )
+            }
+        }
+
+        # 4) 統一輸出
+        if ($warningBlocks.Count -gt 0) {
+            foreach ($block in $warningBlocks) {
+                Write-NoticeBlock -Title $block.Title -Lines $block.Lines
+                Write-Host ""
+            }
+            Read-Host " 按任意鍵繼續..." | Out-Null
+        }
+        else {
+            Show-Success "源「確定」是恆定幀率（CFR），且未發現非方形象素問題"
         }
     }
-    catch { throw ("Get-NonSquarePixelWarning：" + $_) }
+    catch { throw ("Test-VideoWarnings：" + $_) }
 }
 
 # 利用 ffprobe 驗證影片檔案封裝格式，無視后綴名（封裝格式用大寫字母表示）
@@ -763,8 +766,7 @@ function Main {
     # Write-Host $streamInfo
 
     # 檢測可變幀率源、非方形象素源並告警
-    Get-VFRWarning -ffprobeStreamInfo $streamInfo -quotedVideoSource $quotedVideoSource
-    Get-NonSquarePixelWarning -ffprobeStreamInfo $streamInfo -quotedVideoSource $quotedVideoSource
+    Test-VideoWarnings -ffprobeStreamInfo $streamInfo -quotedVideoSource $quotedVideoSource
 
     Write-Host ("─" * 50)
 

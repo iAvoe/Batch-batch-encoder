@@ -141,164 +141,164 @@ function Get-VideoStreamInfo {
     return $streamInfo.streams[0]
 }
 
-function Get-VFRWarning {
+# 检测并警告可变帧率以及非方形像素变宽比存在，并提供修复建议
+function Test-VideoWarnings {
     param (
         [Parameter(Mandatory=$true)]$ffprobeStreamInfo,
         [double]$RelativeTolerance = 0.000000001,
         [Parameter(Mandatory=$true)][string]$quotedVideoSource
     )
-    Show-Info "Get-VFRWarning: Validating if video frame rate is variable..."
-    
-    try { # Call Set-FpsParams to update the base frame rate and average frame rate
+
+    function Write-NoticeBlock {
+        param(
+            [Parameter(Mandatory=$true)][string]$Title,
+            [Parameter(Mandatory=$true)][object[]]$Lines
+        )
+
+        Show-Warning $Title
+        foreach ($line in $Lines) {
+            if ($line -is [hashtable]) {
+                Write-Host $line.Text -ForegroundColor $line.Color
+            }
+            else {
+                Write-Host $line -ForegroundColor Yellow
+            }
+        }
+    }
+
+    try {
+        $warningBlocks = @()
+
+        # 1) First update fps
         try {
             Set-FpsParams `
                 -rFpsString ([string]$ffprobeStreamInfo.r_frame_rate).Trim() `
                 -aFpsString ([string]$ffprobeStreamInfo.avg_frame_rate).Trim()
         }
         catch {
-            Show-Warning "Get-VFRWarning: Video frame rate data is missing or corrupted, could not analyze"
+            Show-Warning "Test-VideoWarnings: invalid or empty video framerate, could not analyze"
         }
+
         $rFps = $script:fpsParams.rDouble
         $aFps = $script:fpsParams.aDouble
-
-        # Extract total frames and total duration
         $nbFrames = 0
         $duration = 0
+
         try {
             $nbFrames = [int]$ffprobeStreamInfo.nb_frames.Trim()
             $duration = [double]$ffprobeStreamInfo.duration.Trim()
         }
         catch {
-            Show-Info "Get-VFRWarning: Invalid total frames & duration, video encoder will not show ETA"
+            Show-Info "Test-VideoWarnings: Invalid total frames & duration, video encoder will not show ETA"
         }
 
-        # Estimated fps
         $eFps = $null
-        if ($nbFrames -and $duration -and $duration -gt 0) {
+        if ($nbFrames -gt 0 -and $duration -gt 0) {
             $eFps = $nbFrames / $duration
         }
 
-        # Reasons and possibility score for determining if a video is VFR
+        # 2) VFR check
         $vReasons = @()
         $score = 0
 
-        # 1. Compare base fps to average fps
         if ($rFps -gt 0 -and $aFps -gt 0) {
-            $relDiff =
-                [math]::Abs($rFps-$aFps) / [math]::Max(1e-9, [math]::Max($rFps, $aFps))
+            $relDiff = [math]::Abs($rFps - $aFps) / [math]::Max(1e-9, [math]::Max($rFps, $aFps))
             if ($relDiff -gt $RelativeTolerance) {
                 $score += 1
                 $vReasons += "Base fps ($rFps) differs from avg. fps ($aFps)"
             }
         }
 
-        # 2. Compare estimated frame rate with average frame rate
-        if ($eFps -and $aFps -gt 0) {
-            $relDiff2 = [math]::Abs($eFps-$aFps) / [math]::Max($eFps, $aFps)
+        if ($null -ne $eFps -and $aFps -gt 0) {
+            $relDiff2 = [math]::Abs($eFps - $aFps) / [math]::Max(1e-9, [math]::Max($eFps, $aFps))
             if ($relDiff2 -gt $RelativeTolerance) {
                 $score += 2
                 $vReasons += "Estimated fps ($eFps) differs from avg. fps ($aFps)"
             }
         }
 
-        # 3. Special values (rumor says this indicates VFR)
         if ($ffprobeStreamInfo.r_frame_rate -eq "90000/1") {
             $score += 3
-            $vReasons += "Characteristical r_frame_rate (90000), could be VFR container"
+            $vReasons += "Characteristical r_frame_rate (90000) indicates VFR container"
         }
 
-        # 4. Large avg. fps denom
         $aDnm = $script:fpsParams.aDenumerator
         if ($aDnm -gt 50000) {
             if (Test-IsLikePrime -number $aDnm) {
                 $score += 2
-                $vReasons += "Relatively big, prime-like avg. fps denumerator ($aDnm)"
+                $vReasons += "Relatively big, prime-like average fps denumerator ($aDnm)"
             }
             else {
-                $score++
-                $vReasons += "Relatively big avg. fps denumerator ($aDnm)"
+                $score += 1
+                $vReasons += "Relatively big average fps denumerator ($aDnm)"
             }
         }
 
-        # Final decision mapping
-        $mode = "[is] constant Frame Rate (CFR)"
-        # $confidence = "High"
-        if ($score -ge 5) { $mode = "[is] variable Frame Rate (VFR)" } # $confidence = "Confirmed"
-        if ($score -ge 4) { $mode = "[very likely to be] variable Frame Rate (VFR)" } # $confidence = "High"
-        elseif ($score -ge 2) { $mode = "[could be] variable Frame Rate (VFR)" } # $confidence = "Med"
-        elseif ($score -gt 0) { $mode = "[has signs of being] variable frame rate (VFR)" } # $confidence = "Low"
-        # else {
-        #     $mode = "[is] constant Frame Rate (CFR)"
-        #     $confidence = "High"
-        # }
-        # return [PSCustomObject]@{
-        #     Mode           = $mode
-        #     Confidence     = $confidence
-        #     Score          = $score
-        #     r_frame_rate   = $ffprobeStreamInfo.r_frame_rate
-        #     r_fps          = if ($rFps) {$rFps} else {"N/A"}
-        #     avg_frame_rate = $ffprobeStreamInfo.avg_frame_rate
-        #     avg_fps        = if ($aFps) {$aFps} else {"N/A"}
-        #     computed_fps   = if ($eFps) {$eFps} else {"N/A"}
-        #     vfr_reasons    = $vReasons
-        # }
+        $mode = "[IS] Constant frame rate (CFR)"
+        if ($score -ge 5)     { $mode = "[IS] Variable frame rate (VFR)" }
+        elseif ($score -ge 4) { $mode = "[LIKELY IS] Variable frame rate (VFR)" }
+        elseif ($score -ge 2) { $mode = "[SUGGESTS] Variable frame rate (VFR)" }
+        elseif ($score -gt 0) { $mode = "[FAINTLY HINTS] Variable frame rate (VFR)" }
+
         if ($score -gt 0) {
             $rNum = $script:fpsParams.rNumerator
             $rDnm = $script:fpsParams.rDenumerator
 
-            Show-Warning "Source $mode. This program does not support VFR alignment (Force encoding may leads to duration misalign inbetween video & audio as video progresses)"
-            $vReasons | ForEach-Object { Write-Host ("   - " + $_) -ForegroundColor Yellow }
-            Write-Host " Recommending to re-render to constant frame rate (CFR) before proceed, or ffmpeg/VS/AVS filters" -ForegroundColor Yellow
-            Write-Host " i.e.: Render and encode to FFV1 lossless video:"
-            Write-Host "   - ffmpeg -i $quotedVideoSource -r $rNum/$rDnm -c:v ffv1 -level 3 -context 1 -g 180 -c:a copy output.mkv" -ForegroundColor Magenta
-            Write-Host " i.e.: Measure video frame to detect VFR:"
-            Write-Host "   - ffmpeg -i $quotedVideoSource -vf vfrdet -an -f null -" -ForegroundColor Magenta
-            Write-Host "   - When finished, identify with [Parsed_vfrdet_0 @ 0000012a34b5cd00] VFR:0.x (y/z). " -ForegroundColor Magenta
-            Write-Host "   - y：Frames with unmatching display durations" -ForegroundColor Magenta
-            Read-Host " Press any key to continue..."
-        }
-        else { Show-Success "Source $mode" }
-    }
-    catch { throw ("Get-VFRWarning：" + $_) }
-}
+            $lines = @()
+            $lines += ($vReasons | ForEach-Object { "   - $_" })
+            $lines += "  Please convert source to constant frame rate, or attach ffmpeg/VS/AVS filters in generated batch (Step 4)"
+            $lines += " i.e. Render and encode to FFV1 lossless video:"
+            $lines += @{ Text = "   - ffmpeg -i $quotedVideoSource -r $rNum/$rDnm -c:v ffv1 -level 3 -context 1 -g 180 -c:a copy output.mkv"; Color = "Magenta" }
+            $lines += " Measure video frame to detect VFR:"
+            $lines += @{ Text = "   - ffmpeg -i $quotedVideoSource -vf vfrdet -an -f null -"; Color = "Magenta" }
+            $lines += @{ Text = "   - identify with [Parsed_vfrdet_0 @ 0000012a34b5cd00] VFR:0.xxx (yyy/zzz)"; Color = "Yellow" }
+            $lines += @{ Text = "   - yyy: Frames with unmatching display durations"; Color = "Magenta" }
 
-# Use ffprobe to detect the actual video file container format,
-# ignoring the file extension (the container format is represented by uppercase letters).
-function Get-NonSquarePixelWarning {
-    param (
-        [Parameter(Mandatory=$true)]$ffprobeStreamInfo,
-        [string]$videoSource,
-        [string]$quotedVideoSource
-    )
-    
-    try {
+            $warningBlocks += [PSCustomObject]@{
+                Title = "Source $mode, This program does not handle VFR alignment (Encoding leads to video-audio progressively misalign)"
+                Lines = $lines
+            }
+        }
+
+        # 3) SAR check
         $sampleAspectRatio = "1:1"
         try {
-            $sampleAspectRatio = $ffprobeStreamInfo.sample_aspect_ratio.Trim()
+            $sampleAspectRatio = ([string]$ffprobeStreamInfo.sample_aspect_ratio).Trim()
         }
         catch {
-            Show-Warning "Get-NonSquarePixelWarning: sample aspect radio (SAR) is missing or corrupted, defaulting to 1:1"
+            Show-Warning "Test-VideoWarnings: sample aspect radio (SAR) is missing or corrupted, defaulting to 1:1"
         }
 
-        if ($sampleAspectRatio -notlike "1:1" -and $sampleAspectRatio -ne "0:1") {
-            Show-Warning "$videoSource has a $sampleAspectRatio SAR (non-square pixel)"
-            Write-Host " This program does not support SAR handling." -ForegroundColor Yellow
-            Write-Host " (encodes to square pixel, width shrinks)" -ForegroundColor Yellow
-            Write-Host " Example fix:" -ForegroundColor Magenta
-            $e = @(
-                " 1. ffmpeg -i $quotedVideoSource -c copy -aspect $sampleAspectRatio output.mkv",
-                " 2. MP4Box -par 1=$sampleAspectRatio $quotedVideoSource -out output.mp4",
-                " 3. moviepy:",
-                "    from moviepy.editor import VideoFileClip",
-                "    clip = VideoFileClip($quotedVideoSource)",
-                "    clip.aspect_ratio = $sampleAspectRatio",
-                "    clip.write_videofile('output.mp4')"
-            )
-            $e | ForEach-Object { Write-Host $_ }
-            Read-Host " Press any button to continue..."
+        if ($sampleAspectRatio -notin @("1:1", "0:1")) {
+            $warningBlocks += [PSCustomObject]@{
+                Title = "$videoSource has a $sampleAspectRatio SAR (non-square pixel)"
+                Lines = @(
+                    " This program does not support SAR handling (encodes to square pixel, width shrinks)",
+                    " Example fix:",
+                    " 1. ffmpeg -i $quotedVideoSource -c copy -aspect $sampleAspectRatio output.mkv",
+                    " 2. MP4Box -par 1=$sampleAspectRatio $quotedVideoSource -out output.mp4",
+                    " 3. moviepy:",
+                    "    from moviepy.editor import VideoFileClip",
+                    "    clip = VideoFileClip($quotedVideoSource)",
+                    "    clip.aspect_ratio = $sampleAspectRatio",
+                    "    clip.write_videofile('output.mp4')"
+                )
+            }
+        }
+
+        # 4) Output
+        if ($warningBlocks.Count -gt 0) {
+            foreach ($block in $warningBlocks) {
+                Write-NoticeBlock -Title $block.Title -Lines $block.Lines
+                Write-Host ""
+            }
+            Read-Host " Press any key to continue..." | Out-Null
+        }
+        else {
+            Show-Success "Source [IS] Constant frame rate (CFR), and uses square pixel format"
         }
     }
-    catch { throw ("Get-NonSquarePixelWarning：" + $_) }
+    catch { throw ("Test-VideoWarnings：" + $_) }
 }
 
 # Use ffprobe to detect the actual video file container format, ignoring the file extension (the container format is represented by uppercase letters)
@@ -766,13 +766,15 @@ function Main {
     # Write-Host $streamInfo
 
     # Detect non-square pixel source, source container format and warn
-    Get-VFRWarning -ffprobeStreamInfo $streamInfo -quotedVideoSource $quotedVideoSource
-    Get-NonSquarePixelWarning -ffprobeStreamInfo $streamInfo -quotedVideoSource $quotedVideoSource
+    Test-VideoWarnings -ffprobeStreamInfo $streamInfo -quotedVideoSource $quotedVideoSource
 
     Write-Host ("─" * 50)
 
     # Detect if video container format is genuine, does not support $quotedVideoSource as param input
     $realFormatName = Test-VContainerFormat -ffprobePath $ffprobePath -videoSource $videoSource
+
+    Write-Host ("─" * 50)
+
     $isMOV = ($realFormatName -like "MOV")
     $isVOB = ($realFormatName -like "VOB")
     # if ($isMOV) { Show-Debug "The imported video $videoSource is in MOV format" }
