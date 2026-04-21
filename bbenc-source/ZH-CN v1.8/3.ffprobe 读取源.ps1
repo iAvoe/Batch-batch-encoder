@@ -128,24 +128,25 @@ function Get-VideoStreamInfo {
     }
 
     try {
-        $streamInfo = $ffprobeJson | ConvertFrom-Json
+        $info = $ffprobeJson | ConvertFrom-Json
     }
     catch {
         Write-Host $ffprobeJson
         throw "Get-VideoStreamInfo：无法解析 ffprobe 返回的 JSON"
     }
 
-    if (-not $streamInfo.streams -or $streamInfo.streams.Count -lt 1) {
+    if (-not $info.streams -or $info.streams.Count -lt 1) {
         throw "Get-VideoStreamInfo：未找到视频流信息"
     }
 
-    return $streamInfo.streams[0]
+    return $info.streams[0]
 }
 
 function Get-VFRWarning {
     param (
         [Parameter(Mandatory=$true)]$ffprobeStreamInfo,
-        [double]$RelativeTolerance = 0.000000001
+        [double]$RelativeTolerance = 0.000000001,
+        [Parameter(Mandatory=$true)][string]$quotedVideoSource
     )
     Show-Info "Get-VFRWarning：正在检测视频是否为可变帧率..."
     
@@ -158,12 +159,12 @@ function Get-VFRWarning {
         catch {
             Show-Warning "Get-VFRWarning：视频帧率数据为空或损坏，帧率无从得知"
         }
+
         $rFps = $script:fpsParams.rDouble
         $aFps = $script:fpsParams.aDouble
-
-        # 解析总帧数、总时长
         $nbFrames = 0
         $duration = 0
+
         try {
             $nbFrames = [int]$ffprobeStreamInfo.nb_frames.Trim()
             $duration = [double]$ffprobeStreamInfo.duration.Trim()
@@ -180,7 +181,6 @@ function Get-VFRWarning {
 
         # 判断视频为 VFR 的理由和可能性，只要大于零则咎
         $vReasons = @()
-        $cReasons = @()
         $score = 0
 
         # 1. 比较基础帧率与平均帧率
@@ -191,12 +191,6 @@ function Get-VFRWarning {
                 $score += 1
                 $vReasons += "基础帧率（$rFps）与平均帧率（$aFps）不同"
             }
-            else {
-                $cReasons += "基础帧率与平均帧率相同"
-            }
-        }
-        else {
-            $cReasons += "无法解析基础帧率（r_frame_rate）或平均帧率（avg_frame_rate），可能为 N/A"
         }
 
         # 2. 比较估计帧率与平均帧率
@@ -205,9 +199,6 @@ function Get-VFRWarning {
             if ($relDiff2 -gt $RelativeTolerance) {
                 $score += 2
                 $vReasons += "估计帧率（$eFps）与平均帧率（$aFps）不同"
-            }
-            else {
-                $cReasons += "估计帧率与平均帧率相同"
             }
         }
 
@@ -229,29 +220,14 @@ function Get-VFRWarning {
                 $vReasons += "平均帧率分母值较大（$aDnm）"
             }
         }
-        else {
-            $cReasons += "平均帧率分母值不大（$aDnm）"
-        }
 
         # 最终判定映射
         $mode = "「确定」是恒定帧率（CFR）"
         # $confidence = "高"
-        if ($score -ge 5) {
-            $mode = "「确定」是可变帧率（VFR）"
-            # $confidence = "确认"
-        }
-        if ($score -ge 4) {
-            $mode = "「大概率」是可变帧率（VFR）"
-            # $confidence = "高"
-        }
-        elseif ($score -ge 2) {
-            $mode = "「应该」是可变帧率（VFR）"
-            # $confidence = "中"
-        }
-        elseif ($score -gt 0) {
-            $mode = "「有迹象」是可变帧率（VFR）"
-            # $confidence = "低"
-        }
+        if ($score -ge 5) { $mode = "「确定」是可变帧率（VFR）" } # $confidence = "确认"
+        if ($score -ge 4) { $mode = "「高概率」是可变帧率（VFR）" } # $confidence = "高"
+        elseif ($score -ge 2) { $mode = "「应该」是可变帧率（VFR）" } # $confidence = "中"
+        elseif ($score -gt 0) { $mode = "「有迹象」是可变帧率（VFR）" } # $confidence = "低"
         # else {
         #     $mode = "是恒定帧率（CFR）"
         #     $confidence = "高"
@@ -266,15 +242,14 @@ function Get-VFRWarning {
         #     avg_fps        = if ($aFps) {$aFps} else {"N/A"}
         #     computed_fps   = if ($eFps) {$eFps} else {"N/A"}
         #     vfr_reasons    = $vReasons
-        #     cfr_reasons    = $cReasons
         # }
         if ($score -gt 0) {
-            Show-Warning "源$mode，本程序暂无对策（强行编码可能会导致视频时长错误，随播放与音频失联）"
-            $vReasons | ForEach-Object { Write-Host ("   - " + $_) -ForegroundColor Yellow }
-            Write-Host " 建议重新渲染为恒定帧率（CFR）再继续，或在对应线路添加 ffmpeg/VS/AVS 滤镜组矫正" -ForegroundColor Yellow
-            $quotedVideoSource = Get-QuotedPath $videoSource
             $rNum = $script:fpsParams.rNumerator
             $rDnm = $script:fpsParams.rDenumerator
+
+            Show-Warning "源$mode，本程序暂无对策（强行编码可能会导致视频时长错误，随播放与音讯失联）"
+            $vReasons | ForEach-Object { Write-Host ("   - " + $_) -ForegroundColor Yellow }
+            Write-Host " 建议重新渲染为恒定帧率（CFR）再继续，或在对应线路添加 ffmpeg/VS/AVS 滤镜组矫正" -ForegroundColor Yellow
             Write-Host " 例：渲染并编码为 FFV1 无损视频："
             Write-Host "   - ffmpeg -i $quotedVideoSource -r $rNum/$rDnm -c:v ffv1 -level 3 -context 1 -g 180 -c:a copy output.mkv" -ForegroundColor Magenta
             Write-Host " 例：测量视频帧以确定 VFR："
@@ -283,17 +258,17 @@ function Get-VFRWarning {
             Write-Host "   - yyy：显示时长对不上帧率帧的总数" -ForegroundColor Magenta
             Read-Host " 按任意键继续..."
         }
-        else {
-            Show-Success "源$mode"
-        }
+        else { Show-Success "源$mode" }
     }
-    catch {
-        throw ("Get-VFRWarning：" + $_)
-    }
+    catch { throw ("Get-VFRWarning：" + $_) }
 }
 
 function Get-NonSquarePixelWarning {
-    param ([Parameter(Mandatory=$true)]$ffprobeStreamInfo)
+    param (
+        [Parameter(Mandatory=$true)]$ffprobeStreamInfo,
+        [string]$videoSource,
+        [string]$quotedVideoSource
+    )
     
     try {
         $sampleAspectRatio = "1:1"
@@ -304,12 +279,10 @@ function Get-NonSquarePixelWarning {
             Show-Warning "Get-NonSquarePixelWarning：源的变宽比（SAR）数据损坏，将默认为 1:1"
         }
         
-        if ($sampleAspectRatio -notlike "1:1") {
-            Show-Warning "源的变宽比（SAR）非 1:1（$sampleAspectRatio 的长方形像素）"
-            Write-Host " 本程序暂无对策（强行编码会恢复到方形像素，致画面缩宽），" -ForegroundColor Yellow
-            Write-Host " 请手动修正元数据，或在对应线路添加 ffmpeg/VS/AVS 滤镜组矫正" -ForegroundColor Yellow
-            Write-Host " 手动指定元数据的矫正方法："
-            $quotedVideoSource = Get-QuotedPath $videoSource
+        if ($sampleAspectRatio -notlike "1:1" -and $sampleAspectRatio -ne "0:1") {
+            Show-Warning "源的变宽比（SAR）为 $sampleAspectRatio （非 1:1 方形象素）"
+            Write-Host " 本程序暂无对策（强行编码会恢复到方形象素，致画面缩宽），" -ForegroundColor Yellow
+            Write-Host " 手动矫正方法："
             $e = @(
                 " 1. ffmpeg -i $quotedVideoSource -c copy -aspect $sampleAspectRatio output.mkv",
                 " 2. MP4Box -par 1=$sampleAspectRatio $quotedVideoSource -out output.mp4",
@@ -323,9 +296,7 @@ function Get-NonSquarePixelWarning {
             Read-Host " 按任意键继续..."
         }
     }
-    catch {
-        throw ("Get-NonSquarePixelWarning：" + $_)
-    }
+    catch { throw ("Get-NonSquarePixelWarning：" + $_) }
 }
 
 # 利用 ffprobe 验证视频文件封装格式，无视后缀名（封装格式用大写字母表示）
@@ -792,8 +763,8 @@ function Main {
     # Write-Host $streamInfo
 
     # 检测可变帧率源、非方形像素源并告警
-    Get-VFRWarning -ffprobeStreamInfo $streamInfo
-    Get-NonSquarePixelWarning -ffprobeStreamInfo $streamInfo
+    Get-VFRWarning -ffprobeStreamInfo $streamInfo -quotedVideoSource $quotedVideoSource
+    Get-NonSquarePixelWarning -ffprobeStreamInfo $streamInfo -quotedVideoSource $quotedVideoSource
 
     Write-Host ("─" * 50)
 

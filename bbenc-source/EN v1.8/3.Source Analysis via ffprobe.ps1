@@ -144,7 +144,8 @@ function Get-VideoStreamInfo {
 function Get-VFRWarning {
     param (
         [Parameter(Mandatory=$true)]$ffprobeStreamInfo,
-        [double]$RelativeTolerance = 0.000000001
+        [double]$RelativeTolerance = 0.000000001,
+        [Parameter(Mandatory=$true)][string]$quotedVideoSource
     )
     Show-Info "Get-VFRWarning: Validating if video frame rate is variable..."
     
@@ -179,7 +180,6 @@ function Get-VFRWarning {
 
         # Reasons and possibility score for determining if a video is VFR
         $vReasons = @()
-        $cReasons = @()
         $score = 0
 
         # 1. Compare base fps to average fps
@@ -190,13 +190,6 @@ function Get-VFRWarning {
                 $score += 1
                 $vReasons += "Base fps ($rFps) differs from avg. fps ($aFps)"
             }
-            else {
-                $cReasons += "Base fps is equal to avg. fps"
-            }
-        }
-        else {
-            $cReasons +=
-                "Could not process base fps (r_frame_rate) or avg. fps (avg_frame_rate), could be N/A"
         }
 
         # 2. Compare estimated frame rate with average frame rate
@@ -205,9 +198,6 @@ function Get-VFRWarning {
             if ($relDiff2 -gt $RelativeTolerance) {
                 $score += 2
                 $vReasons += "Estimated fps ($eFps) differs from avg. fps ($aFps)"
-            }
-            else {
-                $cReasons += "Estimated fps is equal to avg. fps"
             }
         }
 
@@ -229,29 +219,14 @@ function Get-VFRWarning {
                 $vReasons += "Relatively big avg. fps denumerator ($aDnm)"
             }
         }
-        else {
-            $cReasons += "Relatively normal avg. fps denumerator ($aDnm)"
-        }
 
         # Final decision mapping
         $mode = "[is] constant Frame Rate (CFR)"
         # $confidence = "High"
-        if ($score -ge 5) {
-            $mode = "[is] variable Frame Rate (VFR)"
-            # $confidence = "Confirmed"
-        }
-        if ($score -ge 4) {
-            $mode = "[very likely to be] variable Frame Rate (VFR)"
-            # $confidence = "High"
-        }
-        elseif ($score -ge 2) {
-            $mode = "[could be] variable Frame Rate (VFR)"
-            # $confidence = "Med"
-        }
-        elseif ($score -gt 0) {
-            $mode = "[has signs of being] variable frame rate (VFR)"
-            # $confidence = "Low"
-        }
+        if ($score -ge 5) { $mode = "[is] variable Frame Rate (VFR)" } # $confidence = "Confirmed"
+        if ($score -ge 4) { $mode = "[very likely to be] variable Frame Rate (VFR)" } # $confidence = "High"
+        elseif ($score -ge 2) { $mode = "[could be] variable Frame Rate (VFR)" } # $confidence = "Med"
+        elseif ($score -gt 0) { $mode = "[has signs of being] variable frame rate (VFR)" } # $confidence = "Low"
         # else {
         #     $mode = "[is] constant Frame Rate (CFR)"
         #     $confidence = "High"
@@ -266,15 +241,14 @@ function Get-VFRWarning {
         #     avg_fps        = if ($aFps) {$aFps} else {"N/A"}
         #     computed_fps   = if ($eFps) {$eFps} else {"N/A"}
         #     vfr_reasons    = $vReasons
-        #     cfr_reasons    = $cReasons
         # }
         if ($score -gt 0) {
+            $rNum = $script:fpsParams.rNumerator
+            $rDnm = $script:fpsParams.rDenumerator
+
             Show-Warning "Source $mode. This program does not support VFR alignment (Force encoding may leads to duration misalign inbetween video & audio as video progresses)"
             $vReasons | ForEach-Object { Write-Host ("   - " + $_) -ForegroundColor Yellow }
             Write-Host " Recommending to re-render to constant frame rate (CFR) before proceed, or ffmpeg/VS/AVS filters" -ForegroundColor Yellow
-            $quotedVideoSource = Get-QuotedPath $videoSource
-            $rNum = $script:fpsParams.rNumerator
-            $rDnm = $script:fpsParams.rDenumerator
             Write-Host " i.e.: Render and encode to FFV1 lossless video:"
             Write-Host "   - ffmpeg -i $quotedVideoSource -r $rNum/$rDnm -c:v ffv1 -level 3 -context 1 -g 180 -c:a copy output.mkv" -ForegroundColor Magenta
             Write-Host " i.e.: Measure video frame to detect VFR:"
@@ -283,19 +257,19 @@ function Get-VFRWarning {
             Write-Host "   - y：Frames with unmatching display durations" -ForegroundColor Magenta
             Read-Host " Press any key to continue..."
         }
-        else {
-            Show-Success "Source $mode"
-        }
+        else { Show-Success "Source $mode" }
     }
-    catch {
-        throw ("Get-VFRWarning：" + $_)
-    }
+    catch { throw ("Get-VFRWarning：" + $_) }
 }
 
 # Use ffprobe to detect the actual video file container format,
 # ignoring the file extension (the container format is represented by uppercase letters).
 function Get-NonSquarePixelWarning {
-    param ([Parameter(Mandatory=$true)]$ffprobeStreamInfo)
+    param (
+        [Parameter(Mandatory=$true)]$ffprobeStreamInfo,
+        [string]$videoSource,
+        [string]$quotedVideoSource
+    )
     
     try {
         $sampleAspectRatio = "1:1"
@@ -306,12 +280,11 @@ function Get-NonSquarePixelWarning {
             Show-Warning "Get-NonSquarePixelWarning: sample aspect radio (SAR) is missing or corrupted, defaulting to 1:1"
         }
 
-        if ($sampleAspectRatio -notlike "1:1") {
-            Show-Warning "$videoSource has a $sampleAspectRatio sample aspect ratio (non-square pixel)"
-            Write-Host " This program does not support SAR handling" -ForegroundColor Yellow
+        if ($sampleAspectRatio -notlike "1:1" -and $sampleAspectRatio -ne "0:1") {
+            Show-Warning "$videoSource has a $sampleAspectRatio SAR (non-square pixel)"
+            Write-Host " This program does not support SAR handling." -ForegroundColor Yellow
             Write-Host " (encodes to square pixel, width shrinks)" -ForegroundColor Yellow
-            Write-Host " you may correct this manually, or specify ffmpeg/VS/AVS filters" -ForegroundColor Yellow
-            Write-Host " Manually attach correcting metadata examples:" -ForegroundColor Magenta
+            Write-Host " Example fix:" -ForegroundColor Magenta
             $e = @(
                 " 1. ffmpeg -i $quotedVideoSource -c copy -aspect $sampleAspectRatio output.mkv",
                 " 2. MP4Box -par 1=$sampleAspectRatio $quotedVideoSource -out output.mp4",
@@ -325,9 +298,7 @@ function Get-NonSquarePixelWarning {
             Read-Host " Press any button to continue..."
         }
     }
-    catch {
-        throw ("Get-NonSquarePixelWarning：" + $_)
-    }
+    catch { throw ("Get-NonSquarePixelWarning：" + $_) }
 }
 
 # Use ffprobe to detect the actual video file container format, ignoring the file extension (the container format is represented by uppercase letters)
@@ -795,8 +766,8 @@ function Main {
     # Write-Host $streamInfo
 
     # Detect non-square pixel source, source container format and warn
-    Get-VFRWarning -ffprobeStreamInfo $streamInfo
-    Get-NonSquarePixelWarning -ffprobeStreamInfo $streamInfo
+    Get-VFRWarning -ffprobeStreamInfo $streamInfo -quotedVideoSource $quotedVideoSource
+    Get-NonSquarePixelWarning -ffprobeStreamInfo $streamInfo -quotedVideoSource $quotedVideoSource
 
     Write-Host ("─" * 50)
 
