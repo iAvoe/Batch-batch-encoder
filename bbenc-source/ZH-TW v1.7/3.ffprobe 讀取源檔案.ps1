@@ -580,7 +580,7 @@ function Main {
             Show-Info '導入或同時生成 AviSynth 和 VapourSynth 腳本'
             $mode = Read-Host " 輸入 'y' 為影片源生成無濾鏡腳本，輸入 'n' 或 Enter 導入自訂腳本"
         
-            if ([string]::IsNullOrWhiteSpace($mode) -or 'n' -eq $mode) { # 導入自訂腳本
+            if ([string]::IsNullOrWhiteSpace($mode) -or 'n' -eq $mode) {
                 Show-Warning "由於腳本支持的導入源路徑的種類繁多，條件組合過於複雜，無法驗證；請自行檢查影片源是否真實存在"
                 do {
                     $scriptSource = Select-File -Title "定位腳本文件（.avs/.vpy...）"
@@ -604,7 +604,6 @@ function Main {
             
                 Show-Success "已選擇腳本文件：$scriptSource"
             }
-            # 生成無濾鏡腳本
             elseif ('y' -eq $mode) {
                 if (Test-NullablePath 'C:\Program Files (x86)\AviSynth+\plugins64+\LSMASHSource.dll') {
                     Show-Success "檢測到 C:\Program Files (x86)\AviSynth+\plugins64+\ 下已有 LSMASHSource.dll，無需配置"
@@ -837,7 +836,7 @@ function Main {
 
     # 執行 ffprobe 並插入影片源路徑
     try {
-        Write-Host $ffprobeArgs
+        Write-Host $ffprobeArgs -ForegroundColor Green
         $ffprobeOutputJson = (& $ffprobePath @ffprobeArgs) -join "`n"
         
         # 構建源資訊對象
@@ -865,7 +864,7 @@ function Main {
         }
     }
     catch { 
-        throw ("ffprobe 執行或導出失敗：" + $_) 
+        throw ("ffprobe 執行或 JSON 導出失敗：" + $_) 
     }
 
     Write-Host ''

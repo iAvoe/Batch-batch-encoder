@@ -2,14 +2,14 @@
 .SYNOPSIS
     FFProbe source analyzer script
 .DESCRIPTION
-    Analyzes the source video and exports file to %USERPROFILE%\temp_v_info(_is_mov).csv, i.e., width, height, csp info, sei info, etc.
+    Analyzes the source video and exports file to %USERPROFILE%\temp_v_info(_is_mov).json, i.e., width, height, csp info, sei info, etc.
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
     1.7
 #>
 
-# If both temp_v_info_is_mov.csv and temp_v_info.csv are detected, use the file created latest
+# If both temp_v_info_is_mov.json and temp_v_info.json are detected, use the file created latest
 
 # Load globals, including $utf8NoBOM、Get-QuotedPath、Select-File、Select-Folder...
 . "$PSScriptRoot\Common\Core.ps1"
@@ -92,7 +92,7 @@ function Test-IsLikePrime {
 function Get-VideoStreamInfo {
     param (
         [Parameter(Mandatory=$true)][string]$ffprobePath,
-        [Parameter(Mandatory=$true)][string]$videoSource,
+        [Parameter(Mandatory=$true)][string]$videoSource, # Do not supply quoted path
         [string]$showEntries = "stream"
     )
     if (-not (Test-NullablePath $ffprobePath)) {
@@ -334,7 +334,7 @@ function Get-NonSquarePixelWarning {
 function Test-VContainerFormat {
     param (
         [Parameter(Mandatory = $true)][string]$ffprobePath,
-        [Parameter(Mandatory = $true)][string]$videoSource
+        [Parameter(Mandatory = $true)][string]$videoSource # Do not supply quoted path
     )
     Show-Info "Test-VContainerFormat: Validating if container format is genuine..."
     
@@ -477,7 +477,7 @@ function Main {
     $toolsJson = Join-Path $Global:TempFolder "tools.json"
     
     Show-Border
-    Show-info (" ffprobe source analyzer, exports " + $Global:TempFolder + "temp_v_info(_is_mov).csv`r`n for later script to take reference on")
+    Show-info (" ffprobe video analyzer, exports " + $Global:TempFolder + "temp_v_info(_is_mov).json`r`n for later scripts' reference")
     Show-Border
     Write-Host ''
 
@@ -506,7 +506,7 @@ function Main {
         }
     }
     
-    # Get upstream tool code（(from CSV); Import DDL for Avs2PipeMod
+    # Get upstream tool code（(from JSON); Import DDL for Avs2PipeMod
     $upstreamCode = $null
     $Avs2PipeModDLL = $null
     $OneLineShotArgsINI = $null
@@ -565,7 +565,7 @@ function Main {
     
     # Define IO Variables
     $videoSource = $null # ffprobe will analyze this one
-    $scriptSource = $null # script source for encoding, but cannot be read by ffprobe
+    $scriptSource = $null # script source, overrides video source in json export
     $encodeImportSourcePath = $null
     $svfiTaskId = $null
 
@@ -580,10 +580,10 @@ function Main {
             }
         
             # Ask user to generate or import existing script
-            Show-Info "Select the preferred AVS/VS script usage..."
-            $mode = Read-Host " Input 'y' to import a custom script; 'n'/Enter to generate a filter-less script"
+            Show-Info "Import one or generate both AviSynth and VapourSynth filter-less scripts"
+            $mode = Read-Host " Input 'y' to generate script, 'n'/Enter to import a custom script"
         
-            if ($mode -eq 'y') { # Custom script
+            if ([string]::IsNullOrWhiteSpace($mode) -or 'n' -eq $mode) {
                 Show-Warning "Due to the wide variety of import source paths supported by the script, the conditions are too complex to validate, please check whether source video exists manually."
                 do {
                     $scriptSource = Select-File -Title "Locate the script file (.avs/.vpy...)"
@@ -606,10 +606,9 @@ function Main {
                 while (-not $scriptSource)
 
                 Show-Success "Script source selected: $scriptSource"
-                # Note: $videoSource is still going to be for ffprobe
             }
             # Generate filter-less script
-            elseif ([string]::IsNullOrWhiteSpace($mode) -or $mode -eq 'n') {
+            elseif ('y' -eq $mode) {
                 if (Test-NullablePath 'C:\Program Files (x86)\AviSynth+\plugins64+\LSMASHSource.dll') {
                     Show-Success "LSMASHSource.dll is detected under C:\Program Files (x86)\AviSynth+\plugins64+\, all set"
                 }
@@ -650,7 +649,7 @@ function Main {
     elseif ($OneLineShotArgsINI -and (Test-Path -LiteralPath $OneLineShotArgsINI)) {
         # SVFI's source path config within ini file (actually its one-liner)：gui_inputs="{
         #     \"inputs\": [{
-        #         \"task_id\": \"...\",
+        #         \"task_id\": \* Requird field to be exported to json\",
         #         \"input_path\": \"X:\\\\Video\\\\\\u5176\\u5b83-\\u52a8\\u6f2b\\u753b\\u516c\\u79cd\\\\Video.mp4\",
         #         \"is_surveillance_folder\": false
         #     }]
@@ -742,7 +741,16 @@ function Main {
 
         $encodeImportSourcePath = $videoSource
     }
+    $quotedVideoSource = Get-QuotedPath $videoSource
 
+    $ffprobeArgs = @(
+        '-i', $quotedVideoSource,
+        '-select_streams', 'v:0',
+        '-v', 'error', '-hide_banner',
+        '-show_streams',
+        '-show_frames', '-read_intervals', "%+#1"
+        '-of', 'json'
+    )
     Write-Host ("─" * 50)
 
     Show-Info "Locating ffprobe.exe..."
@@ -781,13 +789,10 @@ function Main {
     }
 
     Write-Host ("─" * 50)
-
-    $streamInfo = Get-VideoStreamInfo -ffprobePath $ffprobePath -videoSource $videoSource `
-        -showEntries "stream=r_frame_rate,avg_frame_rate,nb_frames,duration,sample_aspect_ratio"
-    Show-Debug "Frame rate, Avg. frame rate, total frames, duration, sample aspect ratio:"
-    Write-Host $streamInfo
-
-    Write-Host ("─" * 50)
+    # Observation only, not for final export, does not support $quotedVideoSource as param input
+    $streamInfo = Get-VideoStreamInfo -ffprobePath $ffprobePath -videoSource $videoSource -showEntries "stream=r_frame_rate,avg_frame_rate,nb_frames,duration,sample_aspect_ratio"
+    # Show-Debug "Frame rate, Avg. frame rate, total frames, duration, sample aspect ratio:"
+    # Write-Host $streamInfo
 
     # Detect non-square pixel source, source container format and warn
     Get-VFRWarning -ffprobeStreamInfo $streamInfo
@@ -795,7 +800,7 @@ function Main {
 
     Write-Host ("─" * 50)
 
-    # Detect if video container format is genuine
+    # Detect if video container format is genuine, does not support $quotedVideoSource as param input
     $realFormatName = Test-VContainerFormat -ffprobePath $ffprobePath -videoSource $videoSource
     $isMOV = ($realFormatName -like "MOV")
     $isVOB = ($realFormatName -like "VOB")
@@ -803,88 +808,63 @@ function Main {
     # elseif ($isVOB -like "VOB") { Show-Debug "The imported video $videoSource is in VOB format" }
     # else { Show-Debug "The imported video $videoSource is not in MOV or VOB format" }
 
-    # Select ffprobe command and define the filename according to container format
-    $ffprobeArgs =
-        if ($isMOV) {@(
-            '-i', $videoSource, '-select_streams', 'v:0', '-v', 'error', '-hide_banner', '-show_streams', '-show_entries',
-            'stream=width,height,pix_fmt,color_space,color_transfer,color_primaries,field_order,avg_frame_rate,nb_frames', '-of', 'csv'
-        )} # A      B     C      D       E           F              G               H           I              J
-        elseif ($isVOB) {@(
-            '-i', $videoSource, '-select_streams', 'v:0', '-v', 'error', '-hide_banner', '-show_streams', '-show_entries',
-            'stream=width,height,pix_fmt,color_space,color_transfer,color_primaries,field_order,avg_frame_rate,nb_frames', '-of', 'csv'
-        )} # A      B     C      D       E           F              G               H           I              J
-        else {@(
-            '-i', $videoSource, '-select_streams', 'v:0', '-v', 'error', '-hide_banner', '-show_streams', '-show_entries',
-            'stream=width,height,pix_fmt,color_space,color_transfer,color_primaries,avg_frame_rate,nb_frames,interlaced_frame,top_field_first:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng',
-            '-of', 'csv'
-        )} # A      B     C      D       E           F              G               H              I         J                K
-    # $ffprobeArgsDebug =
-    #    if ($isMOV) {@(
-    #        '-i', $videoSource, '-select_streams', 'v:0', '-v', 'error', '-hide_banner', '-show_streams', '-show_entries',
-    #        'stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries', '-of', 'ini'
-    #    )}
-    #    else {@(
-    #        '-i', $videoSource, '-select_streams', 'v:0', '-v', 'error', '-hide_banner', '-show_streams', '-show_entries',
-    #        'stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng',
-    #        '-of', 'ini'
-    #    )}
-    
-    # Since ffprobe outputs different numbers of columns from different sources,
-    # causing random misalignment (by extra source information)
-    # A separate CSV (s_info) is needed to store the source information
-    $sourceCSVExportPath = Join-Path $Global:TempFolder "temp_s_info.csv"
-    $ffprobeCSVExportPath =
+    # ffprobe output is different for different formats, leading to misalignment, it was a mistake for using keyless format (-of csv)
+    $sourceJsonExportPath = Join-Path $Global:TempFolder "temp_s_info.json"
+    $ffprobeJsonExportPath =
         if ($isMOV) {
-            Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_mov.csv"
+            Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_mov.json"
         }
         elseif ($isVOB) {
-            Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_vob.csv"
+            Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_vob.json"
         }
         else {
-            Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info.csv"
+            Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info.json"
         }
-    # $ffprobeCSVExportPathDebug =
+    # $ffprobeJsonExportPathDebug =
     #     if ($isMOV) {
-    #         Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_mov_debug.csv"
+    #         Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_mov_debug.json"
     #     }
     #     else {
-    #         Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_debug.csv"
+    #         Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_debug.json"
     #     }
 
     # If the CSV file already exists, manually confirm and delete
-    Confirm-FileDelete (Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_mov.csv")
-    Confirm-FileDelete (Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_vob.csv")
-    Confirm-FileDelete (Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info.csv")
-    Confirm-FileDelete $sourceCSVExportPath
+    Confirm-FileDelete (Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_mov.json")
+    Confirm-FileDelete (Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_vob.json")
+    Confirm-FileDelete (Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info.json")
+    Confirm-FileDelete $sourceJsonExportPath
 
     # Execute ffprobe with video source path provided
     try {
-        $ffprobeOutputCSV = (& $ffprobePath @ffprobeArgs).Trim()
-        # $ffprobeOutputCSVDebug = (& $ffprobePath @ffprobeArgsDebug).Trim()
+        Write-Host $ffprobeArgs -ForegroundColor Green
 
-        # Construct source CSV row
-        $sourceInfoCSV = @"
-"$encodeImportSourcePath",$upstreamCode,"$Avs2PipeModDLL","$OneLineShotArgsINI","$svfiTaskId"
-"@
+        $ffprobeOutputJson = (& $ffprobePath @ffprobeArgs) -join "`n"
         
-        Write-TextFile -Path $ffprobeCSVExportPath -Content $ffprobeOutputCSV -UseBOM $true
-        # [System.IO.File]::WriteAllLines($ffprobeCSVExportPathDebug, $ffprobeOutputCSVDebug)
-
-        Write-TextFile -Path $sourceCSVExportPath -Content $sourceInfoCSV -UseBOM $true
-        Show-Success "CSV file created:`r`n $ffprobeCSVExportPath`r`n $sourceCSVExportPath"
-
+        # Create source info object
+        $sourceInfoObject = @{
+            SourcePath       = $encodeImportSourcePath
+            UpstreamCode     = $upstreamCode
+            Avs2PipeModDllPath = $Avs2PipeModDLL
+            SvfiInputConf    = $OneLineShotArgsINI
+            SvfiTaskId       = $svfiTaskId
+        }
+        
+        # Create ffprobe JSON, source info JSON
+        Write-TextFile -Path $ffprobeJsonExportPath -Content $ffprobeOutputJson -UseBOM $true
+        Write-JsonFile -Path $sourceJsonExportPath -Object $sourceInfoObject
+        Show-Success "JSON file created: `r`n $ffprobeJsonExportPath`r`n $sourceJsonExportPath"
         Write-Host ("─" * 50)
-
-        # Check line breaks (must be CRLF)
-        Show-Debug "Validating file format..."
-        if (-not (Test-TextFileFormat -Path $ffprobeCSVExportPath)) {
+        
+        # 验证 JSON 文件格式（使用新的函数）
+        Show-Debug "Validating JSON format..."
+        if (-not (Test-JsonFileFormat -Path $ffprobeJsonExportPath)) {
             return
         }
-        if (-not (Test-TextFileFormat -Path $sourceCSVExportPath)) {
+        if (-not (Test-JsonFileFormat -Path $sourceJsonExportPath)) {
             return
         }
     }
-    catch { throw ("ffprobe execution failed: " + $_) }
+    catch { throw ("ffprobe execution or JSON export failed: " + $_) }
 
     Write-Host ''
     Show-Success "Script Completed!"
