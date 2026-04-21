@@ -233,7 +233,7 @@ function Get-EncodingIOArgument {
         if ($isx265) {
             Show-Warning "Get-EncodingIOArgument: x265 隔行扫描编码支持是实验性功能"
         }
-        if ($showIVTCGuide) {
+        if ($showIvtcGuide) {
             Show-Info ("转逐行与 IVTC 滤镜教程: " + $script:interlacedArgs.toPFilterTutorial)
             Write-Host ''
         }

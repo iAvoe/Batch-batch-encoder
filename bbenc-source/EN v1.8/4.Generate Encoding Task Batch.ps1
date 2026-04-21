@@ -234,7 +234,7 @@ function Get-EncodingIOArgument {
         if ($isx265) {
             Show-Warning "Get-EncodingIOArgument: x265 interlacing support is experimental"
         }
-        if ($showIVTCGuide) {
+        if ($showIvtcGuide) {
             Show-Info ("转逐行与 IVTC 滤镜教程: " + $script:interlacedArgs.toPFilterTutorial)
             Write-Host ''
         }
