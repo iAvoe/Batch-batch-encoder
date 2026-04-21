@@ -718,10 +718,7 @@ function Get-RateControlLookahead { # 1.8*fps
 }
 
 function Get-x265MERange {
-    Param (
-        [Parameter(Mandatory=$true)]$w,
-        [Parameter(Mandatory=$true)]$h
-    )
+    Param ([Parameter(Mandatory=$true)]$w, [Parameter(Mandatory=$true)]$h)
     [int]$res = 0
     try {
         $width = [int]$w
@@ -1139,7 +1136,7 @@ function Get-EncoderAVSRawCSPBits {
 function Get-IsPlaceHolderSource {
     Param(
         [Parameter(Mandatory=$true)][string]$defaultName,
-        [Parameter(Mandatory=$true)]$sourceJson  # 添加参数
+        [Parameter(Mandatory=$true)]$sourceJson
     )
     return [string]::IsNullOrWhiteSpace($defaultName) -or
         $defaultName -match '^(blank_.*|.*_script)$' -or
@@ -1311,7 +1308,7 @@ function Main {
         throw "无法解析源专用 JSON 或找不到信息，请运行步骤 3 脚本以补全"
     }
     if (-not $sourceJson.SourcePath) { # 检查视频/VS/AVS 源有值即可
-        throw "temp_s_info.json 数据不完整，请重运行步骤 3 脚本以补全"
+        throw "temp_s_info.json 数据不完整，请运行步骤 3 脚本以补全"
     }
     # 视频流（通常是 streams 数组中 codec_type 为 video 的项）
     $videoStream = $ffprobeJson.streams | Where-Object { $_.codec_type -eq 'video' } | Select-Object -First 1
@@ -1340,7 +1337,7 @@ function Main {
     Write-Host ("─" * 50)
     
     # 计算并赋值给对象属性
-    Show-Info "正在优化编码参数（分辨率、动态搜索范围等）..."
+    Show-Info "正在优化编码参数..."
     # $x265Params.Profile = Get-x265SVTAV1Profile -PixelFormat $videoStream.pix_fmt -isIntraOnly $false -isSVTAV1 $false
     # $svtav1Params.Profile = Get-x265SVTAV1Profile -PixelFormat $videoStream.pix_fmt -isIntraOnly $false -isSVTAV1 $true
     $x265Params.Resolution = Get-InputResolution -w $videoStream.width -h $videoStream.height
@@ -1352,12 +1349,10 @@ function Main {
     $x265Params.SEICSP = Get-ColorSpaceSEI -ColorMatrix $videoStream.color_space -Transfer $videoStream.color_transfer -Primaries $videoStream.color_primaries -isx265
     $svtav1Params.SEICSP = Get-ColorSpaceSEI -ColorMatrix $videoStream.color_space -Transfer $videoStream.color_transfer -Primaries $videoStream.color_primaries -isSVTAV1
 
-    # VOB 的总帧数信息位于 J
     $x265Params.TotalFrames = Get-FrameCount -vidStream $videoStream
     $x264Params.TotalFrames = Get-FrameCount -vidStream $videoStream
     $svtav1Params.TotalFrames = Get-FrameCount -vidStream $videoStream -isSVTAV1 -showWarning
 
-    
     # x265 线程管理
     $x265Params.PME = Get-x265PME
     $x265Params.Pools = Get-x265ThreadPool

@@ -201,10 +201,11 @@ function Get-EncodingIOArgument {
         [Parameter(ParameterSetName="x265")][switch]$isx265,
         [Parameter(ParameterSetName="svtav1")][switch]$isSVTAV1,
         [string]$source, # Import path to file (with or without quotes)
-        [bool]$isImport = $true,
+        [switch]$isImport,
         [string]$outputFilePath, # Export directory, not used for import
         [string]$outputFileName, # Export filename, not used for import
-        [string]$outputExtension
+        [string]$outputExtension,
+        [switch]$showIvtcGuide
     )
     # Ensure only one switch is on
     $switchedOn = @(
@@ -226,15 +227,17 @@ function Get-EncodingIOArgument {
     $program = $switchedOn[0]
 
     # Warn encoder limitations on interlated sources
-    if ($script:interlacedArgs.isInterlaced) {
+    if (!$isImport -and !$isx264 -and $script:interlacedArgs.isInterlaced) {
         if ($isSVTAV1) { # Continue on error
-            Show-Error "Get-EncodingIOArgument: SVT-AV1 does not support interlaced source"
+            Show-Warning "Get-EncodingIOArgument: SVT-AV1 does not support interlaced source"
         }
-        elseif ($isx265) {
-            Show-Warning "Get-EncodingIOArgument: x265 interlaced support is experimental"
+        if ($isx265) {
+            Show-Warning "Get-EncodingIOArgument: x265 interlacing support is experimental"
         }
-        Show-Info ("Deinterlacing & IVTC filtering tutorial: " + $script:interlacedArgs.toPFilterTutorial)
-        Write-Host ''
+        if ($showIVTCGuide) {
+            Show-Info ("转逐行与 IVTC 滤镜教程: " + $script:interlacedArgs.toPFilterTutorial)
+            Write-Host ''
+        }
     }
 
     # Interlaced specifier params
@@ -290,7 +293,7 @@ function Get-EncodingIOArgument {
         switch -Wildcard ($program) {
             'ffmpeg' { return "-i $quotedInput" }
             'svfi' { return "--input $quotedInput" }
-            # $sourceCSV.sourcePath accepts only .vpy/.avs files,
+            # $sourceJson.sourcePath accepts only .vpy/.avs files,
             # but upstream steps may include an toolchain incompatible with script
             # While auto-generated placeholder script source provide both scripts,
             # specifying custom scripts bypasses it.
@@ -356,9 +359,9 @@ function Get-x264BaseParam {
     $enableFGO = $false
     if ($askUserFGO -and -not $isHelp) {
         Write-Host ''
-        Write-Host " Some modified x264 supports high-freq rate-distortion opt. (Film Grain Opt.), enabling is recommended" -ForegroundColor Cyan
+        Write-Host " Some mod-x264 supports high-freq rate-distortion optimization (Film Grain Opt.), recommending to enable" -ForegroundColor Cyan
         Write-Host " Test with 'x264.exe --fullhelp | findstr fgo' to verify if its supported (shows up)" -ForegroundColor DarkGray
-        if ((Read-Host " Input 'y' to add '--fgo' for better image, or Enter to disable (disable if unsure / can't confim)") -match '^[Yy]$') {
+        if ((Read-Host " Input 'y' to add '--fgo' for better image, or Enter to disable (disable if unsure/can't confim)") -match '^[Yy]$') {
             $enableFGO = $true
             Show-Info "Enabled x264 parameter --fgo"
         }
@@ -706,10 +709,10 @@ function Get-RateControlLookahead { # 1.8*fps
     Param (
         [Parameter(Mandatory=$true)][string]$fpsString,
         [Parameter(Mandatory=$true)][int]$bframes,
-        [double]$second = 1.8
+        [double]$durationSecond = 1.8
     )
     try {
-        $frames = [math]::Round(((ConvertTo-Fraction $fpsString) * $second))
+        $frames = [math]::Round(((ConvertTo-Fraction $fpsString) * $durationSecond))
         # must be greater than --bframes
         $frames = [math]::max($frames, $bframes+1)
         return "--rc-lookahead $frames"
@@ -721,18 +724,15 @@ function Get-RateControlLookahead { # 1.8*fps
 }
 
 function Get-x265MERange {
-    Param (
-        [Parameter(Mandatory=$true)]$CSVw,
-        [Parameter(Mandatory=$true)]$CSVh
-    )
+    Param ([Parameter(Mandatory=$true)]$w, [Parameter(Mandatory=$true)]$h)
     [int]$res = 0
     try {
-        $width = [int]$CSVw
-        $height = [int]$CSVh
+        $width = [int]$w
+        $height = [int]$h
         $res = $width * $height
     }
     catch {
-        throw "Unable to resolve video resolution: width=$CSVw, height=$CSVh"
+        throw "Unable to resolve video resolution: width=$w, height=$h"
     }
     if ($res -ge 8294400) { return "--merange 56" } # >=3840x2160
     elseif ($res -ge 3686400) { return "--merange 52" } # >=2560*1440
@@ -816,49 +816,47 @@ function Get-x265ThreadPool {
 # Problem: total frames can reside in .I, .AA-AJ ranges, but its location is random, we only know fake values are 0
 function Get-FrameCount {
     Param (
-        [Parameter(Mandatory=$true)]$ffprobeCSV, # Get fill CSV object
-        [bool]$isSVTAV1
+        [Parameter(Mandatory=$true)]$vidStream,
+        [switch]$isSVTAV1,
+        [switch]$showWarning
     )
-    
-    # All columns which can have total frame count（I, AA, AB, AC, AD, AE, AF, AG, AH, AI, AJ）
-    $frameCountColumns = @();
-    # VOB format only has J, with unrelated large integer around AA, never look there
-    if ($script:interlacedArgs.isVOB) {
-        $frameCountColumns = @('J');
+    if ($null -eq $vidStream) {
+        throw "Unable to parse ffprobe JSON or video stream information is missing. Recommending of re-exec step 3 script"
     }
-    else {
-        $frameCountColumns =
-            @('I') + (65..74 | ForEach-Object { [char]$_ } | ForEach-Object { "A$_" })
-    }
-    
-    # Check each column, use the 1st non-zero value
-    foreach ($column in $frameCountColumns) {
-        $frameCount = $ffprobeCSV.$column
-
-        # Find a number greater than 0
-        if ($frameCount -match "^\d+$" -and [int]$frameCount -gt 0) {
-            if ($isSVTAV1) { 
-                return "-n " + $frameCount 
-            }
-            return "--frames " + $frameCount
+    # Try nb_frames field and NUMBER_OF_FRAMES is tag
+    $frameCount =
+        if ($vidStream.nb_frames -and $vidStream.nb_frames -ne 'N/A') {
+            $vidStream.nb_frames
         }
+        elseif ($vidStream.tags.NUMBER_OF_FRAMES) {
+            $vidStream.tags.NUMBER_OF_FRAMES
+        }
+        else { $null }
+
+    if ($frameCount -match '^\d+$' -and [int]$frameCount -gt 0) {
+        if ($isSVTAV1) { return "-n $frameCount" }
+        else { return "--frames $frameCount" }
     }
-    return "" # Not found
+
+    if ($showWarning) { # Show only once via external caller
+        Show-Warning 'Get-FrameCount：Video frame count is missing or deleted, it will be impossible to estimate the encoding progress and ETA.'
+    }
+    return ""
 }
 
 function Get-InputResolution {
     Param (
-        [Parameter(Mandatory=$true)][int]$CSVw,
-        [Parameter(Mandatory=$true)][int]$CSVh,
+        [Parameter(Mandatory=$true)][int]$w,
+        [Parameter(Mandatory=$true)][int]$h,
         [bool]$isSVTAV1=$false
     )
-    if ($null -eq $CSVw -or $null -eq $CSVh) {
+    if ($null -eq $w -or $null -eq $h) {
         throw "Get-InputResolution：source video comes without frame size (width-height) metadata"
     }
     if ($isSVTAV1) {
-        return "-w $CSVw -h $CSVh"
+        return "-w $w -h $h"
     }
-    return "--input-res ${CSVw}x${CSVh}"
+    return "--input-res ${w}x${h}"
 }
 
 # Added support for fractional fps value in SVT-AV1 (directly preserved fraction strings)
@@ -906,9 +904,9 @@ function Get-FPSParam {
 # Get color matrix, trasnfer characteristics and color primaries
 function Get-ColorSpaceSEI {
     Param (
-        [Parameter(Mandatory=$true)]$CSVColorMatrix,
-        [Parameter(Mandatory=$true)]$CSVTransfer,
-        [Parameter(Mandatory=$true)]$CSVPrimaries,
+        [Parameter(Mandatory=$true)]$ColorMatrix,
+        [Parameter(Mandatory=$true)]$Transfer,
+        [Parameter(Mandatory=$true)]$Primaries,
         [switch]$isx264,
         [switch]$isx265,
         [switch]$isSVTAV1
@@ -920,53 +918,53 @@ function Get-ColorSpaceSEI {
 
     if ($isx264) {
         # Colormatrix
-        if (($CSVColorMatrix -eq "unknown") -or ($CSVColorMatrix -eq "bt2020nc")) {
+        if (($ColorMatrix -eq "unknown") -or ($ColorMatrix -eq "bt2020nc")) {
             $result += "--colormatrix undef" # x264 不写 unknown
         }
         else { # fcc，bt470bg，smpte170m，smpte240m，GBR，YCgCo，bt2020c，smpte2085，chroma-derived-nc，chroma-derived-c，ICtCp
-            $result += "--colormatrix $CSVColorMatrix"
+            $result += "--colormatrix $ColorMatrix"
         }
 
         # Transfer
-        if ($CSVTransfer -eq "unknown") {
+        if ($Transfer -eq "unknown") {
             # bt470m，bt470bg，smpte170m，smpte240m，linear，log100，log316，iec61966-2-4，bt1361e，iec61966-2-1，bt2020-10，bt2020-12，smpte2084，smpte428，arib-std-b67
             $result += "--transfer undef"
         }
         else {
-            $result += "--transfer $CSVTransfer"
+            $result += "--transfer $Transfer"
         }
 
         # Color Primaries
-        if (($CSVPrimaries -eq "unknown") -or ($CSVPrimaries -eq "unspec")) {
+        if (($Primaries -eq "unknown") -or ($Primaries -eq "unspec")) {
             $result += "--colorprim undef"
         }
         else {
-            $result += "--colorprim $CSVPrimaries"
+            $result += "--colorprim $Primaries"
         }
     }
     elseif ($isx265) {
         # Colormatrix
-        if ($CSVColorMatrix -eq "bt2020nc") {
+        if ($ColorMatrix -eq "bt2020nc") {
             $result += "--colormatrix unknown"
         }
         else { # ==x264
-            $result += "--colormatrix $CSVColorMatrix"
+            $result += "--colormatrix $ColorMatrix"
         }
 
         # Transfer
-        $result += "--transfer $CSVTransfer"
+        $result += "--transfer $Transfer"
 
         # Color Primaries
-        if (($CSVPrimaries -eq "unknown") -or ($CSVPrimaries -eq "unspec")) {
+        if (($Primaries -eq "unknown") -or ($Primaries -eq "unspec")) {
             $result += "--colorprim unknown"
         }
         else {
-            $result += "--colorprim $CSVPrimaries"
+            $result += "--colorprim $Primaries"
         }
     }
     elseif ($isSVTAV1) {
         # Color Matrix
-        $c = switch ($CSVColorMatrix) {
+        $c = switch ($ColorMatrix) {
             identity     { 0 }
             bt709        { 1 }
             unspec       { 2 }
@@ -982,14 +980,14 @@ function Get-ColorSpaceSEI {
             "chroma-cl"  { 13 }
             ictcp        { 14 }
             default { 
-                Show-Warning "Get-ColorSpaceSEI：Unknown color matrix: $CSVColorMatrix, using default (bt709)"
+                Show-Warning "Get-ColorSpaceSEI：Unknown color matrix: $ColorMatrix, using default (bt709)"
                 1
             }
         }
         $result += "--matrix-coefficients $c"
 
         # Transfer
-        $t = switch ($CSVTransfer) {
+        $t = switch ($Transfer) {
             bt709           { 1 }
             unspec          { 2 }
             bt470m          { 4 }
@@ -1007,14 +1005,14 @@ function Get-ColorSpaceSEI {
             smpte428        { 17 }
             hlg             { 18 }
             default { 
-                Show-Warning "Get-ColorSpaceSEI：Unknown transfer characteristics: $CSVTransfer, using default (bt709)"
+                Show-Warning "Get-ColorSpaceSEI：Unknown transfer characteristics: $Transfer, using default (bt709)"
                 1
             }
         }
         $result += "--transfer-characteristics $t"
 
         # Color Primaries
-        $p = switch ($CSVPrimaries) {
+        $p = switch ($Primaries) {
             bt709      { 1 }
             unspec     { 2 }
             unknown    { 2 }
@@ -1029,7 +1027,7 @@ function Get-ColorSpaceSEI {
             smpte432   { 12 }
             ebu3213    { 22 }
             default {
-                Show-Warning "Get-ColorSpaceSEI：Unknown color primaries: $CSVPrimaries, using default (bt709)"
+                Show-Warning "Get-ColorSpaceSEI：Unknown color primaries: $Primaries, using default (bt709)"
                 1
             }
         }
@@ -1051,22 +1049,22 @@ function Get-ffmpegCSP {
             "yuv444p","yuv444p10le","yuv444p12le",
             "gray","gray10le","gray12le",
             "nv12","nv16"
-        )][Parameter(Mandatory=$true)]$CSVpixfmt)
+        )][Parameter(Mandatory=$true)]$PixelFormat)
     # Remove any possible "-pix_fmt" prefixes (although its unlikely encounter)
-    $pixfmt = $CSVpixfmt -replace '^-pix_fmt\s+', ''
+    $pixfmt = $PixelFormat -replace '^-pix_fmt\s+', ''
     return "-pix_fmt " + $pixfmt
 }
 
 function Get-EncoderAVSRawCSPBits {
     Param (
-        [Parameter(Mandatory=$true)]$CSVpixfmt,
+        [Parameter(Mandatory=$true)]$PixelFormat,
         [bool]$isEncoderInput=$true,
         [bool]$isAvs2YuvInput=$false,
         [bool]$isSVTAV1=$false,
         [bool]$isAVSPlus=$true # Same default as declared in main
     )
     # Remove any possible "-pix_fmt" prefixes (although its unlikely encounter)
-    $pixfmt = $CSVpixfmt -replace '^-pix_fmt\s+', ''
+    $pixfmt = $PixelFormat -replace '^-pix_fmt\s+', ''
     $chromaFormat = $null
     $depth = 8
 
@@ -1147,10 +1145,13 @@ function Get-EncoderAVSRawCSPBits {
 # Since the auto-generated script source exists, the filename will become "blank_vs_script/blank_avs_script" instead of the video filename.
 # If a match is found, the default (Enter) option will be eliminated.
 function Get-IsPlaceHolderSource {
-    Param([Parameter(Mandatory=$true)][string]$defaultName)
+    Param(
+        [Parameter(Mandatory=$true)][string]$defaultName,
+        [Parameter(Mandatory=$true)]$sourceJson
+    )
     return [string]::IsNullOrWhiteSpace($defaultName) -or
         $defaultName -match '^(blank_.*|.*_script)$' -or
-        -not (Test-Path -LiteralPath $sourceCSV.SourcePath)
+        -not (Test-Path -LiteralPath $sourceJson.SourcePath)
 }
 
 # The pipeline type is simply determined by an elimination process
@@ -1160,30 +1161,30 @@ function Get-IsRAWSource ([string]$validateUpstreamCode) {
 }
 
 # Determine if file is VOB format ASAP (determined by the previous script, and written to filename)
-# this redefines the $ffprobeCSV variable structure, which affects numerous subsequent parameters
+# this redefines the $ffprobeJson variable structure, which affects numerous subsequent parameters
 function Set-IsVOB {
-    Param([Parameter(Mandatory=$true)][string]$ffprobeCsvPath)
-    if ([string]::IsNullOrWhiteSpace($ffprobeCsvPath)) {
-        throw "Set-IsVOB: parameter ffprobeCsvPath is empty, cannot detect"
+    Param([Parameter(Mandatory=$true)][string]$ffprobeJsonPath)
+    if ([string]::IsNullOrWhiteSpace($ffprobeJsonPath)) {
+        throw "Set-IsVOB: parameter ffprobeJsonPath is empty, cannot detect"
     }
-    $script:interlacedArgs.isVOB = $ffprobeCsvPath -like "*_vob*"
+    $script:interlacedArgs.isVOB = $ffprobeJsonPath -like "*_vob*"
 }
 
 # Determine if file is MOV format ASAP (determined by the previous script, and written to filename)
-# this redefines the $ffprobeCSV variable structure, which affects numerous subsequent parameters
+# this redefines the $ffprobeJson variable structure, which affects numerous subsequent parameters
 function Set-IsMOV {
-    Param([Parameter(Mandatory=$true)][string]$ffprobeCsvPath)
-    if ([string]::IsNullOrWhiteSpace($ffprobeCsvPath)) {
-        throw "Set-IsMOV：ffprobeCsvPath is empty, cannot detect"
+    Param([Parameter(Mandatory=$true)][string]$ffprobeJsonPath)
+    if ([string]::IsNullOrWhiteSpace($ffprobeJsonPath)) {
+        throw "Set-IsMOV：ffprobeJsonPath is empty, cannot detect"
     }
-    $script:interlacedArgs.isMOV = $ffprobeCsvPath -like "*_mov*"
+    $script:interlacedArgs.isMOV = $ffprobeJsonPath -like "*_mov*"
 }
 
 function Set-InterlacedArgs {
     Param(
         [Parameter(Mandatory=$true)]
-        [string]$fieldOrderOrIsInterlacedFrame, # VOB: $ffprobe.H；Other: $ffprobeCsv.J
-        [string]$tffAttribute # !MOV & !VOB: $ffprobeCsv.K
+        [string]$fieldOrderOrIsInterlacedFrame,
+        [string]$tffAttribute
     )
     # Initialize
     $script:interlacedArgs.isInterlaced = $false
@@ -1292,37 +1293,44 @@ function Main {
     Show-Border
     Write-Host ''
 
-    # 1. Locate the latest ffprobe CSV and read the video information
-    $ffprobeCsvPath = 
-        Get-ChildItem -Path $Global:TempFolder -Filter "temp_v_info*.csv" | 
+    # 1. Locate the latest ffprobe json and read the video information
+    $ffprobeJsonPath = 
+        Get-ChildItem -Path $Global:TempFolder -Filter "temp_v_info*.json" | 
         Sort-Object LastWriteTime -Descending | 
         Select-Object -First 1 | 
         ForEach-Object { $_.FullName }
 
-    if ($null -eq $ffprobeCsvPath) {
-        throw "Video CSV file from ffprobe (step 3) is missing; Please complete step 3 script"
+    if ($null -eq $ffprobeJsonPath) {
+        throw "Video JSON file from ffprobe (step 3) is missing; Please complete step 3 script"
     }
 
-    # 2. Locate source CSV
-    $sourceInfoCsvPath = Join-Path $Global:TempFolder "temp_s_info.csv"
-    if (-not (Test-Path $sourceInfoCsvPath)) {
-        throw "Stream CSV file from ffprobe (step 3) is missing; Please complete step 3 script"
+    # 2. Locate source json
+    $sourceJsonPath = Join-Path $Global:TempFolder "temp_s_info.json"
+    if (-not (Test-Path $sourceJsonPath)) {
+        throw "Stream JSON file from ffprobe (step 3) is missing; Please complete step 3 script"
     }
 
-    Write-Host ("─" * 50)
-    
-    Show-Info "Reading ffprobe data: $(Split-Path $ffprobeCsvPath -Leaf)..."
-    Show-Info "Reading source data: $(Split-Path $sourceInfoCsvPath -Leaf)..."
-    $ffprobeCSV =
-        Import-Csv $ffprobeCsvPath -Header A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,AA,AB,AC,AD,AE,AF,AG,AH,AI,AJ
-    $sourceCSV =
-        Import-Csv $sourceInfoCsvPath -Header SourcePath,UpstreamCode,Avs2PipeModDllPath,SvfiInputConf,SvfiTaskId
-
-    # Validate CSV data
-    if (-not $sourceCSV.SourcePath) { # Validate CSV field existance, no quote needed
-        throw "temp_s_info CSV data corrupted. Please rerun step 3 script"
+    $ffprobeJson = Read-JsonFile $ffprobeJsonPath
+    if ($null -eq $ffprobeJson) {
+        throw "Unable to parse ffprobe JSON or missing stream information, please re-exec step 3 script to recover"
     }
-
+    if (-not $ffprobeJson.PSObject.Properties.Name -contains 'width') {
+        throw "Invalid ffprobe JSON format, please re-exec step 3 script to recover"
+    }
+    $sourceJson = Read-JsonFile $sourceJsonPath
+    if ($null -eq $ffprobeJson) {
+        throw "Could not parse source JSON, please re-exec step 3 script to recover"
+    }
+    if (-not $sourceJson.SourcePath) { # Check source file field exists
+        throw "temp_s_info.json data is invalid, please re-exec step 3 script to recover"
+    }
+    # 视频流（通常是 streams 数组中 codec_type 为 video 的项）
+    $videoStream = $ffprobeJson.streams | Where-Object { $_.codec_type -eq 'video' } | Select-Object -First 1
+    # 定位首帧（用于获取隔行扫描等动态信息）
+    $firstFrame = $ffprobeJson.frames[0]
+    if ($null -eq $videoStream) {
+        throw "JSON 中未找到视频流信息"
+    }
     Write-Host ("─" * 50)
 
     # Interlaced source support
@@ -1330,38 +1338,36 @@ function Main {
     # avs2pipemod: y4mp, y4mt, y4mb (progressive, tff, bff)
     # x264: --tff, --bff
     # x265: --interlace 0 (progressive), 1 (tff), 2 (bff)
-    # SVT-AV1: Natively unsupported, show error and exit
+    # SVT-AV1: Natively unsupported
     Show-Info "Detecting interlaced formats..."
-    Set-IsVOB -ffprobeCsvPath $ffprobeCsvPath
-    Set-IsMOV -ffprobeCsvPath $ffprobeCsvPath
+    Set-IsVOB -ffprobeJsonPath $ffprobeJsonPath
+    Set-IsMOV -ffprobeJsonPath $ffprobeJsonPath
 
-    # MOV, VOB formats' field order data is in H
-    if (-not $script:interlacedArgs.isMOV -and -not $script:interlacedArgs.isVOB) {
-        Set-InterlacedArgs -fieldOrderOrIsInterlacedFrame $ffprobeCSV.H -tffAttribute $ffprobeCSV.J
+    if ($script:interlacedArgs.isMOV -and $script:interlacedArgs.isVOB) {
+        Set-InterlacedArgs -fieldOrderOrIsInterlacedFrame $videoStream.field_order
     }
     else {
-        Set-InterlacedArgs -fieldOrderOrIsInterlacedFrame $ffprobeCSV.H
+        Set-InterlacedArgs -fieldOrderOrIsInterlacedFrame $firstFrame.interlaced_frame -tffAttribute $firstFrame.top_field_first
     }
 
     Write-Host ("─" * 50)
     
     # Calculate and assign to object properties
     Show-Info "Optimizing encoding parameters..."
-    # $x265Params.Profile = Get-x265SVTAV1Profile -CSVpixfmt $ffprobeCSV.D -isIntraOnly $false -isSVTAV1 $false
-    # $svtav1Params.Profile = Get-x265SVTAV1Profile -CSVpixfmt $ffprobeCSV.D -isIntraOnly $false -isSVTAV1 $true
-    $x265Params.Resolution = Get-InputResolution -CSVw $ffprobeCSV.B -CSVh $ffprobeCSV.C
-    $svtav1Params.Resolution = Get-InputResolution -CSVw $ffprobeCSV.B -CSVh $ffprobeCSV.C -isSVTAV1 $true
-    $x265Params.MERange = Get-x265MERange -CSVw $ffprobeCSV.B -CSVh $ffprobeCSV.C
+    # $x265Params.Profile = Get-x265SVTAV1Profile -PixelFormat $videoStream.pix_fmt -isIntraOnly $false -isSVTAV1 $false
+    # $svtav1Params.Profile = Get-x265SVTAV1Profile -PixelFormat $videoStream.pix_fmt -isIntraOnly $false -isSVTAV1 $true
+    $x265Params.Resolution = Get-InputResolution -w $videoStream.width -h $videoStream.height
+    $svtav1Params.Resolution = Get-InputResolution -w $videoStream.width -h $videoStream.height -isSVTAV1 $true
+    $x265Params.MERange = Get-x265MERange -w $videoStream.width -h $videoStream.height
 
-    # Show-Debug "Color matrix: $($ffprobeCSV.E); Transfer: $($ffprobeCSV.F); Primaries: $($ffprobeCSV.G)"
-    $x264Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -isx264
-    $x265Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -isx265
-    $svtav1Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -isSVTAV1
+    # Show-Debug "矩阵格式：$($videoStream.color_space)；传输特质：$($videoStream.color_transfer)；三原色：$($videoStream.color_primaries)"
+    $x264Params.SEICSP = Get-ColorSpaceSEI -ColorMatrix $videoStream.color_space -Transfer $videoStream.color_transfer -Primaries $videoStream.color_primaries -isx264
+    $x265Params.SEICSP = Get-ColorSpaceSEI -ColorMatrix $videoStream.color_space -Transfer $videoStream.color_transfer -Primaries $videoStream.color_primaries -isx265
+    $svtav1Params.SEICSP = Get-ColorSpaceSEI -ColorMatrix $videoStream.color_space -Transfer $videoStream.color_transfer -Primaries $videoStream.color_primaries -isSVTAV1
 
-    # VOB format—frame count: J
-    $x265Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $false
-    $x264Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $false
-    $svtav1Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $true
+    $x265Params.TotalFrames = Get-FrameCount -vidStream $videoStream
+    $x264Params.TotalFrames = Get-FrameCount -vidStream $videoStream
+    $svtav1Params.TotalFrames = Get-FrameCount -vidStream $videoStream -isSVTAV1 -showWarning
 
     # x265 Threading
     $x265Params.PME = Get-x265PME
@@ -1377,45 +1383,38 @@ function Main {
                 $isAvsPlus = $savedConfig.IsAvsPlus 
             }
         }
-        catch { Show-Info "Config file is missing or corrupted, assuming (AviSynth+) as the envionment of avs2yuv," }
+        catch { Show-Info "Config file is missing or corrupted, assuming (AviSynth+) as the envionment of avs2yuv, recommending to re-exec step 2 script" }
     }
     
     # Obtain color space format
-    $ffmpegParams.CSP = Get-ffmpegCSP -CSVpixfmt $ffprobeCSV.D
-    $svtav1Params.RAWCSP = Get-EncoderAVSRawCSPBits -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $true
-    $x265Params.RAWCSP = Get-EncoderAVSRawCSPBits -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
-    $x264Params.RAWCSP = Get-EncoderAVSRawCSPBits -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
-    $avsyuvParams.CSP = Get-EncoderAVSRawCSPBits -CSVpixfmt $ffprobeCSV.D -isEncoderInput $false -isAvs2YuvInput $true -isSVTAV1 $false -isAVSPlus $isAvsPlus
+    $ffmpegParams.CSP = Get-ffmpegCSP -PixelFormat $videoStream.pix_fmt
+    $svtav1Params.RAWCSP = Get-EncoderAVSRawCSPBits -PixelFormat $videoStream.pix_fmt -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $true
+    $x265Params.RAWCSP = Get-EncoderAVSRawCSPBits -PixelFormat $videoStream.pix_fmt -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
+    $x264Params.RAWCSP = Get-EncoderAVSRawCSPBits -PixelFormat $videoStream.pix_fmt -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
+    $avsyuvParams.CSP = Get-EncoderAVSRawCSPBits -PixelFormat $videoStream.pix_fmt -isEncoderInput $false -isAvs2YuvInput $true -isSVTAV1 $false -isAVSPlus $isAvsPlus
 
-    # VOB、MOV framerate data is located at .I，otherwise it would be .H
-    $ffFpsString =
-        if ($script:interlacedArgs.isVOB -or $script:interlacedArgs.isMOV) { $ffprobeCSV.I }
-        else { $ffprobeCSV.H }
-    # Show-Debug "Source is VOB mux：$($script:interlacedArgs.isVOB)"
-    # Show-Debug "Source is MOV mux：$($script:interlacedArgs.isMOV)"
-    # Show-Debug "FPS：$ffFpsString"
-    $ffmpegParams.FPS = Get-FPSParam -fpsString $ffFpsString -Target ffmpeg
-    $svtav1Params.FPS = Get-FPSParam -fpsString $ffFpsString -Target svtav1
-    $x265Params.FPS = Get-FPSParam -fpsString $ffFpsString -Target x265
-    $x264Params.FPS = Get-FPSParam -fpsString $ffFpsString -Target x264
-    $x265Params.Subme = Get-x265SubmotionEstimation -fpsString $ffFpsString
-    [int]$x265SubmeInt = Get-x265SubmotionEstimation -fpsString $ffFpsString -stripParameterName
-    $x264Params.Keyint = Get-Keyint -fpsString $ffFpsString -bframes 250 -askUser -isx264
-    $x265Params.Keyint = Get-Keyint -fpsString $ffFpsString -bframes $x265SubmeInt -askUser -isx265
-    $svtav1Params.Keyint = Get-Keyint -fpsString $ffFpsString -bframes 999 -askUser -isSVTAV1
-    $x264Params.RCLookahead = Get-RateControlLookahead -fpsString $ffFpsString -bframes 250
-    $x265Params.RCLookahead = Get-RateControlLookahead -fpsString $ffFpsString -bframes $x265SubmeInt
+    $ffmpegParams.FPS = Get-FPSParam -fpsString $videoStream.avg_frame_rate -Target ffmpeg
+    $svtav1Params.FPS = Get-FPSParam -fpsString $videoStream.avg_frame_rate -Target svtav1
+    $x265Params.FPS = Get-FPSParam -fpsString $videoStream.avg_frame_rate -Target x265
+    $x264Params.FPS = Get-FPSParam -fpsString $videoStream.avg_frame_rate -Target x264
+    $x265Params.Subme = Get-x265SubmotionEstimation -fpsString $videoStream.avg_frame_rate
+    [int]$x265SubmeInt = Get-x265SubmotionEstimation -fpsString $videoStream.avg_frame_rate -stripParameterName
+    $x264Params.Keyint = Get-Keyint -fpsString $videoStream.avg_frame_rate -bframes 250 -askUser -isx264
+    $x265Params.Keyint = Get-Keyint -fpsString $videoStream.avg_frame_rate -bframes $x265SubmeInt -askUser -isx265
+    $svtav1Params.Keyint = Get-Keyint -fpsString $videoStream.avg_frame_rate -bframes 999 -askUser -isSVTAV1
+    $x264Params.RCLookahead = Get-RateControlLookahead -fpsString $videoStream.avg_frame_rate -bframes 250
+    $x265Params.RCLookahead = Get-RateControlLookahead -fpsString $videoStream.avg_frame_rate -bframes $x265SubmeInt
 
     Write-Host ("─" * 50)
 
     # Avs2PipeMod's required DLL
-    $quotedDllPath = Get-QuotedPath $sourceCSV.Avs2PipeModDllPath
+    $quotedDllPath = Get-QuotedPath $sourceJson.Avs2PipeModDllPath
     $avsmodParams.DLLInput = "-dll $quotedDllPath"
 
     # SVFI's required INI file & Task ID
     $olsargParams.ConfigInput =
-        if (![string]::IsNullOrWhiteSpace($sourceCSV.SvfiInputConf)) {
-            "--config $(Get-QuotedPath $sourceCSV.SvfiInputConf) --task-id $($sourceCSV.SvfiTaskId)"
+        if (![string]::IsNullOrWhiteSpace($sourceJson.SvfiInputConf)) {
+            "--config $(Get-QuotedPath $sourceJson.SvfiInputConf) --task-id $($sourceJson.SvfiTaskId)"
         }
         else { '' }
 
@@ -1423,31 +1422,31 @@ function Main {
     Show-Info "Configure output path, filename..."
     $encodeOutputPath = Select-Folder -Description "Select output path for encoder file output"
     # 1. Get source filename (pass to selection function as an option)
-    $sourcePathRaw = $sourceCSV.SourcePath
+    $sourcePathRaw = $sourceJson.SourcePath
     $defaultNameBase = [System.IO.Path]::GetFileNameWithoutExtension($sourcePathRaw)
     # 2. Check if is a placeholder script source
-    $isPlaceholder = Get-IsPlaceHolderSource -defaultName $defaultNameBase
-    # 3. Get the final filename (all interactions, validations, and retries are done within the function).
+    $isPlaceholder = Get-IsPlaceHolderSource -defaultName $defaultNameBase -sourceJson $sourceJson
+    # 3. Get final filename (all interactions, validations are within function).
     $encodeOutputFileName = Get-EncodeOutputName -SourcePath $sourcePathRaw -IsPlaceholder $isPlaceholder
 
     Show-Info "Generate IO Parameters (Input/Output)..."
     # 1. Upstream Program Input of the Pipe
     # The pipe connector is controlled by the batch generated by the previous script,
     # and is not specified here.
-    $ffmpegParams.Input = Get-EncodingIOArgument -isffmpeg -isImport $true -source $sourceCSV.SourcePath
-    $vspipeParams.Input = Get-EncodingIOArgument -isVsPipe -isImport $true -source $sourceCSV.SourcePath
-    $avsyuvParams.Input = Get-EncodingIOArgument -isAvs2Yuv -isImport $true -source $sourceCSV.SourcePath
-    $avsmodParams.Input = Get-EncodingIOArgument -isAvs2Pipemod -isImport $true -source $sourceCSV.SourcePath
-    $olsargParams.Input = Get-EncodingIOArgument -isSVFI -isImport $true -source $sourceCSV.SourcePath
+    $ffmpegParams.Input = Get-EncodingIOArgument -isffmpeg -isImport -source $sourceJson.SourcePath
+    $vspipeParams.Input = Get-EncodingIOArgument -isVsPipe -isImport -source $sourceJson.SourcePath
+    $avsyuvParams.Input = Get-EncodingIOArgument -isAvs2Yuv -isImport -source $sourceJson.SourcePath
+    $avsmodParams.Input = Get-EncodingIOArgument -isAvs2Pipemod -isImport -source $sourceJson.SourcePath
+    $olsargParams.Input = Get-EncodingIOArgument -isSVFI -isImport -source $sourceJson.SourcePath
     # 2. Downstream program (encoder) input
     # requires interlaced specifier parameters, using Get-EncodingIOArgument is mandatory
-    $x264Params.Input = Get-EncodingIOArgument -isx264 -isImport $true -source $sourceCSV.SourcePath
-    $x265Params.Input = Get-EncodingIOArgument -isx265 -isImport $true -source $sourceCSV.SourcePath
-    $svtav1Params.Input = Get-EncodingIOArgument -isSVTAV1 -isImport $true -source $sourceCSV.SourcePath
+    $x264Params.Input = Get-EncodingIOArgument -isx264 -isImport -source $sourceJson.SourcePath
+    $x265Params.Input = Get-EncodingIOArgument -isx265 -isImport -source $sourceJson.SourcePath
+    $svtav1Params.Input = Get-EncodingIOArgument -isSVTAV1 -isImport -source $sourceJson.SourcePath
     # 3. Pipe downstream program output
-    $x264Params.Output = Get-EncodingIOArgument -isx264 -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $x264Params.OutputExtension
-    $x265Params.Output = Get-EncodingIOArgument -isx265 -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $x265Params.OutputExtension
-    $svtav1Params.Output = Get-EncodingIOArgument -isSVTAV1 -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $svtav1Params.OutputExtension
+    $x264Params.Output = Get-EncodingIOArgument -isx264 -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $x264Params.OutputExtension
+    $x265Params.Output = Get-EncodingIOArgument -isx265 -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $x265Params.OutputExtension
+    $svtav1Params.Output = Get-EncodingIOArgument -isSVTAV1 -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $svtav1Params.OutputExtension -showIvtcGuide
 
     Write-Host ("─" * 50)
 
@@ -1474,7 +1473,7 @@ function Main {
     $x265RawPipeApdx = Join-Params $x265Params @('FPS', 'RAWCSP', 'Resolution', 'TotalFrames')
     $svtav1RawPipeApdx = Join-Params $svtav1Params @('FPS', 'RAWCSP', 'Resolution', 'TotalFrames')
     # 4. RAW pipe mode
-    if (Get-IsRAWSource -validateUpstreamCode $sourceCSV.UpstreamCode) {
+    if (Get-IsRAWSource -validateUpstreamCode $sourceJson.UpstreamCode) {
         $x264FinalParam = "$x264RawPipeApdx $x264FinalParam"
         $x265FinalParam = "$x265RawPipeApdx $x265FinalParam"
         $svtav1FinalParam = "$svtav1RawPipeApdx $svtav1FinalParam"
