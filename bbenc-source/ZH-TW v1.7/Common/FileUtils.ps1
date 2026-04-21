@@ -325,7 +325,7 @@ function Get-StreamMetadata {
             "-print_format", "json",
             "-show_streams",
             "-select_streams", $streamSelector,
-            "`"$FilePath`""
+            (Get-QuotedPath $FilePath)
         )
         
         Show-Debug "執行 ffprobe：$FFprobePath $arguments"

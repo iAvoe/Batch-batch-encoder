@@ -1050,13 +1050,13 @@ function Get-ffmpegCSP {
     return "-pix_fmt " + $pixfmt
 }
 
-function Get-RAWCSPBitDepth {
+function Get-EncoderAVSRawCSPBits {
     Param (
         [Parameter(Mandatory=$true)]$CSVpixfmt,
         [bool]$isEncoderInput=$true,
         [bool]$isAvs2YuvInput=$false,
         [bool]$isSVTAV1=$false,
-        [bool]$isAVSPlus=$false
+        [bool]$isAVSPlus=$true # 与 main 定义的默认值一致
     )
     # 移除可能的 "-pix_fmt " 前缀（尽管实际情况不会遇到）
     $pixfmt = $CSVpixfmt -replace '^-pix_fmt\s+', ''
@@ -1072,39 +1072,23 @@ function Get-RAWCSPBitDepth {
     }
 
     # 解析色度采样
-    if ($pixfmt -match '^yuv420') {
-        $chromaFormat = 'i420'
-    }
-    elseif ($pixfmt -match '^yuv422') {
-        $chromaFormat = 'i422'
-    }
-    elseif ($pixfmt -match '^nv12') {
-        $chromaFormat = 'nv12'
-    }
-    elseif ($pixfmt -match '^nv16') {
-        $chromaFormat = 'nv16'
-    }
-    elseif ($pixfmt -match '^yuv444') {
-        $chromaFormat = 'i444'
-    }
-    elseif ($pixfmt -match '^(gray|yuv400)') {
-        $chromaFormat = 'i400'
-    }
-    else { # 默认 4:2:0
-        if ($isEncoderInput) {
-            $chromaFormat = 'i420'
-            Show-Warning "[编码器] 未知像素格式：$pixfmt，将使用默认值（i420）"
-        }
-        else {
-            $chromaFormat = 'AUTO'
-            Show-Warning "[AviSynth] 未知像素格式：$pixfmt，将使用默认值（AUTO）"
+    $chromaFormat = switch -Regex ($pixfmt) {
+        '^yuv420'        { 'i420' }
+        '^yuv422'        { 'i422' }
+        '^nv12'          { 'nv12' }
+        '^nv16'          { 'nv16' }
+        '^yuv444'        { 'i444' }
+        '^(gray|yuv400)' { 'i400' }
+        default {
+            Show-Warning "[编码器/AviSynth] 未知像素格式：$pixfmt，将使用默认值"
+            if ($isEncoderInput) { 'i420' } else { 'AUTO' }
         }
     }
 
     if ($isEncoderInput) {
         if ($isSVTAV1) { # --color-format，--input-depth
             if ($depth -eq 12) {
-                Show-Warning "Get-RAWCSPBitDepth: 检测到与 SVT-AV1 不兼容的 12bit 源视频位深，若先前指定该编码器则重做步骤 2"
+                Show-Warning "Get-EncoderAVSRawCSPBits: 检测到与 SVT-AV1 不兼容的 12bit 源视频位深，若先前指定该编码器则重做步骤 2"
                 Write-Host ("─" * 50)
             }
 
@@ -1136,9 +1120,8 @@ function Get-RAWCSPBitDepth {
             if (-not $csp) { $csp = 'i420' }
             return "--input-csp $csp --input-depth $depth"
         }
-    }
-    elseif ($isAvs2YuvInput) {
-        # avs2yuv 0.30 放弃了对 AviSynth 的支持（仅AviSynth+），因此 -csp 参数被取消
+    } # elseif ($isAvs2YuvInput) {
+    else { # avs2yuv 0.30 仅支持 AviSynth+，因此 -csp 参数被取消
         $cspMap = @{
             '420' = 'i420'
             '422' = 'i422'
@@ -1147,12 +1130,8 @@ function Get-RAWCSPBitDepth {
         }
         $csp = $cspMap[$chromaFormat]
         if (-not $csp) { $csp = 'AUTO' }
-        if ($isAVSPlus) {
-            return "-depth $depth"
-        }
-        else {
-            return "-csp $csp -depth $depth"
-        }
+        if ($isAVSPlus) { return "-depth $depth" }
+        else { return "-csp $csp -depth $depth" }
     }
     return ""
 }
@@ -1391,10 +1370,10 @@ function Main {
     
     # 获取并配置色彩空间格式
     $ffmpegParams.CSP = Get-ffmpegCSP -CSVpixfmt $ffprobeCSV.D
-    $svtav1Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $true
-    $x265Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
-    $x264Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
-    $avsyuvParams.CSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $false -isAvs2YuvInput $true -isSVTAV1 $false -isAVSPlus $isAvsPlus
+    $svtav1Params.RAWCSP = Get-EncoderAVSRawCSPBits -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $true
+    $x265Params.RAWCSP = Get-EncoderAVSRawCSPBits -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
+    $x264Params.RAWCSP = Get-EncoderAVSRawCSPBits -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
+    $avsyuvParams.CSP = Get-EncoderAVSRawCSPBits -CSVpixfmt $ffprobeCSV.D -isEncoderInput $false -isAvs2YuvInput $true -isSVTAV1 $false -isAVSPlus $isAvsPlus
 
     # VOB、MOV 格式的帧率信息位于 .I，否则为 .H
     $ffFpsString =

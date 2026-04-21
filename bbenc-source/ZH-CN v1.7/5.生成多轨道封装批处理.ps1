@@ -339,10 +339,10 @@ function Main {
     $containerExt = ""
     do {
         switch (Read-Host "请输入选项（1/2/3/4）") {
-            1 { $containerExt = ".mp4" }
-            2 { $containerExt = ".mov" }
-            3 { $containerExt = ".mkv" }
-            4 { $containerExt = ".mxf" }
+            '1' { $containerExt = ".mp4" }
+            '2' { $containerExt = ".mov" }
+            '3' { $containerExt = ".mkv" }
+            '4' { $containerExt = ".mxf" }
             default { Write-Warning "无效选项" }
         }
     }

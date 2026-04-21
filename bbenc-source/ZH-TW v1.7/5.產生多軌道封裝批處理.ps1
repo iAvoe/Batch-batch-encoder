@@ -332,10 +332,10 @@ function Main {
     $containerExt = ""
     do {
         switch (Read-Host "請輸入選項（1/2/3/4）") {
-            1 { $containerExt = ".mp4" }
-            2 { $containerExt = ".mov" }
-            3 { $containerExt = ".mkv" }
-            4 { $containerExt = ".mxf" }
+            '1' { $containerExt = ".mp4" }
+            '2' { $containerExt = ".mov" }
+            '3' { $containerExt = ".mkv" }
+            '4' { $containerExt = ".mxf" }
             default { Write-Warning "無效選項" }
         }
     }

@@ -1057,13 +1057,13 @@ function Get-ffmpegCSP {
     return "-pix_fmt " + $pixfmt
 }
 
-function Get-RAWCSPBitDepth {
+function Get-EncoderAVSRawCSPBits {
     Param (
         [Parameter(Mandatory=$true)]$CSVpixfmt,
         [bool]$isEncoderInput=$true,
         [bool]$isAvs2YuvInput=$false,
         [bool]$isSVTAV1=$false,
-        [bool]$isAVSPlus=$false
+        [bool]$isAVSPlus=$true # Same default as declared in main
     )
     # Remove any possible "-pix_fmt" prefixes (although its unlikely encounter)
     $pixfmt = $CSVpixfmt -replace '^-pix_fmt\s+', ''
@@ -1079,39 +1079,23 @@ function Get-RAWCSPBitDepth {
     }
 
     # Match and validate chroma subsampling type
-    if ($pixfmt -match '^yuv420') {
-        $chromaFormat = 'i420'
-    }
-    elseif ($pixfmt -match '^yuv422') {
-        $chromaFormat = 'i422'
-    }
-    elseif ($pixfmt -match '^nv12') {
-        $chromaFormat = 'nv12'
-    }
-    elseif ($pixfmt -match '^nv16') {
-        $chromaFormat = 'nv16'
-    }
-    elseif ($pixfmt -match '^yuv444') {
-        $chromaFormat = 'i444'
-    }
-    elseif ($pixfmt -match '^(gray|yuv400)') {
-        $chromaFormat = 'i400'
-    }
-    else { # Default to 4:2:0
-        if ($isEncoderInput) {
-            $chromaFormat = 'i420'
-            Show-Warning "[Encoder] Unknown pixel format: $pixfmt, using default (i420)"
-        }
-        else {
-            $chromaFormat = 'AUTO'
-            Show-Warning "[AviSynth] Unknown pixel format: $pixfmt, using default (AUTO)"
+    $chromaFormat = switch -Regex ($pixfmt) {
+        '^yuv420'        { 'i420' }
+        '^yuv422'        { 'i422' }
+        '^nv12'          { 'nv12' }
+        '^nv16'          { 'nv16' }
+        '^yuv444'        { 'i444' }
+        '^(gray|yuv400)' { 'i400' }
+        default {
+            Show-Warning "[Encoder/AviSynth] Unknown pixel format: $pixfmt, using default value"
+            if ($isEncoderInput) { 'i420' } else { 'AUTO' }
         }
     }
 
     if ($isEncoderInput) {
         if ($isSVTAV1) { # --color-format, --input-depth
             if ($depth -eq 12) {
-                Show-Warning "Get-RAWCSPBitDepth: detecting SVT-AV1-incompatible 12bit source format, re-run step 2 if SVT-AV1 is designated"
+                Show-Warning "Get-EncoderAVSRawCSPBits: detecting SVT-AV1-incompatible 12bit source format, re-run step 2 if SVT-AV1 is designated"
                 Write-Host ("─" * 50)
             }
 
@@ -1143,9 +1127,8 @@ function Get-RAWCSPBitDepth {
             if (-not $csp) { $csp = 'i420' }
             return "--input-csp $csp --input-depth $depth"
         }
-    }
-    elseif ($isAvs2YuvInput) {
-        # avs2yuv 0.30 Dropped support for AviSynth (AviSynth+ only) therefore -csp option is gone
+    } # elseif ($isAvs2YuvInput) {
+    else { # avs2yuv 0.30 only supports AviSynth+, -csp option is gone
         $cspMap = @{
             '420' = 'i420'
             '422' = 'i422'
@@ -1154,12 +1137,8 @@ function Get-RAWCSPBitDepth {
         }
         $csp = $cspMap[$chromaFormat]
         if (-not $csp) { $csp = 'AUTO' }
-        if ($isAVSPlus) {
-            return "-depth $depth"
-        }
-        else {
-            return "-csp $csp -depth $depth"
-        }
+        if ($isAVSPlus) { return "-depth $depth" }
+        else { return "-csp $csp -depth $depth" }
         
     }
     return ""
@@ -1306,6 +1285,8 @@ function Join-Params ($Object, $PropertyOrder) {
 
 #region Main
 function Main {
+    $toolsJson = Join-Path $Global:TempFolder "tools.json"   
+
     Show-Border
     Write-Host "Video encoding task gnerator" -ForegroundColor Cyan
     Show-Border
@@ -1401,10 +1382,10 @@ function Main {
     
     # Obtain color space format
     $ffmpegParams.CSP = Get-ffmpegCSP -CSVpixfmt $ffprobeCSV.D
-    $svtav1Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $true
-    $x265Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
-    $x264Params.RAWCSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
-    $avsyuvParams.CSP = Get-RAWCSPBitDepth -CSVpixfmt $ffprobeCSV.D -isEncoderInput $false -isAvs2YuvInput $true -isSVTAV1 $false -isAVSPlus $isAvsPlus
+    $svtav1Params.RAWCSP = Get-EncoderAVSRawCSPBits -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $true
+    $x265Params.RAWCSP = Get-EncoderAVSRawCSPBits -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
+    $x264Params.RAWCSP = Get-EncoderAVSRawCSPBits -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
+    $avsyuvParams.CSP = Get-EncoderAVSRawCSPBits -CSVpixfmt $ffprobeCSV.D -isEncoderInput $false -isAvs2YuvInput $true -isSVTAV1 $false -isAVSPlus $isAvsPlus
 
     # VOB、MOV framerate data is located at .I，otherwise it would be .H
     $ffFpsString =
