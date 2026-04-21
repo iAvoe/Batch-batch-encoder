@@ -200,10 +200,11 @@ function Get-EncodingIOArgument {
         [Parameter(ParameterSetName="x265")][switch]$isx265,
         [Parameter(ParameterSetName="svtav1")][switch]$isSVTAV1,
         [string]$source, # 導入路徑到文件（帶或不帶引號）
-        [bool]$isImport = $true,
+        [switch]$isImport,
         [string]$outputFilePath, # 導出目錄，不用於導入
         [string]$outputFileName, # 導出檔案名，不用於導入
-        [string]$outputExtension
+        [string]$outputExtension,
+        [switch]$showIvtcGuide
     )
     # 確保只有一個開關被啟用
     $switchedOn = @(
@@ -223,17 +224,19 @@ function Get-EncodingIOArgument {
         throw "Get-EncodingIOArgument：最多指定一個程序，當前指定了: $($switchedOn -join ', ')"
     }
     $program = $switchedOn[0]
-    
+
     # 警告編碼器在隔行源上的限制
-    if ($script:interlacedArgs.isInterlaced) {
+    if (!$isImport -and !$isx264 -and $script:interlacedArgs.isInterlaced) {
         if ($isSVTAV1) { # Continue on error
-            Show-Error "Get-EncodingIOArgument: SVT-AV1 不支持隔行掃描"
+            Show-Warning "Get-EncodingIOArgument: SVT-AV1 不支持隔行掃描源"
         }
-        elseif ($isx265) {
+        if ($isx265) {
             Show-Warning "Get-EncodingIOArgument: x265 隔行掃描編碼支持是實驗性功能"
         }
-        Show-Info ("轉逐行與 IVTC 濾鏡教學: " + $script:interlacedArgs.toPFilterTutorial)
-        Write-Host ''
+        if ($showIVTCGuide) {
+            Show-Info ("轉逐行與 IVTC 濾鏡教學: " + $script:interlacedArgs.toPFilterTutorial)
+            Write-Host ''
+        }
     }
 
     # 隔行掃描相關參數
@@ -289,7 +292,7 @@ function Get-EncodingIOArgument {
         switch -Wildcard ($program) {
             'ffmpeg' { return "-i $quotedInput" }
             'svfi' { return "--input $quotedInput" }
-            # $sourceCSV.sourcePath 只有 .vpy 或 .avs 單個源，而先前步驟允許選擇多種上遊程序
+            # $sourceJson.sourcePath 只有 .vpy 或 .avs 單個源，而先前步驟允許選擇多種上遊程序
             # 因此必然會出現 .vpy 腳本輸入出現在 AVS 程序，或反過來的情況
             # 儘管“自動生成占位腳本”功能會同時提供 .vpy 和 .avs 腳本，但用戶選擇輸入自訂腳本就不會做這一步
             # 這個問題需要透過修改源的副檔名來紓解，但默認修改檔案名後的源一定不存在，此時只警告用戶然後繼續
@@ -499,8 +502,8 @@ function Get-svtav1BaseParam {
         [switch]$askUserCRF,
         [switch]$askUserDLF
     )
-    $isHelp = $pickOps -in @('helpzh', 'helpen')
     
+    $isHelp = $pickOps -in @('helpzh', 'helpen')
     $enableDLF2 = $false
     Write-Host ''
     if ($askUserDLF -and (-not $isHelp) -and ($pickOps -ne 'b')) {
@@ -700,10 +703,10 @@ function Get-RateControlLookahead { # 1.8*fps
     Param (
         [Parameter(Mandatory=$true)][string]$fpsString,
         [Parameter(Mandatory=$true)][int]$bframes,
-        [double]$second = 1.8
+        [double]$durationSecond = 1.8
     )
     try {
-        $frames = [math]::Round(((ConvertTo-Fraction $fpsString) * $second))
+        $frames = [math]::Round(((ConvertTo-Fraction $fpsString) * $durationSecond))
         # 必須大於 --bframes
         $frames = [math]::max($frames, $bframes+1)
         return "--rc-lookahead $frames"
@@ -716,17 +719,17 @@ function Get-RateControlLookahead { # 1.8*fps
 
 function Get-x265MERange {
     Param (
-        [Parameter(Mandatory=$true)]$CSVw,
-        [Parameter(Mandatory=$true)]$CSVh
+        [Parameter(Mandatory=$true)]$w,
+        [Parameter(Mandatory=$true)]$h
     )
     [int]$res = 0
     try {
-        $width = [int]$CSVw
-        $height = [int]$CSVh
+        $width = [int]$w
+        $height = [int]$h
         $res = $width * $height
     }
     catch {
-        throw "無法解析影片解析度：寬度=$CSVw, 高度=$CSVh"
+        throw "無法解析影片解析度：寬度=$w, 高度=$h"
     }
     if ($res -ge 8294400) { return "--merange 56" } # >=3840x2160
     elseif ($res -ge 3686400) { return "--merange 52" } # >=2560*1440
@@ -806,52 +809,48 @@ function Get-x265ThreadPool {
     }
 }
 
-# 問題：總幀數可以存在於 .I、.J、.AA-AJ 等範圍，但位置隨機（假值一定為 0）
+# 總幀數可能出現在非常規欄位，需要導入整個 JSON 檢查
 function Get-FrameCount {
     Param (
-        [Parameter(Mandatory=$true)]$ffprobeCSV, # 完整 CSV 對象
-        [bool]$isSVTAV1=$false
+        [Parameter(Mandatory=$true)]$vidStream,
+        [switch]$isSVTAV1,
+        [switch]$showWarning
     )
-    
-    # 定義所有可能包含總幀數的列名（I, AA, AB, AC, AD, AE, AF, AG, AH, AI, AJ）
-    $frameCountColumns = @();
-    # VOB 格式僅位於 J，同時 AA 等位置有無關數值，不可試
-    if ($script:interlacedArgs.isVOB) {
-        $frameCountColumns = @('J');
+    if ($null -eq $vidStream) {
+        throw "無法解析 ffprobe JSON 或找不到影片串流資訊，建議重新運行步驟 3 腳本"
     }
-    else {
-        $frameCountColumns =
-            @('I') + (65..74 | ForEach-Object { [char]$_ } | ForEach-Object { "A$_" })
+    # 嘗試 nb_frames 欄位、tags 中的 NUMBER_OF_FRAMES
+    $frameCount =
+        if ($vidStream.nb_frames -and $vidStream.nb_frames -ne 'N/A') {
+            $vidStream.nb_frames
+        }
+        elseif ($vidStream.tags.NUMBER_OF_FRAMES) {
+            $vidStream.tags.NUMBER_OF_FRAMES
+        }
+        else { $null }
+
+    if ($frameCount -match '^\d+$' -and [int]$frameCount -gt 0) {
+        if ($isSVTAV1) { return "-n $frameCount" }
+        else { return "--frames $frameCount" }
     }
 
-    # 遍歷檢查列，找到首個非零值
-    foreach ($column in $frameCountColumns) {
-        $frameCount = $ffprobeCSV.$column
-        
-        # 檢查是否為數字且大於 0
-        if ($frameCount -match "^\d+$" -and [int]$frameCount -gt 0) {
-            if ($isSVTAV1) { 
-                return "-n " + $frameCount 
-            }
-            return "--frames " + $frameCount
-        }
+    if ($showWarning) { # 從外部控制只顯示一次
+        Show-Warning 'Get-FrameCount：影片總幀數數據不存在或被刪除，將無法估計編碼進度與 ETA'
     }
-    return "" # 找不到
+    return ""
 }
 
 function Get-InputResolution {
     Param (
-        [Parameter(Mandatory=$true)][int]$CSVw,
-        [Parameter(Mandatory=$true)][int]$CSVh,
+        [Parameter(Mandatory=$true)][int]$w,
+        [Parameter(Mandatory=$true)][int]$h,
         [bool]$isSVTAV1=$false
     )
-    if ($null -eq $CSVw -or $null -eq $CSVh) {
+    if ($null -eq $w -or $null -eq $h) {
         throw "Get-InputResolution：影片元數據缺少幀大小（寬高）資訊"
     }
-    if ($isSVTAV1) {
-        return "-w $CSVw -h $CSVh"
-    }
-    return "--input-res ${CSVw}x${CSVh}"
+    if ($isSVTAV1) { return "-w $w -h $h" }
+    return "--input-res ${w}x${h}"
 }
 
 # 添加對 SVT-AV1 的丟幀幀率支持，丟幀幀率直接保留字串
@@ -899,9 +898,9 @@ function Get-FPSParam {
 # 獲取矩陣格式、傳輸特質、三原色
 function Get-ColorSpaceSEI {
     Param (
-        [Parameter(Mandatory=$true)]$CSVColorMatrix,
-        [Parameter(Mandatory=$true)]$CSVTransfer,
-        [Parameter(Mandatory=$true)]$CSVPrimaries,
+        [Parameter(Mandatory=$true)]$ColorMatrix,
+        [Parameter(Mandatory=$true)]$Transfer,
+        [Parameter(Mandatory=$true)]$Primaries,
         [switch]$isx264,
         [switch]$isx265,
         [switch]$isSVTAV1
@@ -913,53 +912,53 @@ function Get-ColorSpaceSEI {
     
     if ($isx264) {
         # Colormatrix
-        if (($CSVColorMatrix -eq "unknown") -or ($CSVColorMatrix -eq "bt2020nc")) {
+        if (($ColorMatrix -eq "unknown") -or ($ColorMatrix -eq "bt2020nc")) {
             $result += "--colormatrix undef" # x264 不寫 unknown
         }
         else { # fcc，bt470bg，smpte170m，smpte240m，GBR，YCgCo，bt2020c，smpte2085，chroma-derived-nc，chroma-derived-c，ICtCp
-            $result += "--colormatrix $CSVColorMatrix"
+            $result += "--colormatrix $ColorMatrix"
         }
 
         # Transfer
-        if ($CSVTransfer -eq "unknown") {
+        if ($Transfer -eq "unknown") {
             # bt470m，bt470bg，smpte170m，smpte240m，linear，log100，log316，iec61966-2-4，bt1361e，iec61966-2-1，bt2020-10，bt2020-12，smpte2084，smpte428，arib-std-b67
             $result += "--transfer undef"
         }
         else {
-            $result += "--transfer $CSVTransfer"
+            $result += "--transfer $Transfer"
         }
 
         # Color Primaries
-        if (($CSVPrimaries -eq "unknown") -or ($CSVPrimaries -eq "unspec")) {
+        if (($Primaries -eq "unknown") -or ($Primaries -eq "unspec")) {
             $result += "--colorprim undef"
         }
         else {
-            $result += "--colorprim $CSVPrimaries"
+            $result += "--colorprim $Primaries"
         }
     }
     elseif ($isx265) {
         # Colormatrix
-        if ($CSVColorMatrix -eq "bt2020nc") {
+        if ($ColorMatrix -eq "bt2020nc") {
             $result += "--colormatrix unknown"
         }
         else { # ==x264
-            $result += "--colormatrix $CSVColorMatrix"
+            $result += "--colormatrix $ColorMatrix"
         }
 
         # Transfer
-        $result += "--transfer $CSVTransfer"
+        $result += "--transfer $Transfer"
 
         # Color Primaries
-        if (($CSVPrimaries -eq "unknown") -or ($CSVPrimaries -eq "unspec")) {
+        if (($Primaries -eq "unknown") -or ($Primaries -eq "unspec")) {
             $result += "--colorprim unknown"
         }
         else {
-            $result += "--colorprim $CSVPrimaries"
+            $result += "--colorprim $Primaries"
         }
     }
     elseif ($isSVTAV1) {
         # Color Matrix
-        $c = switch ($CSVColorMatrix) {
+        $c = switch ($ColorMatrix) {
             identity     { 0 }
             bt709        { 1 }
             unspec       { 2 }
@@ -975,14 +974,14 @@ function Get-ColorSpaceSEI {
             "chroma-cl"  { 13 }
             ictcp        { 14 }
             default { 
-                Show-Warning "Get-ColorSpaceSEI：未知矩陣格式：$CSVColorMatrix，使用默認（bt709）"
+                Show-Warning "Get-ColorSpaceSEI：未知矩陣格式：$ColorMatrix，使用默認（bt709）"
                 1
             }
         }
         $result += "--matrix-coefficients $c"
 
         # Transfer
-        $t = switch ($CSVTransfer) {
+        $t = switch ($Transfer) {
             bt709           { 1 }
             unspec          { 2 }
             bt470m          { 4 }
@@ -1000,14 +999,14 @@ function Get-ColorSpaceSEI {
             smpte428        { 17 }
             hlg             { 18 }
             default { 
-                Show-Warning "Get-ColorSpaceSEI：未知傳輸特質：$CSVTransfer，使用默認（bt709）"
+                Show-Warning "Get-ColorSpaceSEI：未知傳輸特質：$Transfer，使用默認（bt709）"
                 1
             }
         }
         $result += "--transfer-characteristics $t"
 
         # Color Primaries
-        $p = switch ($CSVPrimaries) {
+        $p = switch ($Primaries) {
             bt709      { 1 }
             unspec     { 2 }
             unknown    { 2 }
@@ -1022,7 +1021,7 @@ function Get-ColorSpaceSEI {
             smpte432   { 12 }
             ebu3213    { 22 }
             default {
-                Show-Warning "Get-ColorSpaceSEI：未知三原色：$CSVPrimaries，使用默認（bt709）"
+                Show-Warning "Get-ColorSpaceSEI：未知三原色：$Primaries，使用默認（bt709）"
                 1
             }
         }
@@ -1044,22 +1043,22 @@ function Get-ffmpegCSP {
             "yuv444p","yuv444p10le","yuv444p12le",
             "gray","gray10le","gray12le",
             "nv12","nv16"
-        )][Parameter(Mandatory=$true)]$CSVpixfmt)
+        )][Parameter(Mandatory=$true)]$PixelFormat)
     # 移除可能的 "-pix_fmt " 前綴（儘管實際情況不會遇到）
-    $pixfmt = $CSVpixfmt -replace '^-pix_fmt\s+', ''
+    $pixfmt = $PixelFormat -replace '^-pix_fmt\s+', ''
     return "-pix_fmt " + $pixfmt
 }
 
 function Get-EncoderAVSRawCSPBits {
     Param (
-        [Parameter(Mandatory=$true)]$CSVpixfmt,
+        [Parameter(Mandatory=$true)]$PixelFormat,
         [bool]$isEncoderInput=$true,
         [bool]$isAvs2YuvInput=$false,
         [bool]$isSVTAV1=$false,
         [bool]$isAVSPlus=$true # 與 main 定義的預設值一致
     )
     # 移除可能的 "-pix_fmt " 前綴（儘管實際情況不會遇到）
-    $pixfmt = $CSVpixfmt -replace '^-pix_fmt\s+', ''
+    $pixfmt = $PixelFormat -replace '^-pix_fmt\s+', ''
     $chromaFormat = $null
     $depth = 8
 
@@ -1138,10 +1137,13 @@ function Get-EncoderAVSRawCSPBits {
 
 # 由於自動生成的腳本源存在，因此檔案名會變成 "blank_vs_script/blank_avs_script" 而非影片檔案名。若匹配到則消除默認（Enter）選項
 function Get-IsPlaceHolderSource {
-    Param([Parameter(Mandatory=$true)][string]$defaultName)
+    Param(
+        [Parameter(Mandatory=$true)][string]$defaultName,
+        [Parameter(Mandatory=$true)]$sourceJson  # 添加參數
+    )
     return [string]::IsNullOrWhiteSpace($defaultName) -or
         $defaultName -match '^(blank_.*|.*_script)$' -or
-        -not (Test-Path -LiteralPath $sourceCSV.SourcePath)
+        -not (Test-Path -LiteralPath $sourceJson.SourcePath)
 }
 
 # 簡單通過排除法獲取管道類型，因此如果添加只支持 RAW YUV 管道的上游工具需要修改
@@ -1149,29 +1151,29 @@ function Get-IsRAWSource ([string]$validateUpstreamCode) {
     return $validateUpstreamCode -eq 'e'
 }
 
-# 盡快判斷文件是否為 VOB 格式（格式判斷已被先前腳本確定），影響後續大量參數的 $ffprobeCSV 變數讀法
+# 盡快判斷文件是否為 VOB 格式（格式判斷已被先前腳本確定），影響後續大量參數的 $ffprobeJson 變數讀法
 function Set-IsVOB {
-    Param([Parameter(Mandatory=$true)][string]$ffprobeCsvPath)
-    if ([string]::IsNullOrWhiteSpace($ffprobeCsvPath)) {
-        throw "Set-IsVOB：ffprobeCsvPath 參數為空，無法判斷"
+    Param([Parameter(Mandatory=$true)][string]$ffprobeJsonPath)
+    if ([string]::IsNullOrWhiteSpace($ffprobeJsonPath)) {
+        throw "Set-IsVOB：ffprobeJsonPath 參數為空，無法判斷"
     }
-    $script:interlacedArgs.isVOB = $ffprobeCsvPath -like "*_vob*"
+    $script:interlacedArgs.isVOB = $ffprobeJsonPath -like "*_vob*"
 }
 
-# 盡快判斷文件是否為 MOV 格式（格式判斷已被先前腳本確定），影響後續大量參數的 $ffprobeCSV 變數讀法
+# 盡快判斷文件是否為 MOV 格式（格式判斷已被先前腳本確定），影響後續大量參數的 $ffprobeJson 變數讀法
 function Set-IsMOV {
-    Param([Parameter(Mandatory=$true)][string]$ffprobeCsvPath)
-    if ([string]::IsNullOrWhiteSpace($ffprobeCsvPath)) {
-        throw "Set-IsMOV：ffprobeCsvPath 參數為空，無法判斷"
+    Param([Parameter(Mandatory=$true)][string]$ffprobeJsonPath)
+    if ([string]::IsNullOrWhiteSpace($ffprobeJsonPath)) {
+        throw "Set-IsMOV：ffprobeJsonPath 參數為空，無法判斷"
     }
-    $script:interlacedArgs.isMOV = $ffprobeCsvPath -like "*_mov*"
+    $script:interlacedArgs.isMOV = $ffprobeJsonPath -like "*_mov*"
 }
 
 function Set-InterlacedArgs {
     Param(
         [Parameter(Mandatory=$true)]
-        [string]$fieldOrderOrIsInterlacedFrame, # VOB：$ffprobe.H；其它：$ffprobeCsv.J
-        [string]$tffAttribute # !MOV & !VOB: $ffprobeCsv.K
+        [string]$fieldOrderOrIsInterlacedFrame,
+        [string]$tffAttribute
     )
     # 初始化
     $script:interlacedArgs.isInterlaced = $false
@@ -1273,42 +1275,51 @@ function Join-Params ($Object, $PropertyOrder) {
 
 #region Main
 function Main {
+    $toolsJson = Join-Path $Global:TempFolder "tools.json"   
+
     Show-Border
     Write-Host "參數計算與批處理注入工具" -ForegroundColor Cyan
     Show-Border
     Write-Host ''
 
-    # 1. 自動尋找最新的 ffprobe CSV，並讀取影片資訊
-    $ffprobeCsvPath = 
-        Get-ChildItem -Path $Global:TempFolder -Filter "temp_v_info*.csv" | 
+    Show-Info "正在讀取步驟 3 的影片分析結果..."
+    # 1. 自動尋找最新的 ffprobe json，並讀取影片資訊
+    $ffprobeJsonPath = 
+        Get-ChildItem -Path $Global:TempFolder -Filter "temp_v_info*.json" | 
         Sort-Object LastWriteTime -Descending | 
         Select-Object -First 1 | 
         ForEach-Object { $_.FullName }
 
-    if ($null -eq $ffprobeCsvPath) {
-        throw "未找到 ffprobe 生成的 CSV 文件；請運行步驟 3 腳本以補全"
+    if ($null -eq $ffprobeJsonPath) {
+        throw "未找到 ffprobe 生成的 JSON 文件；請運行步驟 3 腳本以補全"
+    }
+    # 2. 尋找源資訊 json
+    $sourceJsonPath = Join-Path $Global:TempFolder "temp_s_info.json"
+    if (-not (Test-Path $sourceJsonPath)) {
+        throw "未找到源專用資訊 JSON 文件；請運行步驟 3 腳本以補全"
     }
 
-    # 2. 尋找源資訊 CSV
-    $sourceInfoCsvPath = Join-Path $Global:TempFolder "temp_s_info.csv"
-    if (-not (Test-Path $sourceInfoCsvPath)) {
-        throw "未找到專用資訊 CSV 文件；請運行步驟 3 腳本以補全"
+    $ffprobeJson = Read-JsonFile $ffprobeJsonPath
+    if ($null -eq $ffprobeJson) {
+        throw "無法解析 ffprobe JSON 或找不到影片串流資訊，請運行步驟 3 腳本以補全"
     }
-
-    Write-Host ("─" * 50)
-    
-    Show-Info "正在讀取 ffprobe 資訊：$(Split-Path $ffprobeCsvPath -Leaf)..."
-    Show-Info "正在讀取源專用資訊：$(Split-Path $sourceInfoCsvPath -Leaf)..."
-    $ffprobeCSV =
-        Import-Csv $ffprobeCsvPath -Header A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,AA,AB,AC,AD,AE,AF,AG,AH,AI,AJ
-    $sourceCSV =
-        Import-Csv $sourceInfoCsvPath -Header SourcePath,UpstreamCode,Avs2PipeModDllPath,SvfiInputConf,SvfiTaskId
-
-    # 驗證 CSV 數據
-    if (-not $sourceCSV.SourcePath) { # 直接驗證 CSV 項存在，不需要添加引號
-        throw "temp_s_info CSV 數據不完整，請重運行步驟 3 腳本"
+    if (-not $ffprobeJson.PSObject.Properties.Name -contains 'width') {
+        throw "ffprobe JSON 格式不正確，請運行步驟 3 腳本以補全"
     }
-
+    $sourceJson = Read-JsonFile $sourceJsonPath
+    if ($null -eq $ffprobeJson) {
+        throw "無法解析源專用 JSON 或找不到資訊，請運行步驟 3 腳本以補全"
+    }
+    if (-not $sourceJson.SourcePath) { # 檢查影片/VS/AVS 源有值即可
+        throw "temp_s_info.json 數據不完整，請重運行步驟 3 腳本以補全"
+    }
+    # 影片串流（通常是 streams 數組中 codec_type 為 video 的項）
+    $videoStream = $ffprobeJson.streams | Where-Object { $_.codec_type -eq 'video' } | Select-Object -First 1
+    # 定位首幀（用於獲取隔行掃描等動態資訊）
+    $firstFrame = $ffprobeJson.frames[0]
+    if ($null -eq $videoStream) {
+        throw "JSON 中未找到影片串流資訊"
+    }
     Write-Host ("─" * 50)
 
     # 隔行掃描源支持
@@ -1316,38 +1327,36 @@ function Main {
     # avs2pipemod: y4mp, y4mt, y4mb (progressive, tff, bff)
     # x264: --tff, --bff
     # x265: --interlace 0 (progressive), 1 (tff), 2 (bff)
-    # SVT-AV1：原生不支持，報錯並退出
+    # SVT-AV1：原生不支持
     Show-Info "正在區分隔行掃描格式..."
-    Set-IsVOB -ffprobeCsvPath $ffprobeCsvPath
-    Set-IsMOV -ffprobeCsvPath $ffprobeCsvPath
-
-    # MOV、VOB 格式的隔行場率資訊位於 H
-    if (-not $script:interlacedArgs.isMOV -and -not $script:interlacedArgs.isVOB) {
-        Set-InterlacedArgs -fieldOrderOrIsInterlacedFrame $ffprobeCSV.H -tffAttribute $ffprobeCSV.J
+    Set-IsVOB -ffprobeJsonPath $ffprobeJsonPath
+    Set-IsMOV -ffprobeJsonPath $ffprobeJsonPath
+    if ($script:interlacedArgs.isMOV -and $script:interlacedArgs.isVOB) {
+        Set-InterlacedArgs -fieldOrderOrIsInterlacedFrame $videoStream.field_order
     }
     else {
-        Set-InterlacedArgs -fieldOrderOrIsInterlacedFrame $ffprobeCSV.H
+        Set-InterlacedArgs -fieldOrderOrIsInterlacedFrame $firstFrame.interlaced_frame -tffAttribute $firstFrame.top_field_first
     }
-
     Write-Host ("─" * 50)
     
     # 計算並賦值給對象屬性
-    Show-Info "正在最佳化編碼參數（Profile、解析度、動態搜索範圍等）..."
-    # $x265Params.Profile = Get-x265SVTAV1Profile -CSVpixfmt $ffprobeCSV.D -isIntraOnly $false -isSVTAV1 $false
-    # $svtav1Params.Profile = Get-x265SVTAV1Profile -CSVpixfmt $ffprobeCSV.D -isIntraOnly $false -isSVTAV1 $true
-    $x265Params.Resolution = Get-InputResolution -CSVw $ffprobeCSV.B -CSVh $ffprobeCSV.C
-    $svtav1Params.Resolution = Get-InputResolution -CSVw $ffprobeCSV.B -CSVh $ffprobeCSV.C -isSVTAV1 $true
-    $x265Params.MERange = Get-x265MERange -CSVw $ffprobeCSV.B -CSVh $ffprobeCSV.C
+    Show-Info "正在最佳化編碼參數（解析度、動態搜索範圍等）..."
+    # $x265Params.Profile = Get-x265SVTAV1Profile -PixelFormat $videoStream.pix_fmt -isIntraOnly $false -isSVTAV1 $false
+    # $svtav1Params.Profile = Get-x265SVTAV1Profile -PixelFormat $videoStream.pix_fmt -isIntraOnly $false -isSVTAV1 $true
+    $x265Params.Resolution = Get-InputResolution -w $videoStream.width -h $videoStream.height
+    $svtav1Params.Resolution = Get-InputResolution -w $videoStream.width -h $videoStream.height -isSVTAV1 $true
+    $x265Params.MERange = Get-x265MERange -w $videoStream.width -h $videoStream.height
 
-    # Show-Debug "矩陣格式：$($ffprobeCSV.E)；傳輸特質：$($ffprobeCSV.F)；三原色：$($ffprobeCSV.G)"
-    $x264Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -isx264
-    $x265Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -isx265
-    $svtav1Params.SEICSP = Get-ColorSpaceSEI -CSVColorMatrix $ffprobeCSV.E -CSVTransfer $ffprobeCSV.F -CSVPrimaries $ffprobeCSV.G -isSVTAV1
+    # Show-Debug "矩陣格式：$($videoStream.color_space)；傳輸特質：$($videoStream.color_transfer)；三原色：$($videoStream.color_primaries)"
+    $x264Params.SEICSP = Get-ColorSpaceSEI -ColorMatrix $videoStream.color_space -Transfer $videoStream.color_transfer -Primaries $videoStream.color_primaries -isx264
+    $x265Params.SEICSP = Get-ColorSpaceSEI -ColorMatrix $videoStream.color_space -Transfer $videoStream.color_transfer -Primaries $videoStream.color_primaries -isx265
+    $svtav1Params.SEICSP = Get-ColorSpaceSEI -ColorMatrix $videoStream.color_space -Transfer $videoStream.color_transfer -Primaries $videoStream.color_primaries -isSVTAV1
 
     # VOB 的總幀數資訊位於 J
-    $x265Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $false
-    $x264Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $false
-    $svtav1Params.TotalFrames = Get-FrameCount -ffprobeCSV $ffprobeCSV -isSVTAV1 $true
+    $x265Params.TotalFrames = Get-FrameCount -vidStream $videoStream
+    $x264Params.TotalFrames = Get-FrameCount -vidStream $videoStream
+    $svtav1Params.TotalFrames = Get-FrameCount -vidStream $videoStream -isSVTAV1 -showWarning
+
     
     # x265 執行緒管理
     $x265Params.PME = Get-x265PME
@@ -1367,41 +1376,34 @@ function Main {
     }
     
     # 獲取並配置色彩空間格式
-    $ffmpegParams.CSP = Get-ffmpegCSP -CSVpixfmt $ffprobeCSV.D
-    $svtav1Params.RAWCSP = Get-EncoderAVSRawCSPBits -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $true
-    $x265Params.RAWCSP = Get-EncoderAVSRawCSPBits -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
-    $x264Params.RAWCSP = Get-EncoderAVSRawCSPBits -CSVpixfmt $ffprobeCSV.D -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
-    $avsyuvParams.CSP = Get-EncoderAVSRawCSPBits -CSVpixfmt $ffprobeCSV.D -isEncoderInput $false -isAvs2YuvInput $true -isSVTAV1 $false -isAVSPlus $isAvsPlus
+    $ffmpegParams.CSP = Get-ffmpegCSP -PixelFormat $videoStream.pix_fmt
+    $svtav1Params.RAWCSP = Get-EncoderAVSRawCSPBits -PixelFormat $videoStream.pix_fmt -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $true
+    $x265Params.RAWCSP = Get-EncoderAVSRawCSPBits -PixelFormat $videoStream.pix_fmt -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
+    $x264Params.RAWCSP = Get-EncoderAVSRawCSPBits -PixelFormat $videoStream.pix_fmt -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
+    $avsyuvParams.CSP = Get-EncoderAVSRawCSPBits -PixelFormat $videoStream.pix_fmt -isEncoderInput $false -isAvs2YuvInput $true -isSVTAV1 $false -isAVSPlus $isAvsPlus
 
-    # VOB、MOV 格式的幀率資訊位於 .I，否則為 .H
-    $ffFpsString =
-        if ($script:interlacedArgs.isVOB -or $script:interlacedArgs.isMOV) { $ffprobeCSV.I }
-        else { $ffprobeCSV.H }
-    # Show-Debug "格式為 VOB：$($script:interlacedArgs.isVOB)"
-    # Show-Debug "格式為 MOV：$($script:interlacedArgs.isMOV)"
-    # Show-Debug "幀率：$ffFpsString"
-    $ffmpegParams.FPS = Get-FPSParam -fpsString $ffFpsString -Target ffmpeg
-    $svtav1Params.FPS = Get-FPSParam -fpsString $ffFpsString -Target svtav1
-    $x265Params.FPS = Get-FPSParam -fpsString $ffFpsString -Target x265
-    $x264Params.FPS = Get-FPSParam -fpsString $ffFpsString -Target x264
-    $x265Params.Subme = Get-x265SubmotionEstimation -fpsString $ffFpsString
-    [int]$x265SubmeInt = Get-x265SubmotionEstimation -fpsString $ffFpsString -stripParameterName
-    $x264Params.Keyint = Get-Keyint -fpsString $ffFpsString -bframes 250 -askUser -isx264
-    $x265Params.Keyint = Get-Keyint -fpsString $ffFpsString -bframes $x265SubmeInt -askUser -isx265
-    $svtav1Params.Keyint = Get-Keyint -fpsString $ffFpsString -bframes 999 -askUser -isSVTAV1
-    $x264Params.RCLookahead = Get-RateControlLookahead -fpsString $ffFpsString -bframes 250
-    $x265Params.RCLookahead = Get-RateControlLookahead -fpsString $ffFpsString -bframes $x265SubmeInt
+    $ffmpegParams.FPS = Get-FPSParam -fpsString $videoStream.avg_frame_rate -Target ffmpeg
+    $svtav1Params.FPS = Get-FPSParam -fpsString $videoStream.avg_frame_rate -Target svtav1
+    $x265Params.FPS = Get-FPSParam -fpsString $videoStream.avg_frame_rate -Target x265
+    $x264Params.FPS = Get-FPSParam -fpsString $videoStream.avg_frame_rate -Target x264
+    $x265Params.Subme = Get-x265SubmotionEstimation -fpsString $videoStream.avg_frame_rate
+    [int]$x265SubmeInt = Get-x265SubmotionEstimation -fpsString $videoStream.avg_frame_rate -stripParameterName
+    $x264Params.Keyint = Get-Keyint -fpsString $videoStream.avg_frame_rate -bframes 250 -askUser -isx264
+    $x265Params.Keyint = Get-Keyint -fpsString $videoStream.avg_frame_rate -bframes $x265SubmeInt -askUser -isx265
+    $svtav1Params.Keyint = Get-Keyint -fpsString $videoStream.avg_frame_rate -bframes 999 -askUser -isSVTAV1
+    $x264Params.RCLookahead = Get-RateControlLookahead -fpsString $videoStream.avg_frame_rate -bframes 250
+    $x265Params.RCLookahead = Get-RateControlLookahead -fpsString $videoStream.avg_frame_rate -bframes $x265SubmeInt
 
     Write-Host ("─" * 50)
 
     # Avs2PipeMod 需要的 DLL
-    $quotedDllPath = Get-QuotedPath $sourceCSV.Avs2PipeModDllPath
+    $quotedDllPath = Get-QuotedPath $sourceJson.Avs2PipeModDllPath
     $avsmodParams.DLLInput = "-dll $quotedDllPath"
 
     # SVFI 需要的設定檔及 Task ID
     $olsargParams.ConfigInput =
-        if (![string]::IsNullOrWhiteSpace($sourceCSV.SvfiInputConf)) {
-            "--config $(Get-QuotedPath $sourceCSV.SvfiInputConf) --task-id $($sourceCSV.SvfiTaskId)"
+        if (![string]::IsNullOrWhiteSpace($sourceJson.SvfiInputConf)) {
+            "--config $(Get-QuotedPath $sourceJson.SvfiInputConf) --task-id $($sourceJson.SvfiTaskId)"
         }
         else { '' }
 
@@ -1409,29 +1411,29 @@ function Main {
     Show-Info "配置編碼結果導出路徑、檔案名..."
     $encodeOutputPath = Select-Folder -Description "選擇壓制結果的導出位置"
     # 1. 獲取源檔案名（用於傳遞給函數）
-    $sourcePathRaw = $sourceCSV.SourcePath
+    $sourcePathRaw = $sourceJson.SourcePath
     $defaultNameBase = [System.IO.Path]::GetFileNameWithoutExtension($sourcePathRaw)
     # 2. 判斷是否為占位符腳本源
-    $isPlaceholder = Get-IsPlaceHolderSource -defaultName $defaultNameBase
+    $isPlaceholder = Get-IsPlaceHolderSource -defaultName $defaultNameBase -sourceJson $sourceJson
     # 3. 獲取最終檔案名（所有交互、驗證、重試都在函數內完成）
     $encodeOutputFileName = Get-EncodeOutputName -SourcePath $sourcePathRaw -IsPlaceholder $isPlaceholder
 
     Show-Info "生成管道上下遊程序的 IO 參數 (Input/Output)..."
     # 1. 管道上遊程序輸入
     # 管道連接符由先前腳本生成的批處理控制，這裡不寫
-    $ffmpegParams.Input = Get-EncodingIOArgument -isffmpeg -isImport $true -source $sourceCSV.SourcePath
-    $vspipeParams.Input = Get-EncodingIOArgument -isVsPipe -isImport $true -source $sourceCSV.SourcePath
-    $avsyuvParams.Input = Get-EncodingIOArgument -isAvs2Yuv -isImport $true -source $sourceCSV.SourcePath
-    $avsmodParams.Input = Get-EncodingIOArgument -isAvs2Pipemod -isImport $true -source $sourceCSV.SourcePath
-    $olsargParams.Input = Get-EncodingIOArgument -isSVFI -isImport $true -source $sourceCSV.SourcePath
+    $ffmpegParams.Input = Get-EncodingIOArgument -isffmpeg -isImport -source $sourceJson.SourcePath
+    $vspipeParams.Input = Get-EncodingIOArgument -isVsPipe -isImport -source $sourceJson.SourcePath
+    $avsyuvParams.Input = Get-EncodingIOArgument -isAvs2Yuv -isImport -source $sourceJson.SourcePath
+    $avsmodParams.Input = Get-EncodingIOArgument -isAvs2Pipemod -isImport -source $sourceJson.SourcePath
+    $olsargParams.Input = Get-EncodingIOArgument -isSVFI -isImport -source $sourceJson.SourcePath
     # 2. 管道下遊程序（編碼器）輸入——需要根據隔行掃描判斷參數，因此必用 Get-EncodingIOArgument
-    $x264Params.Input = Get-EncodingIOArgument -isx264 -isImport $true -source $sourceCSV.SourcePath
-    $x265Params.Input = Get-EncodingIOArgument -isx265 -isImport $true -source $sourceCSV.SourcePath
-    $svtav1Params.Input = Get-EncodingIOArgument -isSVTAV1 -isImport $true -source $sourceCSV.SourcePath
+    $x264Params.Input = Get-EncodingIOArgument -isx264 -isImport -source $sourceJson.SourcePath
+    $x265Params.Input = Get-EncodingIOArgument -isx265 -isImport -source $sourceJson.SourcePath
+    $svtav1Params.Input = Get-EncodingIOArgument -isSVTAV1 -isImport -source $sourceJson.SourcePath
     # 3. 管道下遊程序輸出
-    $x264Params.Output = Get-EncodingIOArgument -isx264 -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $x264Params.OutputExtension
-    $x265Params.Output = Get-EncodingIOArgument -isx265 -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $x265Params.OutputExtension
-    $svtav1Params.Output = Get-EncodingIOArgument -isSVTAV1 -isImport $false -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $svtav1Params.OutputExtension
+    $x264Params.Output = Get-EncodingIOArgument -isx264 -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $x264Params.OutputExtension
+    $x265Params.Output = Get-EncodingIOArgument -isx265 -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $x265Params.OutputExtension
+    $svtav1Params.Output = Get-EncodingIOArgument -isSVTAV1 -outputFilePath $encodeOutputPath -outputFileName $encodeOutputFileName -outputExtension $svtav1Params.OutputExtension -showIvtcGuide
 
     Write-Host ("─" * 50)
 
@@ -1458,7 +1460,7 @@ function Main {
     $x265RawPipeApdx = Join-Params $x265Params @('FPS', 'RAWCSP', 'Resolution', 'TotalFrames')
     $svtav1RawPipeApdx = Join-Params $svtav1Params @('FPS', 'RAWCSP', 'Resolution', 'TotalFrames')
     # 4. RAW 管道相容
-    if (Get-IsRAWSource -validateUpstreamCode $sourceCSV.UpstreamCode) {
+    if (Get-IsRAWSource -validateUpstreamCode $sourceJson.UpstreamCode) {
         $x264FinalParam = "$x264RawPipeApdx $x264FinalParam"
         $x265FinalParam = "$x265RawPipeApdx $x265FinalParam"
         $svtav1FinalParam = "$svtav1RawPipeApdx $svtav1FinalParam"

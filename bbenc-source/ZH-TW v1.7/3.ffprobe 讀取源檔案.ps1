@@ -2,14 +2,14 @@
 .SYNOPSIS
     ffprobe 影片源分析腳本
 .DESCRIPTION
-    分析源影片並導出到 %USERPROFILE%\temp_v_info(_is_mov).csv: 總幀數，寬，高，色彩空間，傳輸特定等。繁體在地化由繁化姬實現：https://zhconvert.org
+    分析源影片並導出到 %USERPROFILE%\temp_v_info(_is_mov).json: 總幀數，寬，高，色彩空間，傳輸特定等。繁體在地化由繁化姬實現：https://zhconvert.org
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
     1.7
 #>
 
-# 若同時檢測到 temp_v_info_is_mov.csv 與 temp_v_info.csv，則使用其中創建日期最新的文件
+# 若同時檢測到 temp_v_info_is_mov.json 與 temp_v_info.json，則使用其中創建日期最新的文件
 
 # 載入共用代碼，包括 $utf8NoBOM、Get-QuotedPath、Select-File、Select-Folder...
 . "$PSScriptRoot\Common\Core.ps1"
@@ -91,7 +91,7 @@ function Test-IsLikePrime {
 function Get-VideoStreamInfo {
     param (
         [Parameter(Mandatory=$true)][string]$ffprobePath,
-        [Parameter(Mandatory=$true)][string]$videoSource,
+        [Parameter(Mandatory=$true)][string]$videoSource, # 輸入路徑不要加引號
         [string]$showEntries = "stream"
     )
 
@@ -332,7 +332,7 @@ function Get-NonSquarePixelWarning {
 function Test-VContainerFormat {
     param (
         [Parameter(Mandatory=$true)][string]$ffprobePath,
-        [Parameter(Mandatory=$true)][string]$videoSource
+        [Parameter(Mandatory=$true)][string]$videoSource # 輸入路徑不要加引號
     )
     Show-Info "Test-VContainerFormat：正在檢測影片檔案封裝格式真偽..."
 
@@ -475,7 +475,7 @@ function Main {
     $toolsJson = Join-Path $Global:TempFolder "tools.json"
 
     Show-Border
-    Show-info ("ffprobe 源讀取工具，導出 " + $Global:TempFolder + "temp_v_info(_is_mov).csv 以備用")
+    Show-info ("ffprobe 源讀取工具，導出 " + $Global:TempFolder + "temp_v_info(_is_mov).json 以備用")
     Show-Border
     Write-Host ''
 
@@ -504,7 +504,7 @@ function Main {
         }
     }
     
-    # 獲取上遊程序代號（寫入 CSV）；為 Avs2PipeMod 導入必須的 DLL
+    # 獲取上遊程序代號（寫入 json）；為 Avs2PipeMod 導入必須的 DLL
     $upstreamCode = $null
     $Avs2PipeModDLL = $null
     $OneLineShotArgsINI = $null
@@ -563,7 +563,7 @@ function Main {
 
     # 定義 IO 變數
     $videoSource = $null # ffprobe 將分析這個影片檔案
-    $scriptSource = $null # 腳本文件路徑，如果有則在導出的 CSV 中覆蓋影片源
+    $scriptSource = $null # 腳本文件路徑，如果有則在導出的 json 中覆蓋影片源
     $encodeImportSourcePath = $null
     $svfiTaskId = $null
 
@@ -576,11 +576,11 @@ function Main {
                 $videoSource = Select-File -Title "選擇影片源文件（例如 .mp4/.mkv/.mov）"
                 if ($null -eq $videoSource) { Show-Error "未選擇影片檔案" }
             }
+
+            Show-Info '導入或同時生成 AviSynth 和 VapourSynth 腳本'
+            $mode = Read-Host " 輸入 'y' 為影片源生成無濾鏡腳本，輸入 'n' 或 Enter 導入自訂腳本"
         
-            # 詢問用戶是否要生成無濾鏡腳本
-            $mode = Read-Host "輸入 'y' 導入自訂腳本，輸入 'n' 或 Enter 為影片源生成無濾鏡腳本"
-        
-            if ($mode -eq 'y') { # 導入自訂腳本
+            if ([string]::IsNullOrWhiteSpace($mode) -or 'n' -eq $mode) { # 導入自訂腳本
                 Show-Warning "由於腳本支持的導入源路徑的種類繁多，條件組合過於複雜，無法驗證；請自行檢查影片源是否真實存在"
                 do {
                     $scriptSource = Select-File -Title "定位腳本文件（.avs/.vpy...）"
@@ -603,10 +603,9 @@ function Main {
                 while (-not $scriptSource)
             
                 Show-Success "已選擇腳本文件：$scriptSource"
-                # 注意：影片源 $videoSource 仍然用於 ffprobe
             }
             # 生成無濾鏡腳本
-            elseif ([string]::IsNullOrWhiteSpace($mode) -or $mode -eq 'n') {
+            elseif ('y' -eq $mode) {
                 if (Test-NullablePath 'C:\Program Files (x86)\AviSynth+\plugins64+\LSMASHSource.dll') {
                     Show-Success "檢測到 C:\Program Files (x86)\AviSynth+\plugins64+\ 下已有 LSMASHSource.dll，無需配置"
                 }
@@ -647,7 +646,7 @@ function Main {
     elseif ($OneLineShotArgsINI -and (Test-Path -LiteralPath $OneLineShotArgsINI)) { 
         # SVFI ini 文件中的影片路徑（實際上內容為單行）：gui_inputs="{
         #     \"inputs\": [{
-        #         \"task_id\": \"必須獲取並賦值到 CSV\",
+        #         \"task_id\": \"必須獲取並賦值到 json\",
         #         \"input_path\": \"X:\\\\Video\\\\\\u5176\\u5b83-\\u52a8\\u6f2b\\u753b\\u516c\\u79cd\\\\影片.mp4\",
         #         \"is_surveillance_folder\": false
         #     }]
@@ -738,6 +737,17 @@ function Main {
 
         $encodeImportSourcePath = $videoSource
     }
+    $quotedVideoSource = Get-QuotedPath $videoSource
+
+    # ffprobe 命令
+    $ffprobeArgs = @(
+        '-i', $quotedVideoSource,
+        '-select_streams', 'v:0',
+        '-v', 'error', '-hide_banner',
+        '-show_streams',
+        '-show_frames', '-read_intervals', "%+#1"
+        '-of', 'json'
+    )
     Write-Host ("─" * 50)
 
     Show-Info "定位 ffprobe.exe..."
@@ -777,12 +787,10 @@ function Main {
     
     Write-Host ("─" * 50)
 
-    $streamInfo = Get-VideoStreamInfo -ffprobePath $ffprobePath -videoSource $videoSource `
-        -showEntries "stream=r_frame_rate,avg_frame_rate,nb_frames,duration,sample_aspect_ratio"
-    Show-Debug "幀率，平均幀率，總幀數，時長，變寬比："
-    Write-Host $streamInfo
-
-    Write-Host ("─" * 50)
+    # 僅用於觀察，不用於最終導出，不支持 $quotedVideoSource
+    $streamInfo = Get-VideoStreamInfo -ffprobePath $ffprobePath -videoSource $videoSource -showEntries "stream=r_frame_rate,avg_frame_rate,nb_frames,duration,sample_aspect_ratio"
+    # Show-Debug "幀率，平均幀率，總幀數，時長，變寬比："
+    # Write-Host $streamInfo
 
     # 檢測可變幀率源、非方形象素源並告警
     Get-VFRWarning -ffprobeStreamInfo $streamInfo
@@ -790,7 +798,7 @@ function Main {
 
     Write-Host ("─" * 50)
 
-    # 檢測封裝文件真偽
+    # 檢測封裝文件真偽，不支持 $quotedVideoSource
     $realFormatName = Test-VContainerFormat -ffprobePath $ffprobePath -videoSource $videoSource
 
     Write-Host ("─" * 50)
@@ -801,86 +809,64 @@ function Main {
     # elseif ($isVOB -like "VOB") { Show-Debug "導入影片 $videoSource 的封裝格式為 VOB" }
     # else { Show-Debug "導入影片 $videoSource 的封裝格式非 MOV、VOB" }
 
-    # 根據封裝文件類型選用 ffprobe 命令、定義檔案名
-    $ffprobeArgs =
-        if ($isMOV) {@(
-            '-i', $videoSource, '-select_streams', 'v:0', '-v', 'error', '-hide_banner', '-show_streams', '-show_entries',
-            'stream=width,height,pix_fmt,color_space,color_transfer,color_primaries,field_order,avg_frame_rate,nb_frames', '-of', 'csv'
-        )} # A      B     C      D       E           F              G               H           I              J
-        elseif ($isVOB) {@(
-            '-i', $videoSource, '-select_streams', 'v:0', '-v', 'error', '-hide_banner', '-show_streams', '-show_entries',
-            'stream=width,height,pix_fmt,color_space,color_transfer,color_primaries,field_order,avg_frame_rate,nb_frames', '-of', 'csv'
-        )} # A      B     C      D       E           F              G               H           I              J
-        else {@(
-            '-i', $videoSource, '-select_streams', 'v:0', '-v', 'error', '-hide_banner', '-show_streams', '-show_entries',
-            'stream=width,height,pix_fmt,color_space,color_transfer,color_primaries,avg_frame_rate,nb_frames,interlaced_frame,top_field_first:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng',
-            '-of', 'csv'
-        )} # A      B     C      D       E           F              G               H              I         J                K
-    # $ffprobeArgsDebug =
-    #    if ($isMOV) {@(
-    #        '-i', $videoSource, '-select_streams', 'v:0', '-v', 'error', '-hide_banner', '-show_streams', '-show_entries',
-    #        'stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries', '-of', 'ini'
-    #    )}
-    #    else {@(
-    #        '-i', $videoSource, '-select_streams', 'v:0', '-v', 'error', '-hide_banner', '-show_streams', '-show_entries',
-    #        'stream=width,height,pix_fmt,avg_frame_rate,nb_frames,color_space,color_transfer,color_primaries:stream_tags=NUMBER_OF_FRAMES,NUMBER_OF_FRAMES-eng',
-    #        '-of', 'ini'
-    #    )}
-    
-    # 由於 ffprobe 讀取不同源所產生的列數不一，導致讀取額外插入的資訊隨機錯位，因此需要獨立的 CSV（s_info）來儲存源資訊
-    $sourceCSVExportPath = Join-Path $Global:TempFolder "temp_s_info.csv"
-    $ffprobeCSVExportPath =
+    # 由於 ffprobe 讀取不同源所產生的列數不一會導致數據隨機錯位，因此不用無鍵的格式
+    $sourceJsonExportPath = Join-Path $Global:TempFolder "temp_s_info.json"
+    $ffprobeJsonExportPath =
         if ($isMOV) {
-            Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_mov.csv"
+            Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_mov.json"
         }
         elseif ($isVOB) {
-            Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_vob.csv"
+            Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_vob.json"
         }
         else {
-            Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info.csv"
+            Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info.json"
         }
-    # $ffprobeCSVExportPathDebug =
+    # $ffprobeJsonExportPathDebug =
     #     if ($isMOV) {
-    #         Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_mov_debug.csv"
+    #         Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_mov_debug.json"
     #     }
     #     else {
-    #         Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_debug.csv"
+    #         Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_debug.json"
     #     }
 
-    # 若 CSV 已存在，要求手動確認後清理，避免覆蓋
-    Confirm-FileDelete (Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_mov.csv")
-    Confirm-FileDelete (Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_vob.csv")
-    Confirm-FileDelete (Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info.csv")
-    Confirm-FileDelete $sourceCSVExportPath
+    # 若 json 已存在，要求手動確認後清理，避免覆蓋
+    Confirm-FileDelete (Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_mov.json")
+    Confirm-FileDelete (Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info_is_vob.json")
+    Confirm-FileDelete (Join-Path -Path $Global:TempFolder -ChildPath "temp_v_info.json")
+    Confirm-FileDelete $sourceJsonExportPath
 
     # 執行 ffprobe 並插入影片源路徑
     try {
-        $ffprobeOutputCSV = (& $ffprobePath @ffprobeArgs).Trim()
-        # $ffprobeOutputCSVDebug = (& $ffprobePath @ffprobeArgsDebug).Trim()
-
-        # 構建源 CSV 行
-        $sourceInfoCSV = @"
-"$encodeImportSourcePath",$upstreamCode,"$Avs2PipeModDLL","$OneLineShotArgsINI","$svfiTaskId"
-"@
-
-        Write-TextFile -Path $ffprobeCSVExportPath -Content $ffprobeOutputCSV -UseBOM $true
-        # [System.IO.File]::WriteAllLines($ffprobeCSVExportPathDebug, $ffprobeOutputCSVDebug)
-
-        Write-TextFile -Path $sourceCSVExportPath -Content $sourceInfoCSV -UseBOM $true
-        Show-Success "CSV 文件已生成：`r`n $ffprobeCSVExportPath`r`n $sourceCSVExportPath"
-
+        Write-Host $ffprobeArgs
+        $ffprobeOutputJson = (& $ffprobePath @ffprobeArgs) -join "`n"
+        
+        # 構建源資訊對象
+        $sourceInfoObject = @{
+            SourcePath       = $encodeImportSourcePath
+            UpstreamCode     = $upstreamCode
+            Avs2PipeModDllPath = $Avs2PipeModDLL
+            SvfiInputConf    = $OneLineShotArgsINI
+            SvfiTaskId       = $svfiTaskId
+        }
+        
+        # 寫入 ffprobe JSON、源資訊 JSON
+        Write-TextFile -Path $ffprobeJsonExportPath -Content $ffprobeOutputJson -UseBOM $true
+        Write-JsonFile -Path $sourceJsonExportPath -Object $sourceInfoObject
+        Show-Success "JSON 文件已生成：`r`n $ffprobeJsonExportPath`r`n $sourceJsonExportPath"
         Write-Host ("─" * 50)
-
-        # 驗證換行符
-        Show-Debug "驗證 CSV 檔案格式..."
-        if (-not (Test-TextFileFormat -Path $ffprobeCSVExportPath)) {
+        
+        # 驗證 JSON 檔案格式（使用新的函數）
+        Show-Debug "驗證 JSON 檔案格式..."
+        if (-not (Test-JsonFileFormat -Path $ffprobeJsonExportPath)) {
             return
         }
-        if (-not (Test-TextFileFormat -Path $sourceCSVExportPath)) {
+        if (-not (Test-JsonFileFormat -Path $sourceJsonExportPath)) {
             return
         }
     }
-    catch { throw ("ffprobe 執行失敗：" + $_) }
+    catch { 
+        throw ("ffprobe 執行或導出失敗：" + $_) 
+    }
 
     Write-Host ''
     Show-Success "腳本執行完成！"

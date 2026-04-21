@@ -18,6 +18,25 @@ function Write-JsonFile {
     [System.IO.File]::WriteAllText($Path, $json, $utf8)
 }
 
+# Validate json file on write
+function Test-JsonFileFormat {
+    param([string]$Path)
+    if (-not (Test-Path $Path)) {
+        Show-Error "File missing: $Path"
+        return $false
+    }
+    try {
+        $null = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
+        Show-Debug "JSON format validation passed: $Path"
+        return $true
+    }
+    catch {
+        Show-Error "JSON format validation failed：$Path"
+        Write-Host $_ -ForegroundColor Red
+        return $false
+    }
+}
+
 # Verify if the filename conforms to Windows naming rules.
 function Test-FilenameValid {
     param([string]$Filename)

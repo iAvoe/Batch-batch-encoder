@@ -80,6 +80,10 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 <p align="center"><img src="bmc_qr.png" alt="支持一下 -_-"><br><img src="pp_tip_qr.png" alt="支持一下 =_="></p>
 
 ## 更新信息
+**1.8.0**
+- 步骤 3-4:
+  - 从 CSV 格式的视频元数据处理更换为 JSON 格式
+
 **v1.7.9**
 - 步骤 2:
   - 为程序路径添加了新的配置文件读写功能

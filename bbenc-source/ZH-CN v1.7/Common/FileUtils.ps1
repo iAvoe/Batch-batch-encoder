@@ -18,6 +18,25 @@ function Write-JsonFile {
     [System.IO.File]::WriteAllText($Path, $json, $utf8)
 }
 
+# 验证 JSON 文件格式
+function Test-JsonFileFormat {
+    param([string]$Path)
+    if (-not (Test-Path $Path)) {
+        Show-Error "文件不存在：$Path"
+        return $false
+    }
+    try {
+        $null = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
+        Show-Debug "JSON 文件验证通过：$Path"
+        return $true
+    }
+    catch {
+        Show-Error "JSON 文件格式错误：$Path"
+        Write-Host $_ -ForegroundColor Red
+        return $false
+    }
+}
+
 # 检测文件名是否符合 Windows 命名规则
 function Test-FilenameValid {
     param([string]$Filename)

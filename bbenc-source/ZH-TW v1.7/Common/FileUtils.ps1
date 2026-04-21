@@ -1,5 +1,4 @@
-﻿
-# 調用 Test-Path 前先確保變數名非空或 null
+﻿# 調用 Test-Path 前先確保變數名非空或 null
 function Test-NullablePath {
     param([string]$Path)
     if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
@@ -17,6 +16,25 @@ function Write-JsonFile {
     $json = $Object | ConvertTo-Json -Depth 10
     $utf8 = [System.Text.UTF8Encoding]::new($true) # 帶 BOM
     [System.IO.File]::WriteAllText($Path, $json, $utf8)
+}
+
+# 驗證 JSON 檔案格式
+function Test-JsonFileFormat {
+    param([string]$Path)
+    if (-not (Test-Path $Path)) {
+        Show-Error "文件不存在：$Path"
+        return $false
+    }
+    try {
+        $null = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
+        Show-Debug "JSON 文件驗證通過：$Path"
+        return $true
+    }
+    catch {
+        Show-Error "JSON 檔案格式錯誤：$Path"
+        Write-Host $_ -ForegroundColor Red
+        return $false
+    }
 }
 
 # 檢測檔案名是否符合 Windows 命名規則
@@ -164,7 +182,6 @@ function Select-File(
     elseif ($BatOnly) { $dialog.Filter = 'bat Files (*.bat)|*.bat' }
     else { $dialog.Filter = 'All files (*.*)|*.*' }
 
-
     # 創建一個隱藏的 TopMost 窗口作為 owner
     $form = New-Object System.Windows.Forms.Form
     $form.TopMost = $true
@@ -180,8 +197,7 @@ function Select-File(
         $hwnd = [WinAPI]::GetConsoleWindow()
         [WinAPI]::SetForegroundWindow($hwnd) | Out-Null
 
-        $choice = Read-Host "未選擇文件，按回車重試或輸入 'q' 強制退出"
-        if ($choice -eq 'q') { exit 1 }
+        if ('q' -eq (Read-Host "未選擇文件，按回車重試或輸入 'q' 強制退出")) { exit 1 }
     }
 }
 
@@ -326,6 +342,7 @@ function Get-StreamMetadata {
             "-show_streams",
             "-select_streams", $streamSelector,
             (Get-QuotedPath $FilePath)
+            
         )
         
         Show-Debug "執行 ffprobe：$FFprobePath $arguments"
