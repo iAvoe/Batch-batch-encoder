@@ -521,14 +521,19 @@ cmd /k
             return
         }
     
-        # Show usages
+        
+        # Show extra usages: x265 routes are 2, 5, 8, 10, 14; SVT-AV1 routes are 3, 6, 9, 12, 15
+        $selectedDownstream = $Global:PipePresets[$selectedPreset].Downstream
         Write-Host ''
-        if ($downstream -eq 'x265') {
+        if ($selectedDownstream -eq 'x265') {
             Show-Warning "x265 encoder will export .hevc files"
             Write-Host " To multiplex, please refer to later script steps, or use ffmpeg manually"
         }
+        # User may have both x265 and SVT-AV1 imported, don not use elseif here
+        if ($selectedDownstream -eq 'svtav1') {
+            Show-Info "Compile your own SVT-AV1 binary is recommended (much faster)"
+            Write-Host " Compile guide is in：https://iavoe.github.io/av1-web-tutorial/HTML/index.html"
 
-        if ($downstream -eq 'svtav1') {
             Show-Warning "AV1 encoder will export .ivf files (Indeo format)"
             Write-Host " To multiplex, please refer to later script steps, or use ffmpeg manually"
         }

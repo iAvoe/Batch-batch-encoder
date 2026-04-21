@@ -224,28 +224,30 @@ function Get-EncodingIOArgument {
     }
     $program = $switchedOn[0]
 
-    # 隔行扫描相关参数
-    $iArg = ""
+    # 警告编码器在隔行源上的限制
     if ($script:interlacedArgs.isInterlaced) {
-        switch ($program) {
-            'avs2pipemod' { # avs2pipemod: y4mp (progressive), y4mt (tff), y4mb (bff)
-                $iArg =
-                    if ($script:interlacedArgs.isTFF) { "-y4mt" }
-                    else { "-y4mb" }
-            }
-            'x264' { # x264: --tff, --bff
-                $iArg =
-                    if ($script:interlacedArgs.isTFF) { "--tff" }
-                    else { "--bff" }
-            }
-            'x265' { # x265: --interlace 0 (progressive), 1 (tff), 2 (bff)
-                $iArg =
-                    if ($script:interlacedArgs.isTFF) { "--interlace 1" }
-                    else { "--interlace 2" }
-            }
-            # SVT-AV1 与 ffmpeg 不支持隔行，vspipe/avs2yuv/svfi 忽略
+        if ($isSVTAV1) { # Continue on error
+            Show-Error "Get-EncodingIOArgument: SVT-AV1 不支持隔行扫描"
         }
+        elseif ($isx265) {
+            Show-Warning "Get-EncodingIOArgument: x265 隔行扫描编码支持是实验性功能"
+        }
+        Show-Info ("转逐行与 IVTC 滤镜教程: " + $script:interlacedArgs.toPFilterTutorial)
+        Write-Host ''
     }
+
+    # 隔行扫描相关参数
+    $iArg = if (-not $script:interlacedArgs.isInterlaced) { "" }
+        elseif ($isavs2pipemod) { # avs2pipemod: y4mp (progressive), y4mt (tff), y4mb (bff)
+            if ($script:interlacedArgs.isTFF) { "-y4mt" } else { "-y4mb" }
+        }
+        elseif ($isx264) { # x264: --tff, --bff
+            if ($script:interlacedArgs.isTFF) { "--tff" } else { "--bff" }
+        }
+        elseif ($isx265) { # x265: --interlace 0 (progressive), 1 (tff), 2 (bff)
+            if ($script:interlacedArgs.isTFF) { "--interlace 1" } else { "--interlace 2" }
+        }
+        else { "" } # SVT-AV1 与 ffmpeg 不支持隔行，vspipe/avs2yuv/svfi 忽略
 
     # 验证输入文件（生成导入命令）
     $quotedInput = $null
@@ -1436,14 +1438,6 @@ function Main {
     $isPlaceholder = Get-IsPlaceHolderSource -defaultName $defaultNameBase
     # 3. 获取最终文件名（所有交互、验证、重试都在函数内完成）
     $encodeOutputFileName = Get-EncodeOutputName -SourcePath $sourcePathRaw -IsPlaceholder $isPlaceholder
-
-    # 由于默认给所有编码器生成参数，因此仅通知兼容性问题，而非报错退出
-    if ($script:interlacedArgs.isInterlaced -and
-        $program -in @('x265', 'h265', 'hevc', 'svt-av1', 'svtav1', 'ivf')) {
-        Show-Info "Get-EncodingIOArgument：SVT-AV1 原生不支持隔行扫描、x265 的隔行扫描编码是实验性功能（官方版）"
-        Show-Info ("转逐行与 IVTC 滤镜教程：" + $script:interlacedArgs.toPFilterTutorial)
-        Write-Host ''
-    }
 
     Show-Info "生成管道上下游程序的 IO 参数 (Input/Output)..."
     # 1. 管道上游程序输入

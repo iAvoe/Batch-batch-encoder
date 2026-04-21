@@ -223,29 +223,31 @@ function Get-EncodingIOArgument {
         throw "Get-EncodingIOArgument：最多指定一個程序，當前指定了: $($switchedOn -join ', ')"
     }
     $program = $switchedOn[0]
+    
+    # 警告編碼器在隔行源上的限制
+    if ($script:interlacedArgs.isInterlaced) {
+        if ($isSVTAV1) { # Continue on error
+            Show-Error "Get-EncodingIOArgument: SVT-AV1 不支持隔行掃描"
+        }
+        elseif ($isx265) {
+            Show-Warning "Get-EncodingIOArgument: x265 隔行掃描編碼支持是實驗性功能"
+        }
+        Show-Info ("轉逐行與 IVTC 濾鏡教學: " + $script:interlacedArgs.toPFilterTutorial)
+        Write-Host ''
+    }
 
     # 隔行掃描相關參數
-    $iArg = ""
-    if ($script:interlacedArgs.isInterlaced) {
-        switch ($program) {
-            'avs2pipemod' { # avs2pipemod: y4mp (progressive), y4mt (tff), y4mb (bff)
-                $iArg =
-                    if ($script:interlacedArgs.isTFF) { "-y4mt" }
-                    else { "-y4mb" }
-            }
-            'x264' { # x264: --tff, --bff
-                $iArg =
-                    if ($script:interlacedArgs.isTFF) { "--tff" }
-                    else { "--bff" }
-            }
-            'x265' { # x265: --interlace 0 (progressive), 1 (tff), 2 (bff)
-                $iArg =
-                    if ($script:interlacedArgs.isTFF) { "--interlace 1" }
-                    else { "--interlace 2" }
-            }
-            # SVT-AV1 與 ffmpeg 不支持隔行，vspipe/avs2yuv/svfi 忽略
+    $iArg = if (-not $script:interlacedArgs.isInterlaced) { "" }
+        elseif ($isavs2pipemod) { # avs2pipemod: y4mp (progressive), y4mt (tff), y4mb (bff)
+            if ($script:interlacedArgs.isTFF) { "-y4mt" } else { "-y4mb" }
         }
-    }
+        elseif ($isx264) { # x264: --tff, --bff
+            if ($script:interlacedArgs.isTFF) { "--tff" } else { "--bff" }
+        }
+        elseif ($isx265) { # x265: --interlace 0 (progressive), 1 (tff), 2 (bff)
+            if ($script:interlacedArgs.isTFF) { "--interlace 1" } else { "--interlace 2" }
+        }
+        else { "" } # SVT-AV1 與 ffmpeg 不支持隔行，vspipe/avs2yuv/svfi 忽略
 
     # 驗證輸入文件（生成導入命令）
     $quotedInput = $null
@@ -1434,14 +1436,6 @@ function Main {
     $isPlaceholder = Get-IsPlaceHolderSource -defaultName $defaultNameBase
     # 3. 獲取最終檔案名（所有交互、驗證、重試都在函數內完成）
     $encodeOutputFileName = Get-EncodeOutputName -SourcePath $sourcePathRaw -IsPlaceholder $isPlaceholder
-
-    # 由於默認給所有編碼器生成參數，因此僅通知相容性問題，而非報錯退出
-    if ($script:interlacedArgs.isInterlaced -and
-        $program -in @('x265', 'h265', 'hevc', 'svt-av1', 'svtav1', 'ivf')) {
-        Show-Info "Get-EncodingIOArgument：SVT-AV1 原生不支持隔行掃描、x265 的隔行掃描編碼是實驗性功能（官方版）"
-        Show-Info ("轉逐行與 IVTC 濾鏡教學：" + $script:interlacedArgs.toPFilterTutorial)
-        Write-Host ''
-    }
 
     Show-Info "生成管道上下遊程序的 IO 參數 (Input/Output)..."
     # 1. 管道上遊程序輸入

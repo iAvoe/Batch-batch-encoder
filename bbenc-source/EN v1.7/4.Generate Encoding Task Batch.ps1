@@ -225,28 +225,30 @@ function Get-EncodingIOArgument {
     }
     $program = $switchedOn[0]
 
-    # Interlaced specifier params
-    $iArg = ""
+    # Warn encoder limitations on interlated sources
     if ($script:interlacedArgs.isInterlaced) {
-        switch ($program) {
-            'avs2pipemod' { # avs2pipemod: y4mp (progressive), y4mt (tff), y4mb (bff)
-                $iArg =
-                    if ($script:interlacedArgs.isTFF) { "-y4mt" }
-                    else { "-y4mb" }
-            }
-            'x264' { # x264: --tff, --bff
-                $iArg =
-                    if ($script:interlacedArgs.isTFF) { "--tff" }
-                    else { "--bff" }
-            }
-            'x265' { # x265: --interlace 0 (progressive), 1 (tff), 2 (bff)
-                $iArg =
-                    if ($script:interlacedArgs.isTFF) { "--interlace 1" }
-                    else { "--interlace 2" }
-            }
-            # SVT-AV1 & ffmpeg don't support interlaced, skip for vspipe/avs2yuv/svfi
+        if ($isSVTAV1) { # Continue on error
+            Show-Error "Get-EncodingIOArgument: SVT-AV1 does not support interlaced source"
         }
+        elseif ($isx265) {
+            Show-Warning "Get-EncodingIOArgument: x265 interlaced support is experimental"
+        }
+        Show-Info ("Deinterlacing & IVTC filtering tutorial: " + $script:interlacedArgs.toPFilterTutorial)
+        Write-Host ''
     }
+
+    # Interlaced specifier params
+    $iArg = if (-not $script:interlacedArgs.isInterlaced) { "" }
+        elseif ($isavs2pipemod) { # avs2pipemod: y4mp (progressive), y4mt (tff), y4mb (bff)
+            if ($script:interlacedArgs.isTFF) { "-y4mt" } else { "-y4mb" }
+        }
+        elseif ($isx264) { # x264: --tff, --bff
+            if ($script:interlacedArgs.isTFF) { "--tff" } else { "--bff" }
+        }
+        elseif ($isx265) { # x265: --interlace 0 (progressive), 1 (tff), 2 (bff)
+            if ($script:interlacedArgs.isTFF) { "--interlace 1" } else { "--interlace 2" }
+        }
+        else { "" } # SVT-AV1 & ffmpeg don't support interlaced, skip for vspipe/avs2yuv/svfi
 
     # Validate file input (generate input argument)
     $quotedInput = $null
@@ -1446,14 +1448,6 @@ function Main {
     $isPlaceholder = Get-IsPlaceHolderSource -defaultName $defaultNameBase
     # 3. Get the final filename (all interactions, validations, and retries are done within the function).
     $encodeOutputFileName = Get-EncodeOutputName -SourcePath $sourcePathRaw -IsPlaceholder $isPlaceholder
-
-    # All encoders are getting parameters, therefore warn compatibility issues not don't quit
-    if ($script:interlacedArgs.isInterlaced -and
-        $program -in @('x265', 'h265', 'hevc', 'svt-av1', 'svtav1', 'ivf')) {
-        Show-Info "Get-EncodingIOArgument: SVT-AV1 natively reject interlaced source; x265 interlaced support is experimental (official version)"
-        Show-Info ("Deinterlacing & IVTC filtering tutorial: " + $script:interlacedArgs.toPFilterTutorial)
-        Write-Host ''
-    }
 
     Show-Info "Generate IO Parameters (Input/Output)..."
     # 1. Upstream Program Input of the Pipe

@@ -34,19 +34,16 @@ function Get-QuotedPath {
 # Prompt delete if file exists
 function Confirm-FileDelete {
     param([string]$Path)
-
     if (-not (Test-Path -LiteralPath $Path)) { return }
-
     Show-Warning "Detecting existing file: $Path"
-
-    while ('y' -ne $confirm) {
+    do {
         $confirm = Read-Host " Delete file to continue? Type 'y' to confirm, input 'q' to force quit (permanent deletion)."
         if ('y' -eq $confirm) { break }
         elseif ('q' -eq $confirm) {
             Show-Info "Stopping..."
             exit 1
         }
-    }
+    } while ('y' -ne $confirm)
 
     Remove-Item $Path -Force
     Write-Host ''
