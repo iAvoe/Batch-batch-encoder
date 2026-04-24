@@ -260,30 +260,29 @@ function Test-VideoWarnings {
         }
     }
 
+    # 1) 先更新帧率参数
+    try {
+        Set-FpsParams `
+            -rFpsString ([string]$ffprobeStreamInfo.r_frame_rate).Trim() `
+            -aFpsString ([string]$ffprobeStreamInfo.avg_frame_rate).Trim()
+    }
+    catch { Show-Warning '视频帧率数据为空或损坏，帧率无从得知' }
+    
     try {
         $warningBlocks = @()
-
-        # 1) 先更新帧率参数
-        try {
-            Set-FpsParams `
-                -rFpsString ([string]$ffprobeStreamInfo.r_frame_rate).Trim() `
-                -aFpsString ([string]$ffprobeStreamInfo.avg_frame_rate).Trim()
-        }
-        catch {
-            Show-Warning "视频帧率数据为空或损坏，帧率无从得知"
-        }
-
         $rFps = $script:fpsParams.rDouble
         $aFps = $script:fpsParams.aDouble
         $nbFrames = 0
         $duration = 0
+        $vReasons = @()
+        $score = 0
 
         try {
             $nbFrames = [int]$ffprobeStreamInfo.nb_frames.Trim()
             $duration = [double]$ffprobeStreamInfo.duration.Trim()
         }
         catch {
-            Show-Info "视频总帧数、时长元数据缺失，编码器将不显示 ETA"
+            Show-Info '视频总帧数、时长元数据缺失，编码器将不显示 ETA'
         }
 
         $eFps = $null
@@ -292,9 +291,6 @@ function Test-VideoWarnings {
         }
 
         # 2) VFR 判定
-        $vReasons = @()
-        $score = 0
-
         if ($rFps -gt 0 -and $aFps -gt 0) {
             $relDiff = [math]::Abs($rFps - $aFps) / [math]::Max(1e-9, [math]::Max($rFps, $aFps))
             if ($relDiff -gt $RelativeTolerance) {
@@ -328,11 +324,11 @@ function Test-VideoWarnings {
             }
         }
 
-        $mode = "「确定」是恒定帧率（CFR）"
-        if ($score -ge 5)     { $mode = "「确定」是可变帧率（VFR）" }
-        elseif ($score -ge 4) { $mode = "「高概率」是可变帧率（VFR）" }
-        elseif ($score -ge 2) { $mode = "「应该」是可变帧率（VFR）" }
-        elseif ($score -gt 0) { $mode = "「有迹象」是可变帧率（VFR）" }
+        $mode = if ($score -ge 5) { '「确定」是可变帧率（VFR）' }
+            elseif ($score -ge 4) { '「高概率」是可变帧率（VFR）' }
+            elseif ($score -ge 2) { '「应该」是可变帧率（VFR）' }
+            elseif ($score -gt 0) { '「有迹象」是可变帧率（VFR）' }
+            else { '「确定」是恒定帧率（CFR）' }
 
         if ($score -gt 0) {
             $rNum = $script:fpsParams.rNumerator
@@ -367,8 +363,7 @@ function Test-VideoWarnings {
             $warningBlocks += [PSCustomObject]@{
                 Title = "源的变宽比（SAR）为 $sampleAspectRatio（非 1:1 方形象素）"
                 Lines = @(
-                    " 本程序暂无对策（强行编码会恢复到方形象素，致画面缩宽）",
-                    " 手动矫正方法：",
+                    " 本程序暂无对策（强行编码会恢复到方形象素，致画面缩宽）；手动矫正方法：",
                     " 1. ffmpeg -i $quotedVideoSource -c copy -aspect $sampleAspectRatio output.mkv",
                     " 2. MP4Box -par 1=$sampleAspectRatio $quotedVideoSource -out output.mp4",
                     " 3. moviepy:",
@@ -587,8 +582,8 @@ function Main {
                 }
                 else { # 用户可能未安装 AviSynth——产生误报
                     Show-Warning "未在 C:\Program Files (x86)\AviSynth+\plugins64+\ 下发现 LSMASHSource.dll（解码器）"
-                    Write-Host " 缺少该文件会导致大量 AVS 脚本，包括本工具自动生成的脚本无法执行"
-                    Write-Host " 下载并解压 64bit 版：https://github.com/HomeOfAviSynthPlusEvolution/L-SMASH-Works/releases`r`n" -ForegroundColor Magenta
+                    Write-Host " 缺少该文件会导致大量 AVS 脚本，包括本工具自动生成的脚本无法执行" -ForegroundColor Yellow
+                    Write-Host " 下载并解压 64bit 版：https://github.com/HomeOfAviSynthPlusEvolution/L-SMASH-Works/releases`r`n" -ForegroundColor DarkYellow
                 }
                 Write-Host ("─" * 50)
                 
@@ -745,7 +740,8 @@ function Main {
             Show-Success "将直接使用自动检测到的 ffprobe.exe：$ffprobePath"
         }
         else {
-            $ffprobePath = Get-Source -WindowTitle "定位 ffprobe.exe" -ExeOnly -ErrMsg "未选择 ffprobe.exe，请重试"
+            $ffprobePath =
+                Get-Source -WindowTitle "定位 ffprobe.exe" -ExeOnly -ErrMsg "未选择 ffprobe.exe，请重试"
             Show-Success "已导入 ffprobe.exe：$ffprobePath"
         }
     }
