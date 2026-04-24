@@ -6,7 +6,7 @@
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
-    1.7
+    1.8
 #>
 
 # 加载共用代码
@@ -1558,16 +1558,14 @@ REM svtav1_appendix=$svtav1RawPipeApdx
         Write-Host "3. 你可以手动更改 encode_template.bat 中的命令来切换上下游编码工具链"
         Write-Host ("─" * 50)
     }
-    catch {
-        Show-Error "写入文件失败：$_"
-    }
+    catch { Show-Error $_ }
     pause
 }
 #endregion
 
 try { Main }
 catch {
-    Show-Error "脚本执行出错：$_"
+    Show-Error $_
     Write-Host "错误详情：" -ForegroundColor Red
     Write-Host $_.Exception.ToString()
     Read-Host "按 Enter 退出"

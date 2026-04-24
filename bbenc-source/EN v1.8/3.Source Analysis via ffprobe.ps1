@@ -6,7 +6,7 @@
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
-    1.7
+    1.8
 #>
 
 # If both temp_v_info_is_mov.json and temp_v_info.json are detected, use the file created latest
@@ -673,14 +673,14 @@ function Main {
                 }
             }
             catch {
-                Show-Error "Failed to parse JSON：$_"
+                Show-Error $_
                 Show-Debug "Original JSON string：$jsonString"
                 Read-Host "Press Enter to exit"
                 return
             }
         }
         catch {
-            Show-Error "Could not read SVFI INI：$_"
+            Show-Error $_
             Read-Host "Press Enter to exit"
             return
         }
@@ -830,7 +830,7 @@ function Main {
 
 try { Main }
 catch {
-    Show-Error "Script failed: $_"
+    Show-Error $_
     Write-Host "Error details: " -ForegroundColor Red
     Write-Host $_.Exception.ToString()
     Read-Host "Press any button to exit"

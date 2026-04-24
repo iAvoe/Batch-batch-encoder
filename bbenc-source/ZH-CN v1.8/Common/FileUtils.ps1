@@ -242,11 +242,11 @@ function Write-TextFile { # 需在 Core.ps1 写入全局变量后运行
         [bool]$UseBOM = $true
     )
     if ([string]::IsNullOrWhiteSpace($Path)) {
-        Write-Error "Write-TextFile - 文件写入失败：空路径"
+        Show-Error "Write-TextFile - 文件写入失败：空路径"
         return
     }
     if ([string]::IsNullOrWhiteSpace($Content)) {
-        Write-Error "Write-TextFile - 文件写入失败：空内容"
+        Show-Error "Write-TextFile - 文件写入失败：空内容"
         return
     }
 
@@ -302,7 +302,7 @@ function Test-TextFileFormat {
         return $isValid
     }
     catch {
-        Show-Error "验证失败：$_"
+        Show-Error $_
         return $false
     }
 }
@@ -402,7 +402,7 @@ function Get-StreamMetadata {
         
     }
     catch {
-        Show-Error "解析 ffprobe 输出时出错：$_"
+        Show-Error $_
         Show-Debug "错误详情：$($_.ScriptStackTrace)"
         return $null
     }

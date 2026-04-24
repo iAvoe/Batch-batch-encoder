@@ -6,7 +6,7 @@
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
-    1.7
+    1.8
 #>
 
 # 加载共用代码
@@ -43,7 +43,7 @@ function Request-AdministratorElevation {
         exit $process.ExitCode
     }
     catch {
-        Write-Error "权限提升失败：$_"
+        Show-Error $_
         Write-Host "按任意键退出..." -ForegroundColor Yellow
         $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
         exit 1
@@ -111,7 +111,7 @@ function Test-FileSystemPermission {
         }
     }
     catch {
-        [void]$report.AppendLine("× 无法检查 $Path 的权限: $_")
+        [void]$report.AppendLine("× 无法检查 $Path 的权限: " + $_)
     }
     
     return $report.ToString()
@@ -135,7 +135,7 @@ function Get-UACRegistryValues {
         }
     }
     catch {
-        Write-Warning "无法读取 UAC 注册表设置: $_"
+        Show-Warning $_
         return $null
     }
 }
@@ -169,7 +169,7 @@ function Set-UACRegistryValues {
         return $true
     }
     catch {
-        Write-Error "设置 UAC 失败: $_"
+        Show-Error $_
         return $false
     }
 }
@@ -180,9 +180,7 @@ function Show-HardwareInformation {
         $os = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
         Show-Info "操作系统: $($os.Caption) (Build $($os.BuildNumber))"
     }
-    catch {
-        Show-Warning "无法获取操作系统信息: $_"
-    }
+    catch { Show-Warning $_ }
     
     Show-Border
     Show-Info "主板信息"
@@ -199,11 +197,9 @@ function Show-HardwareInformation {
             "版本: $($baseboard.Version)"
         )
         
-        $info | ForEach-Object { Write-Host "  $_" }
+        $info | ForEach-Object { Write-Host $_ }
     }
-    catch {
-        Show-Warning "无法获取主板信息: $_"
-    }
+    catch { Show-Warning $_ }
     
     Show-Border
     Show-Info "BIOS信息"
@@ -218,11 +214,9 @@ function Show-HardwareInformation {
             "发布日期: $(($bios.ReleaseDate).ToString('yyyy-MM-dd'))"
         )
         
-        $info | ForEach-Object { Write-Host "  $_" }
+        $info | ForEach-Object { Write-Host $_ }
     }
-    catch {
-        Show-Warning "无法获取BIOS信息: $_"
-    }
+    catch { Show-Warning $_ }
     
     Show-Border
     Show-Info "处理器信息"
@@ -244,13 +238,11 @@ function Show-HardwareInformation {
                 "当前负载: $($processor.LoadPercentage)%"
             )
             
-            $info | ForEach-Object { Write-Host "  $_" }
+            $info | ForEach-Object { Write-Host $_ }
             Write-Host ''
         }
     }
-    catch {
-        Show-Warning "无法获取处理器信息: $_"
-    }
+    catch { Show-Warning $_ }
     
     Show-Border
     Show-Info "内存信息"
@@ -273,15 +265,13 @@ function Show-HardwareInformation {
                 "序列号: $($module.SerialNumber)"
             )
             
-            $info | ForEach-Object { Write-Host "  $_" }
+            $info | ForEach-Object { Write-Host $_ }
             Write-Host ''
         }
         
         Show-Success "总内存: $totalMemory GB"
     }
-    catch {
-        Show-Warning "无法获取内存信息: $_"
-    }
+    catch { Show-Warning $_ }
 }
 #endregion
 
@@ -432,7 +422,7 @@ function Main {
 # 执行主函数
 try { Main }
 catch {
-    Show-Error "脚本执行出错: $_"
+    Show-Error $_
     Write-Host "按任意键退出..." -ForegroundColor Yellow
     $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
     exit 1

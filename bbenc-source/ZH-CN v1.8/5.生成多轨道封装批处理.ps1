@@ -6,7 +6,7 @@
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
-    1.7
+    1.8
 #>
 
 # 加载共用代码
@@ -169,7 +169,7 @@ function Get-StreamArgs {
                         }
                     }
                     '3' { # 选择常见帧率
-                        Write-Warning "帧率必须与源完全一致，否则视频无法正确播放"
+                        Show-Warning "帧率必须与源完全一致，否则视频无法正确播放"
                         Write-Host "`n常用帧率预设：" -ForegroundColor Cyan
                         Write-Host "1. 23.976（24000/1001）" -ForegroundColor Yellow
                         Write-Host "2. 24" -ForegroundColor Yellow
@@ -334,7 +334,7 @@ function Main {
     Write-Host " 2：MOV（适合剪辑）"
     Write-Host " 3：MKV（兼容字幕、字体）"
     Write-Host " 4：MXF（专业用途）"
-    Write-Warning " ffmpeg 正在弃用 MP4 时间码（pts）生成功能，届时 MP4 格式选项将不可用"
+    Show-Warning " ffmpeg 正在弃用 MP4 时间码（pts）生成功能，届时 MP4 格式选项将不可用"
     
     $containerExt = ""
     do {
@@ -343,7 +343,7 @@ function Main {
             '2' { $containerExt = ".mov" }
             '3' { $containerExt = ".mkv" }
             '4' { $containerExt = ".mxf" }
-            default { Write-Warning "无效选项" }
+            default { Show-Warning "无效选项" }
         }
     }
     while ($containerExt -eq "")
@@ -439,7 +439,7 @@ cmd /k
 
 try { Main }
 catch {
-    Show-Error "脚本执行出错：$_"
+    Show-Error $_
     Write-Host "错误详情：" -ForegroundColor Red
     Write-Host $_.Exception.ToString()
     Read-Host "按 Enter 退出"

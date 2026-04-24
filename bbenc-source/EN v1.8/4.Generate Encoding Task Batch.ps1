@@ -6,7 +6,7 @@
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
-    1.7
+    1.8
 #>
 
 # Load globals
@@ -1580,16 +1580,14 @@ REM svtav1_appendix=$svtav1RawPipeApdx
         Write-Host "   to switch upstream and downstream encoding tools or routes"
         Write-Host ("─" * 50)
     }
-    catch {
-        Show-Error "File write failed: $_"
-    }
+    catch { Show-Error $_ }
     pause
 }
 #endregion
 
 try { Main }
 catch {
-    Show-Error "Script execution error: $_"
+    Show-Error $_
     Write-Host "Error details: " -ForegroundColor Red
     Write-Host $_.Exception.ToString()
     Read-Host "Press Enter to exit"

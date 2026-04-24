@@ -6,7 +6,7 @@
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
-    1.7
+    1.8
 #>
 
 # 下游工具（編碼器）必須支持 Y4M 管道，否則需要添加管道無法匹配的錯誤退出邏輯（由於所有工具支持因此未創建代碼）
@@ -328,10 +328,12 @@ function Main {
                 Show-Info "選擇使用的 avs2yuv(64).exe 類型："
                 $avs2yuvVer = Read-Host " [默認 Enter/a: AviSynth+ (0.30) | b: AviSynth (up to 0.26)]"
                 if ([string]::IsNullOrWhiteSpace($avs2yuvVer) -or 'a' -eq $avs2yuvVer) {
-                    $global:isAvsPlus = $true; break
+                    $global:isAvsPlus = $true
+                    break
                 }
                 elseif ('b' -eq $avs2yuvVer) {
-                    $global:isAvsPlus = $false; break
+                    $global:isAvsPlus = $false
+                    break
                 }
                 Show-Warning "輸入值超出理解，請重試"
             }
@@ -570,7 +572,7 @@ cmd /k
 
 try { Main }
 catch {
-    Show-Error "腳本執行出錯：$_"
+    Show-Error $_
     Write-Host "錯誤詳情：" -ForegroundColor Red
     Write-Host $_.Exception.ToString()
     Read-Host "按 Enter 退出"

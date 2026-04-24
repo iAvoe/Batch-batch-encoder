@@ -6,7 +6,7 @@
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
-    1.7
+    1.8
 #>
 
 # Load globals
@@ -47,7 +47,7 @@ function Request-AdministratorElevation {
         exit $process.ExitCode
     }
     catch {
-        Show-Error "Failed to elevate priviledge $_"
+        Show-Error $_
         Write-Host "Press any button to exit..." -ForegroundColor Yellow
         $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
         exit 1
@@ -117,7 +117,7 @@ function Test-FileSystemPermission {
         }
     }
     catch {
-        [void]$report.AppendLine("× Could not validate access premission to $($Path): $_")
+        [void]$report.AppendLine("× Could not validate access premission to $($Path): " + $_)
     }
     
     return $report.ToString()
@@ -141,7 +141,7 @@ function Get-UACRegistryValues {
         }
     }
     catch {
-        Write-Warning "Could not read UAC Registry: $_"
+        Show-Warning $_
         return $null
     }
 }
@@ -175,7 +175,7 @@ function Set-UACRegistryValues {
         return $true
     }
     catch {
-        Write-Error "Failed to configure UAC: $_"
+        Show-Error $_
         return $false
     }
 }
@@ -185,9 +185,7 @@ function Show-HardwareInformation {
         $os = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
         Show-Info "OS: $($os.Caption) (Build $($os.BuildNumber))"
     }
-    catch {
-        Show-Warning "Could not read OS attributes: $_"
-    }
+    catch { Show-Warning $_ }
     
     Show-Border
     Show-Info "Motherboard"
@@ -204,11 +202,9 @@ function Show-HardwareInformation {
             "Revision: $($baseboard.Version)"
         )
         
-        $info | ForEach-Object { Write-Host "  $_" }
+        $info | ForEach-Object { Write-Host $_ }
     }
-    catch {
-        Show-Warning "Could not read Motherboard attributes: $_"
-    }
+    catch { Show-Warning $_ }
     
     Show-Border
     Show-Info "BIOS"
@@ -222,11 +218,9 @@ function Show-HardwareInformation {
             "Release: $(($bios.ReleaseDate).ToString('yyyy-MM-dd'))"
         )
         
-        $info | ForEach-Object { Write-Host "  $_" }
+        $info | ForEach-Object { Write-Host $_ }
     }
-    catch {
-        Show-Warning "Could not read BIOS attributes: $_"
-    }
+    catch { Show-Warning $_ }
     
     Show-Border
     Show-Info "Processor"
@@ -248,13 +242,11 @@ function Show-HardwareInformation {
                 "Current Load: $($processor.LoadPercentage)%"
             )
             
-            $info | ForEach-Object { Write-Host "  $_" }
+            $info | ForEach-Object { Write-Host $_ }
             Write-Host ''
         }
     }
-    catch {
-        Show-Warning "Could not read Processor attributes: $_"
-    }
+    catch { Show-Warning $_ }
     
     Show-Border
     Show-Info "Memory"
@@ -277,15 +269,13 @@ function Show-HardwareInformation {
                 "Serial:   $($module.SerialNumber)"
             )
             
-            $info | ForEach-Object { Write-Host "  $_" }
+            $info | ForEach-Object { Write-Host $_ }
             Write-Host ''
         }
         
         Show-Success "Total Memory: $totalMemory GB"
     }
-    catch {
-        Show-Warning "Could not read Memory attributes: $_"
-    }
+    catch { Show-Warning $_ }
 }
 #endregion
 
@@ -429,7 +419,7 @@ function Main {
 
 try { Main }
 catch {
-    Show-Error "Script execution failed: $_"
+    Show-Error $_
     Write-Host "Press any button to exit..." -ForegroundColor Yellow
     $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
     exit 1

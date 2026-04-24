@@ -81,7 +81,7 @@ function Get-x265SVTAV1Profile {
     switch ($chromaFormat) {
         'i422' {
             if ($depth -eq 8) {
-                Write-Warning "x265 不支持 main422-8，降级为 main (4:2:0)"
+                Show-Warning "x265 不支持 main422-8，降级为 main (4:2:0)"
                 $profileBase = "main"
             }
             else {

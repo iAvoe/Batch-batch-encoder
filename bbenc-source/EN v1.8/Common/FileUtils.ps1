@@ -241,11 +241,11 @@ function Write-TextFile { # Call only after the global variable are defined in C
         [bool]$UseBOM = $true
     )
     if ([string]::IsNullOrWhiteSpace($Path)) {
-        Write-Error "Write-TextFile - Failed: Empty path"
+        Show-Error "Write-TextFile - Failed: Empty path"
         return
     }
     if ([string]::IsNullOrWhiteSpace($Content)) {
-        Write-Error "Write-TextFile - Failed: No content"
+        Show-Error "Write-TextFile - Failed: No content"
         return
     }
 
@@ -302,7 +302,7 @@ function Test-TextFileFormat {
         return $isValid
     }
     catch {
-        Show-Error "File validation failed: $_"
+        Show-Error $_
         return $false
     }
 }
@@ -401,7 +401,7 @@ function Get-StreamMetadata {
         
     }
     catch {
-        Show-Error "Failed to parse ffprobe output: $_"
+        Show-Error $_
         Show-Debug "Error details: $($_.ScriptStackTrace)"
         return $null
     }

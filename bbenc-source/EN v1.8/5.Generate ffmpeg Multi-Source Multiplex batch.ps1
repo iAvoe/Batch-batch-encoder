@@ -6,7 +6,7 @@
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
-    1.7
+    1.8
 #>
 
 # Load globals
@@ -170,7 +170,7 @@ function Get-StreamArgs {
                         }
                     }
                     '3' { # Pick a common frame rate
-                        Write-Warning "Framerate (fps) must be exactly same as source video stream, expect playback issues otherwise"
+                        Show-Warning "Framerate (fps) must be exactly same as source video stream, expect playback issues otherwise"
                         Write-Host "`nCommon framerate (fps)" -ForegroundColor Cyan
                         Write-Host "1. 23.976 (24000/1001)" -ForegroundColor Yellow
                         Write-Host "2. 24" -ForegroundColor Yellow
@@ -328,7 +328,7 @@ function Main {
     Write-Host " 2：MOV (Editing software preferred)"
     Write-Host " 3：MKV (Compatible with most subtitles, support fonts)"
     Write-Host " 4：MXF (Professional use case)"
-    Write-Warning " ffmpeg is deprecating the MP4 timecode (pts) generation feature, at which point the MP4 format option will stop working"
+    Show-Warning " ffmpeg is deprecating the MP4 timecode (pts) generation feature, at which point the MP4 format option will stop working"
     
     $containerExt = ""
     do {
@@ -337,7 +337,7 @@ function Main {
             '2' { $containerExt = ".mov" }
             '3' { $containerExt = ".mkv" }
             '4' { $containerExt = ".mxf" }
-            default { Write-Warning "Invalid option selected" }
+            default { Show-Warning "Invalid option selected" }
         }
     }
     while ($containerExt -eq "")
@@ -435,7 +435,7 @@ cmd /k
 
 try { Main }
 catch {
-    Show-Error "Script failed: $_"
+    Show-Error $_
     Write-Host "Error details: " -ForegroundColor Red
     Write-Host $_.Exception.ToString()
     Read-Host "Press any button to exit"

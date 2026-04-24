@@ -6,7 +6,7 @@
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
-    1.7
+    1.8
 #>
 
 # 若同时检测到 temp_v_info_is_mov.json 与 temp_v_info.json，则使用其中创建日期最新的文件
@@ -676,14 +676,14 @@ function Main {
                 }
             }
             catch {
-                Show-Error "解析 JSON 失败：$_"
+                Show-Error $_
                 Show-Debug "原始 JSON 字符串：$jsonString"
                 Read-Host "按 Enter 退出"
                 return
             }
         }
         catch {
-            Show-Error "读取 SVFI INI 文件失败：$_"
+            Show-Error $_
             Read-Host "按 Enter 退出"
             return
         }
@@ -836,7 +836,7 @@ function Main {
 
 try { Main }
 catch {
-    Show-Error "脚本执行出错：$_"
+    Show-Error $_
     Write-Host "错误详情：" -ForegroundColor Red
     Write-Host $_.Exception.ToString()
     Read-Host "按 Enter 退出"

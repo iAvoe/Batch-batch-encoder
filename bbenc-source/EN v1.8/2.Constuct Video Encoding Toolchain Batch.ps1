@@ -6,7 +6,7 @@
 .AUTHOR
     iAvoe - https://github.com/iAvoe
 .VERSION
-    1.7
+    1.8
 #>
 
 # Downstream tools (encoders) must support Y4M pipelines; otherwise, error exit for pipeline mismatch needs should be triggered (not yet implemented since all tools supports it)
@@ -329,10 +329,12 @@ function Main {
                 Show-Info "Please select the version of avs2yuv(64).exe used: "
                 $avs2yuvVer = Read-Host " [Default Enter/a: AviSynth+ (0.30) | b: AviSynth (up to 0.26)]"
                 if ([string]::IsNullOrWhiteSpace($avs2yuvVer) -or 'a' -eq $avs2yuvVer) {
-                    $global:isAvsPlus = $true; break
+                    $global:isAvsPlus = $true
+                    break
                 }
                 elseif ('b' -eq $avs2yuvVer) {
-                    $global:isAvsPlus = $false; break
+                    $global:isAvsPlus = $false
+                    break
                 }
                 Show-Warning "Incomprehensible input value, please try again"
             }
@@ -354,15 +356,7 @@ function Main {
     foreach ($k in $downstreamTools.Keys) { $tools[$k] = $downstreamTools[$k] }
     foreach ($k in $analysisTools.Keys) { $tools[$k] = $analysisTools[$k] }
 
-    <#
-    Show-Debug "Merged encoding tool list..."
-    foreach ($k in $tools.Keys) {
-        $type = if ($tools[$k]) { $tools[$k].GetType().Name } else { "Null" }
-        Write-Host "  Key: [$k] | Value: [$($tools[$k])] | Type: $type"
-    }
-    #>
-
-    # Verify wer have at least 1 stream and 1 downstream tool
+    # Verify: at least 1 upstream, 1 downstream tool
     $hasUpstreamTool =
         @('ffmpeg', 'vspipe', 'avs2yuv', 'avs2pipemod', 'svfi') | Where-Object { 
             $toolPath = $tools[$_]
@@ -380,7 +374,7 @@ function Main {
         }
 
     if (($hasUpstreamTool.Count -eq 0) -or ($hasDownstreamTool.Count -eq 0)) {
-        Show-Error "At least 1 upstream tool and 1 downstream tool need to be selected`r`n (e.g. ffmpeg + x265 or ffmpeg + svtav1)"
+        Show-Error "At least 1 upstream, 1 downstream tool required (e.g. ffmpeg + x265 or vspipe + svtav1)"
         exit 1
     }
     if (!$hasAnalysisTool) {
@@ -541,7 +535,7 @@ cmd /k
         
     }
     catch {
-        Show-Error "File export failed: $_"
+        Show-Error $_
         exit 1
     }
     
@@ -572,7 +566,7 @@ cmd /k
 
 try { Main }
 catch {
-    Show-Error "Script failed: $_"
+    Show-Error $_
     Write-Host "Error details: " -ForegroundColor Red
     Write-Host $_.Exception.ToString()
     Read-Host "Press any button to exit"
