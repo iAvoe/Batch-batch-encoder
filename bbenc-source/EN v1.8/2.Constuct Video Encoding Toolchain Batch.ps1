@@ -304,7 +304,7 @@ function Main {
     if (Test-NullablePath $toolsJson) {
         try {
             $savedConfig = Read-JsonFile $toolsJson
-            Show-Info "Detecting config file ($($savedConfig.SaveDate)), loading now..."
+            Show-Success "Detecting config file ($($savedConfig.SaveDate)), loading now..."
             Update-ToolMap $upstreamTools   $savedConfig.Upstream
             Update-ToolMap $downstreamTools $savedConfig.Downstream
             Update-ToolMap $analysisTools   $savedConfig.Analysis

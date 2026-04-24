@@ -801,7 +801,7 @@ function Get-x265ThreadPool {
         return $poolParam.TrimEnd(',')
     }
     else {
-        Show-Info "检测到安装了 1 颗处理器，忽略 x265 参数 --pools"
+        Show-Success "检测到安装了 1 颗处理器，忽略 x265 参数 --pools"
         return ""
     }
 }
@@ -1362,7 +1362,7 @@ function Main {
     if (Test-NullablePath $toolsJson) {
         try {
             $savedConfig = Read-JsonFile $toolsJson
-            Show-Info "检测到配置文件（$($savedConfig.SaveDate)），正在加载..."
+            Show-Success "检测到配置文件（$($savedConfig.SaveDate)），正在加载..."
             if ($null -ne $savedConfig.IsAvsPlus) {
                 $isAvsPlus = $savedConfig.IsAvsPlus 
             }

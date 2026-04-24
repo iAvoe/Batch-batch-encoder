@@ -718,7 +718,7 @@ function Main {
     if (Test-NullablePath $toolsJson) {
         try {
             $savedConfig = Read-JsonFile $toolsJson
-            Show-Info "Detecting config file ($($savedConfig.SaveDate)), loading now..."
+            Show-Success "Detecting config file ($($savedConfig.SaveDate)), loading now..."
             if ($savedConfig.Analysis) {
                 $ffprobePath = $savedConfig.Analysis.ffprobe
                 Show-Debug ("ffprobe path: " + $ffprobePath)

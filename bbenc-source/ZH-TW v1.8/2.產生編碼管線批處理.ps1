@@ -305,7 +305,7 @@ function Main {
     if (Test-NullablePath $toolsJson) {
         try {
             $savedConfig = Read-JsonFile $toolsJson
-            Show-Info "檢測到路徑設定檔（$($savedConfig.SaveDate)），正在載入..."
+            Show-Success "檢測到路徑設定檔（$($savedConfig.SaveDate)），正在載入..."
             Update-ToolMap $upstreamTools   $savedConfig.Upstream
             Update-ToolMap $downstreamTools $savedConfig.Downstream
             Update-ToolMap $analysisTools   $savedConfig.Analysis

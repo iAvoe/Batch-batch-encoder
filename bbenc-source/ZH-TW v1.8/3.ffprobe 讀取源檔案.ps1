@@ -720,7 +720,7 @@ function Main {
     if (Test-NullablePath $toolsJson) {
         try {
             $savedConfig = Read-JsonFile $toolsJson
-            Show-Info "檢測到設定檔（$($savedConfig.SaveDate)），正在載入..."
+            Show-Success "檢測到設定檔（$($savedConfig.SaveDate)），正在載入..."
             if ($savedConfig.Analysis) {
                 $ffprobePath = $savedConfig.Analysis.ffprobe
                 Show-Debug ("路徑：" + $ffprobePath)

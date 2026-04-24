@@ -303,7 +303,7 @@ function Main {
     if (Test-NullablePath $toolsJson) {
         try {
             $savedConfig = Read-JsonFile $toolsJson
-            Show-Info "检测到配置文件（$($savedConfig.SaveDate)），正在加载..."
+            Show-Success "检测到配置文件（$($savedConfig.SaveDate)），正在加载..."
             Update-ToolMap $upstreamTools   $savedConfig.Upstream
             Update-ToolMap $downstreamTools $savedConfig.Downstream
             Update-ToolMap $analysisTools   $savedConfig.Analysis
