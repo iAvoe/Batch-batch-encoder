@@ -74,16 +74,34 @@ function Get-Source {
     param(
         [string]$WindowTitle,
         [switch]$ScriptOnly,
+        [switch]$DLLOnly,
+        [switch]$INIOnly,
+        [string]$FoundPath,
         [Parameter(Mandatory=$true)][string]$ErrMsg="未选择文件，请重试"
     )
+    if ($ScriptOnly -and $DLLOnly -or $ScriptOnly -and $INIOnly -or $DLLOnly -and $INIOnly) {
+        throw 'Get-Source——Plural not supported: -ScriptOnly, -INIOnly, -DLLOnly, specify one at a time'
+    }
     do {
-        $file = Select-File -Title $windowTitle -ScriptOnly:$ScriptOnly
+        $file = if ($DLLOnly) {
+                Select-File -Title $windowTitle -DllOnly:$DLLOnly -InitialDirectory ([Environment]::GetFolderPath('System'))
+            }
+            elseif ($INIOnly) {
+                if (Test-NullablePath $FoundPath) {
+                    Select-File -Title $windowTitle -IniOnly:$INIOnly -InitialDirectory $FoundPath
+                }
+                else {
+                    Select-File -Title $windowTitle -IniOnly:$INIOnly
+                }
+            }
+            else {
+                Select-File -Title $windowTitle -ScriptOnly:$ScriptOnly
+            }
         if (-not $file) { Show-Error $errMsg }
     }
     while (-not $file)
     return $file
 }
-
 # Modularized ffprobe information retrieval function
 function Get-VideoStreamInfo {
     param (
@@ -507,17 +525,11 @@ function Main {
         'avs2pipemod' {
             $upstreamCode = 'd'
             Show-Info "Locating the path to AviSynth.dll..."
-            Write-Host " Get avisynth.dll: download from AviSynth+ repo (https://github.com/AviSynth/AviSynthPlus/releases)"
+            Write-Host " Get AviSynth.dll: download from AviSynth+ repo (https://github.com/AviSynth/AviSynthPlus/releases)"
             Write-Host " and extract AviSynthPlus_x.x.x_yyyymmdd-filesonly.7z"
-            do {
-                $Avs2PipeModDLL = Select-File -Title "Select avisynth.dll" -InitialDirectory ([Environment]::GetFolderPath('System')) -DllOnly
-                if (-not $Avs2PipeModDLL) {
-                    $placeholderScript = Read-Host "No DLL file selected. Press Enter to retry, input 'q' to force exit"
-                    if ($placeholderScript -eq 'q') { exit }
-                }
-            }
-            while (-not $Avs2PipeModDLL)
-            Show-Success "Path to AviSynth.dll: $Avs2PipeModDLL"
+            $Avs2PipeModDLL =
+                Get-Source -WindowTitle "Select AviSynth.dll" -DllOnly -ErrMsg "No DLL selected, please try again"
+            Show-Success "AviSynth.dll path recorded: $Avs2PipeModDLL"
         }
         'SVFI'        {
             $upstreamCode = 'e'
@@ -527,24 +539,14 @@ function Main {
                 if (Test-Path $p) { $p }
             } | Select-Object -First 1
 
-            Show-Info "Please select the desginated SVFI render configuration INI file"
-            Write-Host " For Steam installation, it would be X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini"
-
-            do {
-                if ($foundPath) { # The the auto-located path
-                    Show-Success "Candidate path found: $foundPath"
-                    $OneLineShotArgsINI = Select-File -Title "Select render configuration（.ini）" -IniOnly -InitialDirectory $foundPath
+            Show-Info "Please specify the desginated SVFI render config INI file:"
+            Write-Host " i.e.: X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini"
+            $OneLineShotArgsINI = if ($foundPath) {
+                    Get-Source -WindowTitle "Select render config file (.ini)" -INIOnly -ErrMsg "No INI selected, please try again" -FoundPath $foundPath
                 }
-                else { # DIY
-                    $OneLineShotArgsINI = Select-File -Title "Select render configuration（.ini）" -IniOnly
+                else {
+                    Get-Source -WindowTitle "Select render config file (.ini)" -INIOnly -ErrMsg "No INI selected, please try again"
                 }
-
-                if (-not $OneLineShotArgsINI) {
-                    $placeholderScript = Read-Host "No INI file selected. Press Enter to retry, input 'q' to force exit"
-                    if ($placeholderScript -eq 'q') { exit }
-                }
-            }
-            while (-not $OneLineShotArgsINI)
         }
         default       { $upstreamCode = 'a' }
     }
@@ -663,7 +665,7 @@ function Main {
 
                 # Validate if video file exists
                 if (-not (Test-Path -LiteralPath $videoSource)) {
-                    Show-Error "Source video fill no longer exists on disk: $videoSource, please recreate INI with SVFI"
+                    Show-Error "Source no longer exists: $videoSource, please recreate INI with SVFI"
                     Read-Host "Press Enter to exit"
                     return
                 }

@@ -73,10 +73,29 @@ function Get-Source {
     param(
         [string]$WindowTitle,
         [switch]$ScriptOnly,
+        [switch]$DLLOnly,
+        [switch]$INIOnly,
+        [string]$FoundPath,
         [Parameter(Mandatory=$true)][string]$ErrMsg="未选择文件，请重试"
     )
+    if ($ScriptOnly -and $DLLOnly -or $ScriptOnly -and $INIOnly -or $DLLOnly -and $INIOnly) {
+        throw 'Get-Source——无法同时使用 -ScriptOnly 和 -DLLOnly，最多指定 1 项'
+    }
     do {
-        $file = Select-File -Title $windowTitle -ScriptOnly:$ScriptOnly
+        $file = if ($DLLOnly) {
+                Select-File -Title $windowTitle -DllOnly:$DLLOnly -InitialDirectory ([Environment]::GetFolderPath('System'))
+            }
+            elseif ($INIOnly) {
+                if (Test-NullablePath $FoundPath) {
+                    Select-File -Title $windowTitle -IniOnly:$INIOnly -InitialDirectory $FoundPath
+                }
+                else {
+                    Select-File -Title $windowTitle -IniOnly:$INIOnly
+                }
+            }
+            else {
+                Select-File -Title $windowTitle -ScriptOnly:$ScriptOnly
+            }
         if (-not $file) { Show-Error $errMsg }
     }
     while (-not $file)
@@ -511,14 +530,8 @@ function Main {
             Show-Info "指定 AviSynth.dll 的路径..."
             Write-Host " 在 AviSynth+ 仓库（https://github.com/AviSynth/AviSynthPlus/releases）中，"
             Write-Host " 下载 AviSynthPlus_x.x.x_yyyymmdd-filesonly.7z，即可获取 DLL"
-            do {
-                $Avs2PipeModDLL = Select-File -Title "选择 avisynth.dll" -InitialDirectory ([Environment]::GetFolderPath('System')) -DllOnly
-                if (-not $Avs2PipeModDLL) {
-                    $placeholderScript = Read-Host "未选择 DLL。按 Enter 重试，输入 'q' 强制退出"
-                    if ($placeholderScript -eq 'q') { exit }
-                }
-            }
-            while (-not $Avs2PipeModDLL)
+            $Avs2PipeModDLL =
+                Get-Source -WindowTitle "选择 AviSynth.dll" -DllOnly -ErrMsg "未选择 DLL，请重试"
             Show-Success "已记录 AviSynth.dll 路径：$Avs2PipeModDLL"
         }
         'SVFI'        {
@@ -531,22 +544,12 @@ function Main {
 
             Show-Info "请指定 SVFI 渲染配置 INI 文件的路径"
             Write-Host " 如 X:\SteamLibrary\steamapps\common\SVFI\Configs\*.ini"
-
-            do {
-                if ($foundPath) { # 尝试自动定位到的 SVFI 路径（Select-File 能自动回退到 Desktop）
-                    Show-Success "已定位候选路径：$foundPath"
-                    $OneLineShotArgsINI = Select-File -Title "选择 SVFI 渲染配置文件（.ini）" -IniOnly -InitialDirectory $foundPath
+            $OneLineShotArgsINI = if ($foundPath) {
+                    Get-Source -WindowTitle "选择 SVFI 渲染配置文件（.ini）" -INIOnly -ErrMsg "未选择INI，请重试" -FoundPath $foundPath
                 }
-                else { # DIY
-                    $OneLineShotArgsINI = Select-File -Title "选择 SVFI 渲染配置文件（.ini）" -IniOnly
+                else {
+                    Get-Source -WindowTitle "选择 SVFI 渲染配置文件（.ini）" -INIOnly -ErrMsg "未选择INI，请重试"
                 }
-
-                if (-not $OneLineShotArgsINI -or -not (Test-Path -LiteralPath $OneLineShotArgsINI)) {
-                    $placeholderScript = Read-Host " INI 路径不存在；按 Enter 重试，输入 'q' 强制退出"
-                    if ($placeholderScript -eq 'q') { exit }
-                }
-            }
-            while (-not $OneLineShotArgsINI -or -not (Test-Path -LiteralPath $OneLineShotArgsINI))
         }
         default       { $upstreamCode = 'a' }
     }
