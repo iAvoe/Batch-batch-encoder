@@ -68,23 +68,18 @@ function Set-FpsParams {
     }
 }
 
-# 检测整数是否类似质数，来源：buttondown.com/behind-the-powershell-pipeline/archive/a-prime-scripting-solution
-function Test-IsLikePrime {
-    param (
-        [Parameter(Mandatory=$true)][int]$number,
-        [int]$threshold = 5 # 整除数的数量阈值，超过后判断为不类似质数
+#region Getters
+function Get-VideoSource {
+    param(
+        [string]$WindowTitle,
+        [Parameter(Mandatory=$true)][string]$ErrMsg="未选择文件，请重试"
     )
-    if ($number -lt 3) { throw "测试值必须大于 3" }
-    $t = 0
-    for ($i=2; $i -le [math]::Sqrt($number); $i++) {
-        if ($number % $i -eq 0) {
-            $t++
-        }
-        if ($t -gt $threshold) {
-            return $false
-        }
+    do {
+        $file = Select-File -Title $windowTitle
+        if (-not $file) { Show-Error $errMsg }
     }
-    return $true
+    while (-not $file)
+    return $file
 }
 
 # 模块化的 ffprobe 信息读取函数
@@ -127,9 +122,7 @@ function Get-VideoStreamInfo {
         throw "Get-VideoStreamInfo：ffprobe 执行失败或未返回有效数据"
     }
 
-    try {
-        $info = $ffprobeJson | ConvertFrom-Json
-    }
+    try { $info = $ffprobeJson | ConvertFrom-Json }
     catch {
         Write-Host $ffprobeJson
         throw "Get-VideoStreamInfo：无法解析 ffprobe 返回的 JSON"
@@ -141,6 +134,77 @@ function Get-VideoStreamInfo {
 
     return $info.streams[0]
 }
+
+# 同时生成占位 AVS/VS 脚本到 %USERPROFILE%，从而在用户暂无可用脚本的情况下顶替
+function Get-BlankAVSVSScript {
+    param([Parameter(Mandatory=$true)][string]$videoSource)
+
+    # 尝试用共用函数拿到带引号的路径
+    $quotedImport = Get-QuotedPath $videoSource
+
+    # 空脚本与导出路径
+    $AVSScriptPath = Join-Path $Global:TempFolder "blank_avs_script.avs"
+    $VSScriptPath = Join-Path $Global:TempFolder "blank_vs_script.vpy"
+    # 生成 AVS 内容（LWLibavVideoSource 需要双引号包裹路径）
+    # 文件夹：C:\Program Files (x86)\AviSynth+\plugins64+\ 中必须有 libvslsmashsource.dll
+    $blankAVSScript = "LWLibavVideoSource($quotedImport) # 自动生成的占位脚本，按需修改"
+    # 生成 VapourSynth 内容（使用原始字符串 literal r"..." 以避免转义问题）
+    # 若 Get-QuotedPath 返回例如 "C:\path\file.mp4"，则 r$quotedImport 将成为 r"C:\path\file.mp4"
+    $blankVSScript = @"
+import vapoursynth as vs
+core = vs.core
+src = core.lsmas.LWLibavSource(source=r$quotedImport)
+# 自动生成无滤镜脚本：按需在此处加入滤镜、裁切、帧率调整等
+src.set_output()
+"@
+
+    try {
+        Confirm-FileDelete $AVSScriptPath
+        Confirm-FileDelete $VSScriptPath
+
+        Show-Info "正在生成无滤镜脚本：`n $AVSScriptPath`n $VSScriptPath"
+        Write-TextFile -Path $AVSScriptPath -Content $blankAVSScript -UseBOM $false
+        Write-TextFile -Path $VSScriptPath -Content $blankVSScript -UseBOM $false
+        Show-Success "已生成无滤镜脚本到用户目录。"
+
+        # 验证换行符
+        Show-Debug "验证脚本文件格式..."
+        if (-not (Test-TextFileFormat -Path $AVSScriptPath)) {
+            return
+        }
+        if (-not (Test-TextFileFormat -Path $VSScriptPath)) {
+            return
+        }
+
+        # 调用方根据上游类型选择使用哪个脚本
+        return @{
+            AVS = $AVSScriptPath
+            VPY = $VSScriptPath
+        }
+    }
+    catch {
+        Show-Error ("生成无滤镜脚本失败：" + $_)
+        return $null
+    }
+}
+#endregion
+
+#region Validation
+# 检测整数是否类似质数，来源：buttondown.com/behind-the-powershell-pipeline/archive/a-prime-scripting-solution
+function Test-IsLikePrime {
+    param (
+        [Parameter(Mandatory=$true)][int]$number,
+        [int]$threshold = 5 # 整除数的数量阈值，超过后判断为不类似质数
+    )
+    if ($number -lt 3) { throw "测试值必须大于 3" }
+    $t = 0
+    for ($i=2; $i -le [math]::Sqrt($number); $i++) {
+        if ($number % $i -eq 0) { $t++ }
+        if ($t -gt $threshold) { return $false }
+    }
+    return $true
+}
+
 
 # 检测并警告可变帧率以及非方形像素变宽比存在，并提供修复建议
 function Test-VideoWarnings {
@@ -155,14 +219,13 @@ function Test-VideoWarnings {
             [Parameter(Mandatory=$true)][string]$Title,
             [Parameter(Mandatory=$true)][object[]]$Lines
         )
-
         Show-Warning $Title
         foreach ($line in $Lines) {
             if ($line -is [hashtable]) {
                 Write-Host $line.Text -ForegroundColor $line.Color
             }
             else {
-                Write-Host $line -ForegroundColor Yellow
+                Write-Host $line -ForegroundColor DarkYellow
             }
         }
     }
@@ -390,59 +453,7 @@ function Test-VContainerFormat {
         [Console]::OutputEncoding = $oldEncoding
     }
 }
-
-# 同时生成占位 AVS/VS 脚本到 %USERPROFILE%，从而在用户暂无可用脚本的情况下顶替
-function Get-BlankAVSVSScript {
-    param([Parameter(Mandatory=$true)][string]$videoSource)
-
-    # 尝试用共用函数拿到带引号的路径
-    $quotedImport = Get-QuotedPath $videoSource
-
-    # 空脚本与导出路径
-    $AVSScriptPath = Join-Path $Global:TempFolder "blank_avs_script.avs"
-    $VSScriptPath = Join-Path $Global:TempFolder "blank_vs_script.vpy"
-    # 生成 AVS 内容（LWLibavVideoSource 需要双引号包裹路径）
-    # 文件夹：C:\Program Files (x86)\AviSynth+\plugins64+\ 中必须有 libvslsmashsource.dll
-    $blankAVSScript = "LWLibavVideoSource($quotedImport) # 自动生成的占位脚本，按需修改"
-    # 生成 VapourSynth 内容（使用原始字符串 literal r"..." 以避免转义问题）
-    # 若 Get-QuotedPath 返回例如 "C:\path\file.mp4"，则 r$quotedImport 将成为 r"C:\path\file.mp4"
-    $blankVSScript = @"
-import vapoursynth as vs
-core = vs.core
-src = core.lsmas.LWLibavSource(source=r$quotedImport)
-# 自动生成无滤镜脚本：按需在此处加入滤镜、裁切、帧率调整等
-src.set_output()
-"@
-
-    try {
-        Confirm-FileDelete $AVSScriptPath
-        Confirm-FileDelete $VSScriptPath
-
-        Show-Info "正在生成无滤镜脚本：`n $AVSScriptPath`n $VSScriptPath"
-        Write-TextFile -Path $AVSScriptPath -Content $blankAVSScript -UseBOM $false
-        Write-TextFile -Path $VSScriptPath -Content $blankVSScript -UseBOM $false
-        Show-Success "已生成无滤镜脚本到用户目录。"
-
-        # 验证换行符
-        Show-Debug "验证脚本文件格式..."
-        if (-not (Test-TextFileFormat -Path $AVSScriptPath)) {
-            return
-        }
-        if (-not (Test-TextFileFormat -Path $VSScriptPath)) {
-            return
-        }
-
-        # 调用方根据上游类型选择使用哪个脚本
-        return @{
-            AVS = $AVSScriptPath
-            VPY = $VSScriptPath
-        }
-    }
-    catch {
-        Show-Error ("生成无滤镜脚本失败：" + $_)
-        return $null
-    }
-}
+#endregion
 
 #region Main
 function Main {
@@ -543,15 +554,12 @@ function Main {
 
     # vspipe / avs2yuv / avs2pipemod：提供生成无滤镜脚本选项
     if ($isScriptUpstream) {
-        do {
-            # 选择视频源文件（ffprobe 分析）
-            Show-Info "选择（脚本引用的）视频源文件（ffprobe 将分析此文件）"
-            while ($null -eq $videoSource) {
-                $videoSource = Select-File -Title "选择视频源文件（例如 .mp4/.mkv/.mov）"
-                if ($null -eq $videoSource) { Show-Error "未选择视频文件" }
-            }
+        Show-Info "选择脚本引用的视频源文件"
+        $videoSource =
+            Get-VideoSource -WindowTitle "选择脚本引用的视频源文件（ffprobe 分析）" -ErrMsg "未选择文件，请重试"
 
-            Show-Info '导入或同时生成 AviSynth 和 VapourSynth 脚本'
+        while ($true) { # 视频源需补充
+            Show-Info '选择导入脚本，或生成 AviSynth、VapourSynth 脚本'
             $mode = Read-Host " 输入 'y' 为视频源生成无滤镜脚本，输入 'n' 或 Enter 导入自定义脚本"
         
             if ([string]::IsNullOrWhiteSpace($mode) -or 'n' -eq $mode) {
@@ -611,7 +619,6 @@ function Main {
             }
             break
         }
-        while ($true)
 
         $encodeImportSourcePath = $scriptSource
     }
@@ -703,11 +710,9 @@ function Main {
                 Show-Error "未选择文件" 
                 continue
             }
-            Show-Success "已选择视频源文件：$videoSource"
-            break
         }
-        while ($true)
-
+        while (-not $videoSource)
+        Show-Success "已选择视频源文件：$videoSource"
         $encodeImportSourcePath = $videoSource
     }
     $quotedVideoSource = Get-QuotedPath $videoSource

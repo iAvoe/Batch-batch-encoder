@@ -69,23 +69,18 @@ function Set-FpsParams {
     }
 }
 
-# Detecting whether an integer is similar to a prime number，credit：buttondown.com/behind-the-powershell-pipeline/archive/a-prime-scripting-solution
-function Test-IsLikePrime {
-    param (
-        [Parameter(Mandatory=$true)][int]$number,
-        [int]$threshold = 5 # Threshold for the number of divisors is set
+#region Getters
+function Get-VideoSource {
+    param(
+        [string]$windowTitle,
+        [Parameter(Mandatory=$true)][string]$errMsg="未选择文件，请重试"
     )
-    if ($number -lt 3) { throw "Test value must be greater than 3" }
-    $t = 0
-    for ($i=2; $i -le [math]::Sqrt($number); $i++) {
-        if ($number % $i -eq 0) {
-            $t++
-        }
-        if ($t -gt $threshold) {
-            return $false
-        }
+    do {
+        $file = Select-File -Title $windowTitle
+        if (-not $file) { Show-Error $errMsg }
     }
-    return $true
+    while (-not $file)
+    return $file
 }
 
 # Modularized ffprobe information retrieval function
@@ -126,9 +121,7 @@ function Get-VideoStreamInfo {
         throw "Get-VideoStreamInfo: ffprobe failed or did not return any valid data"
     }
 
-    try {
-        $streamInfo = $ffprobeJson | ConvertFrom-Json
-    }
+    try { $streamInfo = $ffprobeJson | ConvertFrom-Json }
     catch {
         Write-Host $ffprobeJson
         throw "Get-VideoStreamInfo: Invalid JSON returned by ffprobe"
@@ -139,6 +132,76 @@ function Get-VideoStreamInfo {
     }
 
     return $streamInfo.streams[0]
+}
+
+# Generate both AVS/VS script to %USERPROFILE%, allowing encoding to start when the scripts are not ready
+function Get-BlankAVSVSScript {
+    param([Parameter(Mandatory=$true)][string]$videoSource)
+
+    # Get quotes on path
+    $quotedImport = Get-QuotedPath $videoSource
+
+    # Empty Script and Export Path
+    $AVSScriptPath = Join-Path $Global:TempFolder "blank_avs_script.avs"
+    $VSScriptPath = Join-Path $Global:TempFolder "blank_vs_script.vpy"
+    # Generate AVS content (LWLibavVideoSource requires the path to be enclosed in double quotes)
+    # libvslsmashsource.dll must exist in folder C:\Program Files (x86)\AviSynth+\plugins64+\
+    $blankAVSScript = "LWLibavVideoSource($quotedImport) # Generated filter-less script, modify if needed"
+    # Generate VapourSynth content (use raw string literal r"..." to avoid escaping issues)
+    # If Get-QuotedPath returns strings like "C:\path\file.mp4", then modify r$quotedImport to r"C:\path\file.mp4"
+    $blankVSScript = @"
+import vapoursynth as vs
+core = vs.core
+src = core.lsmas.LWLibavSource(source=r$quotedImport)
+# Add filters needed here
+src.set_output()
+"@
+
+    try {
+        Confirm-FileDelete $AVSScriptPath
+        Confirm-FileDelete $VSScriptPath
+
+        Show-Info "Generating filter-less script: `n $AVSScriptPath`n $VSScriptPath"
+        Write-TextFile -Path $AVSScriptPath -Content $blankAVSScript -UseBOM $false
+        Write-TextFile -Path $VSScriptPath -Content $blankVSScript -UseBOM $false
+        Show-Success "Filter-less script created to %USERPROFILE%"
+
+        # Check line breaks, must be CRLF for Windows
+        Show-Debug "Validate script file format..."
+        if (-not (Test-TextFileFormat -Path $AVSScriptPath)) {
+            return
+        }
+        if (-not (Test-TextFileFormat -Path $VSScriptPath)) {
+            return
+        }
+
+        # Activate a script by previous selection
+        return @{
+            AVS = $AVSScriptPath
+            VPY = $VSScriptPath
+        }
+    }
+    catch {
+        Show-Error ("Failed to create filter-less script: " + $_)
+        return $null
+    }
+}
+#endregion
+
+#region Validation
+# Detecting whether an integer is similar to a prime number，credit：buttondown.com/behind-the-powershell-pipeline/archive/a-prime-scripting-solution
+function Test-IsLikePrime {
+    param (
+        [Parameter(Mandatory=$true)][int]$number,
+        [int]$threshold = 5 # Threshold for the number of divisors is set
+    )
+    if ($number -lt 3) { throw "Test value must be greater than 3" }
+    $t = 0
+    for ($i=2; $i -le [math]::Sqrt($number); $i++) {
+        if ($number % $i -eq 0) { $t++ }
+        if ($t -gt $threshold) { return $false }
+    }
+    return $true
 }
 
 # 检测并警告可变帧率以及非方形像素变宽比存在，并提供修复建议
@@ -154,14 +217,13 @@ function Test-VideoWarnings {
             [Parameter(Mandatory=$true)][string]$Title,
             [Parameter(Mandatory=$true)][object[]]$Lines
         )
-
         Show-Warning $Title
         foreach ($line in $Lines) {
             if ($line -is [hashtable]) {
                 Write-Host $line.Text -ForegroundColor $line.Color
             }
             else {
-                Write-Host $line -ForegroundColor Yellow
+                Write-Host $line -ForegroundColor DarkYellow
             }
         }
     }
@@ -389,59 +451,7 @@ function Test-VContainerFormat {
         [Console]::OutputEncoding = $oldEncoding
     }
 }
-
-# Generate both AVS/VS script to %USERPROFILE%, allowing encoding to start when the scripts are not ready
-function Get-BlankAVSVSScript {
-    param([Parameter(Mandatory=$true)][string]$videoSource)
-
-    # Get quotes on path
-    $quotedImport = Get-QuotedPath $videoSource
-
-    # Empty Script and Export Path
-    $AVSScriptPath = Join-Path $Global:TempFolder "blank_avs_script.avs"
-    $VSScriptPath = Join-Path $Global:TempFolder "blank_vs_script.vpy"
-    # Generate AVS content (LWLibavVideoSource requires the path to be enclosed in double quotes)
-    # libvslsmashsource.dll must exist in folder C:\Program Files (x86)\AviSynth+\plugins64+\
-    $blankAVSScript = "LWLibavVideoSource($quotedImport) # Generated filter-less script, modify if needed"
-    # Generate VapourSynth content (use raw string literal r"..." to avoid escaping issues)
-    # If Get-QuotedPath returns strings like "C:\path\file.mp4", then modify r$quotedImport to r"C:\path\file.mp4"
-    $blankVSScript = @"
-import vapoursynth as vs
-core = vs.core
-src = core.lsmas.LWLibavSource(source=r$quotedImport)
-# Add filters needed here
-src.set_output()
-"@
-
-    try {
-        Confirm-FileDelete $AVSScriptPath
-        Confirm-FileDelete $VSScriptPath
-
-        Show-Info "Generating filter-less script: `n $AVSScriptPath`n $VSScriptPath"
-        Write-TextFile -Path $AVSScriptPath -Content $blankAVSScript -UseBOM $false
-        Write-TextFile -Path $VSScriptPath -Content $blankVSScript -UseBOM $false
-        Show-Success "Filter-less script created to %USERPROFILE%"
-
-        # Check line breaks, must be CRLF for Windows
-        Show-Debug "Validate script file format..."
-        if (-not (Test-TextFileFormat -Path $AVSScriptPath)) {
-            return
-        }
-        if (-not (Test-TextFileFormat -Path $VSScriptPath)) {
-            return
-        }
-
-        # Activate a script by previous selection
-        return @{
-            AVS = $AVSScriptPath
-            VPY = $VSScriptPath
-        }
-    }
-    catch {
-        Show-Error ("Failed to create filter-less script: " + $_)
-        return $null
-    }
-}
+#endregion
 
 #region Main
 function Main {
@@ -542,16 +552,12 @@ function Main {
 
     # vspipe / avs2yuv / avs2pipemod: Filter-less script generation option
     if ($isScriptUpstream) {
-        do {
-            # Select source file (ffprobe analysis)
-            Show-Info "Select the video source file (referenced by the script) for ffprobe to analyze"
-            while ($null -eq $videoSource) {
-                $videoSource = Select-File -Title "Select video source (.mp4/.mkv/.mov)"
-                if ($null -eq $videoSource) { Show-Error "No video source selected" }
-            }
-        
-            # Ask user to generate or import existing script
-            Show-Info "Import one or generate both AviSynth and VapourSynth filter-less scripts"
+        Show-Info "Select source video file used by script"
+        $videoSource =
+            Get-VideoSource -WindowTitle "Select source video file used by script (ffprobe analysis)" -ErrMsg "Invalid file selected, please try again"
+
+        while ($true) {
+            Show-Info 'Select from Import or generate AviSynth/VapourSynth script(s)'
             $mode = Read-Host " Input 'y' to generate script, 'n'/Enter to import a custom script"
         
             if ([string]::IsNullOrWhiteSpace($mode) -or 'n' -eq $mode) {
@@ -612,7 +618,6 @@ function Main {
             }
             break
         }
-        while ($true)
 
         $encodeImportSourcePath = $scriptSource
     }
@@ -704,12 +709,9 @@ function Main {
                 Show-Error "No video source selected" 
                 continue
             }
-            
-            Show-Success "Video source selected: $videoSource"
-            break
         }
-        while ($true)
-
+        while (-not $videoSource)
+        Show-Success "Video source selected: $videoSource"
         $encodeImportSourcePath = $videoSource
     }
     $quotedVideoSource = Get-QuotedPath $videoSource
