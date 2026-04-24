@@ -76,11 +76,18 @@ function Get-Source {
         [switch]$ScriptOnly,
         [switch]$DLLOnly,
         [switch]$INIOnly,
+        [switch]$EXEOnly,
         [string]$FoundPath,
         [Parameter(Mandatory=$true)][string]$ErrMsg="未选择文件，请重试"
     )
-    if ($ScriptOnly -and $DLLOnly -or $ScriptOnly -and $INIOnly -or $DLLOnly -and $INIOnly) {
-        throw 'Get-Source——Plural not supported: -ScriptOnly, -INIOnly, -DLLOnly, specify one at a time'
+    if ($ScriptOnly -and $DLLOnly -or
+        $ScriptOnly -and $INIOnly -or
+        $ScriptOnly -and $EXEOnly -or
+        $DLLOnly -and $INIOnly -or
+        $DLLOnly -and $EXEOnly -or
+        $INIOnly -and $EXEOnly
+    ) {
+        throw 'Get-Source——Plural not supported, use -ScriptOnly, -INIOnly, -DLLOnly, -EXEOnly one at a time'
     }
     do {
         $file = if ($DLLOnly) {
@@ -93,6 +100,9 @@ function Get-Source {
                 else {
                     Select-File -Title $windowTitle -IniOnly:$INIOnly
                 }
+            }
+            elseif ($EXEOnly) {
+                Select-File -Title $windowTitle -ExeOnly:$EXEOnly
             }
             else {
                 Select-File -Title $windowTitle -ScriptOnly:$ScriptOnly
@@ -568,7 +578,6 @@ function Main {
                 Show-Success "Script source selected: $scriptSource"
                 break
             }
-            # Generate filter-less script, both for AVS and VS
             elseif ('y' -eq $mode) {
                 if (Test-NullablePath 'C:\Program Files (x86)\AviSynth+\plugins64+\LSMASHSource.dll') {
                     Show-Success "LSMASHSource.dll is detected under C:\Program Files (x86)\AviSynth+\plugins64+\, all set"
@@ -593,7 +602,6 @@ function Main {
                 else { # vspipe
                     $scriptSource = $placeholderScript.VPY
                 }
-                
                 Show-Success "Filter-less script created: $scriptSource"
                 break
             }
@@ -602,7 +610,6 @@ function Main {
                 continue
             }
         }
-
         $encodeImportSourcePath = $scriptSource
     }
     # SVFI: parse source video from INI file
@@ -616,7 +623,7 @@ function Main {
         # }"
         # Read and find line starts with gui_inputs, i.e.:
         # gui_inputs="{\"inputs\": [{\"task_id\": \"798_2aa174\", \"input_path\": \"X:\\\\Video\\\\\\u5176\\u5b83-\\u52a8\\u6f2b\\u753b\\u516c\\u79cd\\\\[Airota][Yuru Yuri\\u3001][OVA][BDRip 1080p].mp4\", \"is_surveillance_folder\": false}]}"
-        Show-Info "Attempting to get source video path from SVFI render configuration INI file..."
+        Show-Info "Fetching source video path from SVFI render config file..."
 
         try { # Read INI & locate gui_inputs line
             $iniContent = Get-Content -LiteralPath $OneLineShotArgsINI -Raw -ErrorAction Stop
@@ -731,17 +738,11 @@ function Main {
     if (-not $isSavedPathValid) {
         $ffprobePath = Invoke-AutoSearch -ToolName 'ffprobe' -ScriptDir $scriptDir
         if ($ffprobePath) {
-            Show-Success "Going directly with found ffprobe.exe: $ffprobePath"
+            Show-Success "Going with auto-located ffprobe.exe: $ffprobePath"
         }
         else {
-            do {
-                $ffprobePath =
-                    Select-File -Title "Open ffprobe.exe" -InitialDirectory ([Environment]::GetFolderPath('ProgramFiles')) -ExeOnly
-                if (-not (Test-Path -LiteralPath $ffprobePath)) {
-                    Show-Warning "Could not locate ffprobe executable, please retry"
-                }
-            }
-            while (-not (Test-Path -LiteralPath $ffprobePath))
+            $ffprobePath = Get-Source -WindowTitle "Open ffprobe.exe" -ExeOnly -ErrMsg "Could not locate ffprobe.exe, please try again"
+            Show-Success "ffprobe.exe located：$ffprobePath"
         }
     }
 

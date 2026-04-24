@@ -78,8 +78,14 @@ function Get-Source {
         [string]$FoundPath,
         [Parameter(Mandatory=$true)][string]$ErrMsg="未选择文件，请重试"
     )
-    if ($ScriptOnly -and $DLLOnly -or $ScriptOnly -and $INIOnly -or $DLLOnly -and $INIOnly) {
-        throw 'Get-Source——無法同時使用 -ScriptOnly、-INIOnly、-DLLOnly，最多指定 1 項'
+    if ($ScriptOnly -and $DLLOnly -or
+        $ScriptOnly -and $INIOnly -or
+        $ScriptOnly -and $EXEOnly -or
+        $DLLOnly -and $INIOnly -or
+        $DLLOnly -and $EXEOnly -or
+        $INIOnly -and $EXEOnly
+    ) {
+        throw 'Get-Source－不支援複數使用 最多指定 -ScriptOnly、-INIOnly、-DLLOnly、-EXEOnly 中之一'
     }
     do {
         $file = if ($DLLOnly) {
@@ -92,6 +98,9 @@ function Get-Source {
                 else {
                     Select-File -Title $windowTitle -IniOnly:$INIOnly
                 }
+            }
+            elseif ($EXEOnly) {
+                Select-File -Title $windowTitle -ExeOnly:$EXEOnly
             }
             else {
                 Select-File -Title $windowTitle -ScriptOnly:$ScriptOnly
@@ -560,7 +569,7 @@ function Main {
         $videoSource =
             Get-Source -WindowTitle "選擇腳本引用的影片源文件（ffprobe 分析）" -ErrMsg "未選擇文件，請重試"
 
-        while ($true) { # 影片源需補充
+        while ($true) {
             Show-Info '選擇導入腳本，或生成 AviSynth、VapourSynth 腳本'
             $mode = Read-Host " 輸入 'y' 為影片源生成無濾鏡腳本，輸入 'n' 或 Enter 導入自訂腳本"
         
@@ -594,7 +603,6 @@ function Main {
                 else { # vspipe
                     $scriptSource = $placeholderScript.VPY
                 }
-                
                 Show-Success "已生成無濾鏡腳本：$scriptSource"
                 break
             }
@@ -603,7 +611,6 @@ function Main {
                 continue
             }
         }
-
         $encodeImportSourcePath = $scriptSource
     }
     # SVFI：從 INI 文件中讀取影片路徑，以及 task_id
@@ -736,14 +743,8 @@ function Main {
             Show-Success "將直接使用自動檢測到的 ffprobe.exe：$ffprobePath"
         }
         else {
-            do {
-                $ffprobePath =
-                    Select-File -Title "定位 ffprobe.exe" -InitialDirectory ([Environment]::GetFolderPath('ProgramFiles')) -ExeOnly
-                if (-not (Test-Path -LiteralPath $ffprobePath)) {
-                    Show-Warning "找不到 ffprobe 可執行文件，請重試"
-                }
-            }
-            while (-not (Test-Path -LiteralPath $ffprobePath))
+            $ffprobePath = Get-Source -WindowTitle "定位 ffprobe.exe" -ExeOnly -ErrMsg "未選擇 ffprobe.exe，請重試"
+            Show-Success "已導入 ffprobe.exe：$ffprobePath"
         }
     }
     
