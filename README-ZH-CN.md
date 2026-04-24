@@ -80,6 +80,9 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 <p align="center"><img src="bmc_qr.png" alt="支持一下 -_-"><br><img src="pp_tip_qr.png" alt="支持一下 =_="></p>
 
 ## 更新信息
+**1.8.5**
+- 各个步骤脚本均修复了大量 Bug 并优化了代码
+
 **1.8.0**
 - 步骤 3-4:
   - 从 CSV 格式的视频元数据处理更换为 JSON 格式

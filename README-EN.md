@@ -73,6 +73,9 @@ Developing these tools wasn't easy. If this tool improve your efficiency, consid
 <p align="center"><img src="bmc_qr.png" alt="Support me -_-"><br><img src="pp_tip_qr.png" alt="Support me =_="></p>
 
 ## Update Information
+**1.8.5**
+- Major bug fixes and optimizations completed across all step scripts
+
 **1.8.0**
 - Step 3-4
   - Implemented source metadata passing with JSON format (previously CSV)
