@@ -70,13 +70,14 @@ function Set-FpsParams {
 }
 
 #region Getters
-function Get-VideoSource {
+function Get-Source {
     param(
-        [string]$windowTitle,
-        [Parameter(Mandatory=$true)][string]$errMsg="未选择文件，请重试"
+        [string]$WindowTitle,
+        [switch]$ScriptOnly,
+        [Parameter(Mandatory=$true)][string]$ErrMsg="未选择文件，请重试"
     )
     do {
-        $file = Select-File -Title $windowTitle
+        $file = Select-File -Title $windowTitle -ScriptOnly:$ScriptOnly
         if (-not $file) { Show-Error $errMsg }
     }
     while (-not $file)
@@ -455,6 +456,14 @@ function Test-VContainerFormat {
 
 #region Main
 function Main {
+    # IO Variables
+    $videoSource = $null # ffprobe will analyze this one
+    $scriptSource = $null # script source, overrides video source in json export
+    $encodeImportSourcePath = $null
+    $svfiTaskId = $null
+    $upstreamCode = $null
+    $Avs2PipeModDLL = $null # Extra DLL needed
+    $OneLineShotArgsINI = $null
     $toolsJson = Join-Path $Global:TempFolder "tools.json"
     
     Show-Border
@@ -487,10 +496,7 @@ function Main {
         }
     }
     
-    # Get upstream tool code（(from JSON); Import DDL for Avs2PipeMod
-    $upstreamCode = $null
-    $Avs2PipeModDLL = $null
-    $OneLineShotArgsINI = $null
+    # Get upstream tool code（(from JSON)
     $isScriptUpstream =
         $selectedType.Name -in @('vspipe', 'avs2yuv', 'avs2pipemod')
 
@@ -543,55 +549,31 @@ function Main {
         default       { $upstreamCode = 'a' }
     }
     Write-Host ("─" * 50)
-    
-    # Define IO Variables
-    $videoSource = $null # ffprobe will analyze this one
-    $scriptSource = $null # script source, overrides video source in json export
-    $encodeImportSourcePath = $null
-    $svfiTaskId = $null
 
     # vspipe / avs2yuv / avs2pipemod: Filter-less script generation option
     if ($isScriptUpstream) {
         Show-Info "Select source video file used by script"
         $videoSource =
-            Get-VideoSource -WindowTitle "Select source video file used by script (ffprobe analysis)" -ErrMsg "Invalid file selected, please try again"
+            Get-Source -WindowTitle "Select source video file used by script (ffprobe analysis)" -ErrMsg "Invalid file selected, please try again"
 
         while ($true) {
             Show-Info 'Select from Import or generate AviSynth/VapourSynth script(s)'
             $mode = Read-Host " Input 'y' to generate script, 'n'/Enter to import a custom script"
         
             if ([string]::IsNullOrWhiteSpace($mode) -or 'n' -eq $mode) {
-                Show-Warning "Due to the wide variety of import source paths supported by the script, the conditions are too complex to validate, please check whether source video exists manually."
-                do {
-                    $scriptSource = Select-File -Title "Locate the script file (.avs/.vpy...)"
-                    if (-not $scriptSource) {
-                        Show-Error "No script file selected"
-                        continue
-                    }
-                
-                    # Validate file extension
-                    $ext = [IO.Path]::GetExtension($scriptSource).ToLower()
-                    if ($selectedType.Name -in @('avs2yuv', 'avs2pipemod') -and $ext -ne '.avs') {
-                        Show-Error "Incorrect script file, expecting .avs script for $($selectedType.Name)"
-                        $scriptSource = $null
-                    }
-                    elseif ($selectedType.Name -eq 'vspipe' -and $ext -ne '.vpy') {
-                        Show-Error "Incorrect script file, expecting .vpy script for vspipe"
-                        $scriptSource = $null
-                    }
-                }
-                while (-not $scriptSource)
-
+                Show-Warning "High variety of ways writing path in scripts, conditions are too complex to validate, please check spelling manually."
+                $scriptSource = Get-Source -WindowTitle "Locate the script file (.avs/.vpy...)" -ScriptOnly -ErrMsg "No script file selected, please try again"
                 Show-Success "Script source selected: $scriptSource"
+                break
             }
-            # Generate filter-less script
+            # Generate filter-less script, both for AVS and VS
             elseif ('y' -eq $mode) {
                 if (Test-NullablePath 'C:\Program Files (x86)\AviSynth+\plugins64+\LSMASHSource.dll') {
                     Show-Success "LSMASHSource.dll is detected under C:\Program Files (x86)\AviSynth+\plugins64+\, all set"
                 }
-                else {
-                    Show-Warning "Half-baked environment?: LSMASHSource.dll is missing under C:\Program Files (x86)\AviSynth+\plugins64+\ (decoder)"
-                    Write-Host " Missing of this file can result in high quantity of AVS scripts to fail"
+                else { # User may only have VapourSynth installed——false alarm
+                    Show-Warning "LSMASHSource.dll is missing under C:\Program Files (x86)\AviSynth+\plugins64+\"
+                    Write-Host " Missing of this file can result in AVS scripts, including the one generated by this tool to fail"
                     Write-Host " Download and extract 64bit version：https://github.com/HomeOfAviSynthPlusEvolution/L-SMASH-Works/releases`r`n" -ForegroundColor Magenta
                 }
                 Write-Host ("─" * 50)
@@ -611,12 +593,12 @@ function Main {
                 }
                 
                 Show-Success "Filter-less script created: $scriptSource"
+                break
             }
             else {
                 Show-Warning "Invalid input"
                 continue
             }
-            break
         }
 
         $encodeImportSourcePath = $scriptSource

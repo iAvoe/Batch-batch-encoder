@@ -69,13 +69,14 @@ function Set-FpsParams {
 }
 
 #region Getters
-function Get-VideoSource {
+function Get-Source {
     param(
         [string]$WindowTitle,
+        [switch]$ScriptOnly,
         [Parameter(Mandatory=$true)][string]$ErrMsg="未选择文件，请重试"
     )
     do {
-        $file = Select-File -Title $windowTitle
+        $file = Select-File -Title $windowTitle -ScriptOnly:$ScriptOnly
         if (-not $file) { Show-Error $errMsg }
     }
     while (-not $file)
@@ -456,6 +457,14 @@ function Test-VContainerFormat {
 
 #region Main
 function Main {
+    # IO 變數
+    $videoSource = $null # ffprobe 將分析這個影片檔案
+    $scriptSource = $null # 腳本文件路徑，如果有則在導出的 json 中覆蓋影片源
+    $encodeImportSourcePath = $null
+    $svfiTaskId = $null
+    $upstreamCode = $null
+    $Avs2PipeModDLL = $null # Avs2PipeMod 需額外導入 DLL
+    $OneLineShotArgsINI = $null
     $toolsJson = Join-Path $Global:TempFolder "tools.json"
 
     Show-Border
@@ -488,10 +497,7 @@ function Main {
         }
     }
     
-    # 獲取上遊程序代號（寫入 json）；為 Avs2PipeMod 導入必須的 DLL
-    $upstreamCode = $null
-    $Avs2PipeModDLL = $null
-    $OneLineShotArgsINI = $null
+    # 獲取上遊程序代號（寫入 json）
     $isScriptUpstream =
         $selectedType.Name -in @('vspipe', 'avs2yuv', 'avs2pipemod')
 
@@ -545,53 +551,29 @@ function Main {
     }
     Write-Host ("─" * 50)
 
-    # 定義 IO 變數
-    $videoSource = $null # ffprobe 將分析這個影片檔案
-    $scriptSource = $null # 腳本文件路徑，如果有則在導出的 json 中覆蓋影片源
-    $encodeImportSourcePath = $null
-    $svfiTaskId = $null
-
     # vspipe / avs2yuv / avs2pipemod：提供生成無濾鏡腳本選項
     if ($isScriptUpstream) {
         Show-Info "選擇腳本引用的影片源文件"
         $videoSource =
-            Get-VideoSource -WindowTitle "選擇腳本引用的影片源文件（ffprobe 分析）" -ErrMsg "未選擇文件，請重試"
+            Get-Source -WindowTitle "選擇腳本引用的影片源文件（ffprobe 分析）" -ErrMsg "未選擇文件，請重試"
 
         while ($true) { # 影片源需補充
             Show-Info '選擇導入腳本，或生成 AviSynth、VapourSynth 腳本'
             $mode = Read-Host " 輸入 'y' 為影片源生成無濾鏡腳本，輸入 'n' 或 Enter 導入自訂腳本"
         
             if ([string]::IsNullOrWhiteSpace($mode) -or 'n' -eq $mode) {
-                Show-Warning "由於腳本支持的導入源路徑的種類繁多，條件組合過於複雜，無法驗證；請自行檢查影片源是否真實存在"
-                do {
-                    $scriptSource = Select-File -Title "定位腳本文件（.avs/.vpy...）"
-                    if (-not $scriptSource) {
-                        Show-Error "未選擇文件"
-                        continue
-                    }
-                
-                    # 驗證文件副檔名
-                    $ext = [IO.Path]::GetExtension($scriptSource).ToLower()
-                    if ($selectedType.Name -in @('avs2yuv', 'avs2pipemod') -and $ext -ne '.avs') {
-                        Show-Error "對於 $($selectedType.Name)，需要 .avs 腳本文件"
-                        $scriptSource = $null
-                    }
-                    elseif ($selectedType.Name -eq 'vspipe' -and $ext -ne '.vpy') {
-                        Show-Error "對於 vspipe，需要 .vpy 腳本文件"
-                        $scriptSource = $null
-                    }
-                }
-                while (-not $scriptSource)
-            
+                Show-Warning "由於腳本支援的導入路徑寫法繁多，條件過於複雜，無法驗證；請自行檢查視訊來源字串的拼寫"
+                $scriptSource = Get-Source -WindowTitle "定位腳本源文件（.avs/.vpy）" -ScriptOnly -ErrMsg "未選擇文件，請重試"
                 Show-Success "已選擇腳本文件：$scriptSource"
+                break
             }
             elseif ('y' -eq $mode) {
                 if (Test-NullablePath 'C:\Program Files (x86)\AviSynth+\plugins64+\LSMASHSource.dll') {
                     Show-Success "檢測到 C:\Program Files (x86)\AviSynth+\plugins64+\ 下已有 LSMASHSource.dll，無需配置"
                 }
-                else {
+                else { # 用戶可能未安裝 AviSynth——產生誤報
                     Show-Warning "未在 C:\Program Files (x86)\AviSynth+\plugins64+\ 下發現 LSMASHSource.dll（解碼器）"
-                    Write-Host " 缺少該文件會導致大量 AVS 腳本，包括本工具自動生成的腳本無法執行"
+                    Write-Host " 缺少該文件會導致 AVS 腳本，包括本工具自動生成的腳本無法執行"
                     Write-Host " 下載並解壓 64bit 版：https://github.com/HomeOfAviSynthPlusEvolution/L-SMASH-Works/releases`r`n" -ForegroundColor Magenta
                 }
                 Write-Host ("─" * 50)
@@ -611,12 +593,12 @@ function Main {
                 }
                 
                 Show-Success "已生成無濾鏡腳本：$scriptSource"
+                break
             }
             else {
                 Show-Warning "無效輸入"
                 continue
             }
-            break
         }
 
         $encodeImportSourcePath = $scriptSource

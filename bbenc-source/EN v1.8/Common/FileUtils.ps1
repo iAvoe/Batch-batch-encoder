@@ -147,9 +147,8 @@ function Invoke-AutoSearch {
 function Select-File(
         [string]$Title = "Select File",
         [string]$InitialDirectory = [Environment]::GetFolderPath('Desktop'),
+        [switch]$ScriptOnly,
         [switch]$ExeOnly,
-        [switch]$AvsOnly,
-        [switch]$VpyOnly,
         [switch]$DllOnly,
         [switch]$IniOnly,
         [switch]$BatOnly
@@ -173,13 +172,12 @@ function Select-File(
     $dialog.Multiselect = $false
 
     # Filter of extensions
-    if ($ExeOnly) { $dialog.Filter = 'exe files (*.exe)|*.exe' }
-    elseif ($AvsOnly) { $dialog.Filter = 'avs files (*.avs)|*.avs' }
-    elseif ($VpyOnly) { $dialog.Filter = 'vpy files (*.vpy)|*.vpy' }
-    elseif ($DllOnly) { $dialog.Filter = 'dll files (*.dll)|*.dll' }
-    elseif ($IniOnly) { $dialog.Filter = 'ini files (*.ini)|*.ini' }
-    elseif ($BatOnly) { $dialog.Filter = 'bat Files (*.bat)|*.bat' }
-    else { $dialog.Filter = 'All files (*.*)|*.*' }
+    $dialog.Filter = if ($ScriptOnly) { 'Script files (*.avs, *.vpy)|*.avs;*.vpy' }
+        elseif ($ExeOnly) { 'exe files (*.exe)|*.exe' }
+        elseif ($DllOnly) { 'dll files (*.dll)|*.dll' }
+        elseif ($IniOnly) { 'ini files (*.ini)|*.ini' }
+        elseif ($BatOnly) { 'bat Files (*.bat)|*.bat' }
+        else { 'All files (*.*)|*.*' }
 
     # Create a hidden TopMost window as form owner
     $form = New-Object System.Windows.Forms.Form

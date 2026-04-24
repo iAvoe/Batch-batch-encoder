@@ -69,13 +69,14 @@ function Set-FpsParams {
 }
 
 #region Getters
-function Get-VideoSource {
+function Get-Source {
     param(
         [string]$WindowTitle,
+        [switch]$ScriptOnly,
         [Parameter(Mandatory=$true)][string]$ErrMsg="未选择文件，请重试"
     )
     do {
-        $file = Select-File -Title $windowTitle
+        $file = Select-File -Title $windowTitle -ScriptOnly:$ScriptOnly
         if (-not $file) { Show-Error $errMsg }
     }
     while (-not $file)
@@ -457,8 +458,16 @@ function Test-VContainerFormat {
 
 #region Main
 function Main {
+    # IO 变量
+    $videoSource = $null # ffprobe 将分析这个视频文件
+    $scriptSource = $null # 脚本文件路径，如果有则在导出的 json 中覆盖视频源
+    $encodeImportSourcePath = $null
+    $svfiTaskId = $null
+    $upstreamCode = $null
+    $Avs2PipeModDLL = $null # Avs2PipeMod 需额外导入 DLL
+    $OneLineShotArgsINI = $null
     $toolsJson = Join-Path $Global:TempFolder "tools.json"
-
+    
     Show-Border
     Show-info ("ffprobe 源读取工具，导出 " + $Global:TempFolder + "temp_v_info(_is_mov).json 以备用")
     Show-Border
@@ -488,11 +497,8 @@ function Main {
             break
         }
     }
-    
-    # 获取上游程序代号（写入 json）；为 Avs2PipeMod 导入必须的 DLL
-    $upstreamCode = $null
-    $Avs2PipeModDLL = $null
-    $OneLineShotArgsINI = $null
+
+    # 获取上游程序代号（写入 json）
     $isScriptUpstream =
         $selectedType.Name -in @('vspipe', 'avs2yuv', 'avs2pipemod')
 
@@ -546,51 +552,27 @@ function Main {
     }
     Write-Host ("─" * 50)
 
-    # 定义 IO 变量
-    $videoSource = $null # ffprobe 将分析这个视频文件
-    $scriptSource = $null # 脚本文件路径，如果有则在导出的 json 中覆盖视频源
-    $encodeImportSourcePath = $null
-    $svfiTaskId = $null
-
     # vspipe / avs2yuv / avs2pipemod：提供生成无滤镜脚本选项
     if ($isScriptUpstream) {
         Show-Info "选择脚本引用的视频源文件"
         $videoSource =
-            Get-VideoSource -WindowTitle "选择脚本引用的视频源文件（ffprobe 分析）" -ErrMsg "未选择文件，请重试"
+            Get-Source -WindowTitle "选择脚本引用的视频源文件（ffprobe 分析）" -ErrMsg "未选择文件，请重试"
 
         while ($true) { # 视频源需补充
             Show-Info '选择导入脚本，或生成 AviSynth、VapourSynth 脚本'
             $mode = Read-Host " 输入 'y' 为视频源生成无滤镜脚本，输入 'n' 或 Enter 导入自定义脚本"
         
             if ([string]::IsNullOrWhiteSpace($mode) -or 'n' -eq $mode) {
-                Show-Warning "由于脚本支持的导入源路径的种类繁多，条件组合过于复杂，无法验证；请自行检查视频源是否真实存在"
-                do {
-                    $scriptSource = Select-File -Title "定位脚本文件（.avs/.vpy...）"
-                    if (-not $scriptSource) {
-                        Show-Error "未选择文件"
-                        continue
-                    }
-                
-                    # 验证文件扩展名
-                    $ext = [IO.Path]::GetExtension($scriptSource).ToLower()
-                    if ($selectedType.Name -in @('avs2yuv', 'avs2pipemod') -and $ext -ne '.avs') {
-                        Show-Error "对于 $($selectedType.Name)，需要 .avs 脚本文件"
-                        $scriptSource = $null
-                    }
-                    elseif ($selectedType.Name -eq 'vspipe' -and $ext -ne '.vpy') {
-                        Show-Error "对于 vspipe，需要 .vpy 脚本文件"
-                        $scriptSource = $null
-                    }
-                }
-                while (-not $scriptSource)
-            
+                Show-Warning "由于脚本支持的导入源路径写法繁多，条件过于复杂，无法验证；请自行检查视频源字符串的拼写"
+                $scriptSource = Get-Source -WindowTitle "定位脚本源文件（.avs/.vpy）" -ScriptOnly
                 Show-Success "已选择脚本文件：$scriptSource"
+                break
             }
             elseif ('y' -eq $mode) {
                 if (Test-NullablePath 'C:\Program Files (x86)\AviSynth+\plugins64+\LSMASHSource.dll') {
                     Show-Success "检测到 C:\Program Files (x86)\AviSynth+\plugins64+\ 下已有 LSMASHSource.dll，无需配置"
                 }
-                else {
+                else { # 用户可能未安装 AviSynth——产生误报
                     Show-Warning "未在 C:\Program Files (x86)\AviSynth+\plugins64+\ 下发现 LSMASHSource.dll（解码器）"
                     Write-Host " 缺少该文件会导致大量 AVS 脚本，包括本工具自动生成的脚本无法执行"
                     Write-Host " 下载并解压 64bit 版：https://github.com/HomeOfAviSynthPlusEvolution/L-SMASH-Works/releases`r`n" -ForegroundColor Magenta
@@ -612,12 +594,12 @@ function Main {
                 }
                 
                 Show-Success "已生成无滤镜脚本：$scriptSource"
+                break
             }
             else {
                 Show-Warning "无效输入"
                 continue
             }
-            break
         }
 
         $encodeImportSourcePath = $scriptSource
