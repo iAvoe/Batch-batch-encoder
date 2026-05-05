@@ -80,6 +80,13 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
 <p align="center"><img src="bmc_qr.png" alt="支持一下 -_-"><br><img src="pp_tip_qr.png" alt="支持一下 =_="></p>
 
 ## 更新信息
+**1.8.7**
+- 步驟 4：
+  - 修復了參數組裝機制不準確導致 vspipe 輸入語句出錯的問題
+  - 為 x264、x265 和 SVT-AV1 實現了自動顏色範圍參數賦值
+  - 為 x264、x265 和 SVT-AV1 實現了自動色度位置參數賦值
+
+
 **1.8.5**
 - 各個步驟腳本均修復了大量 Bug 並優化了程式碼
 

@@ -73,11 +73,17 @@ Developing these tools wasn't easy. If this tool improve your efficiency, consid
 <p align="center"><img src="bmc_qr.png" alt="Support me -_-"><br><img src="pp_tip_qr.png" alt="Support me =_="></p>
 
 ## Update Information
+**1.8.7**
+- Step 4:
+  - Fixed imprecise parameter joining mechanic which broke vspipe's input statement
+  - Implemented automatic color range parameter assignment for x264, x265 and SVT-AV1
+  - Implemented automatic chroma location parameter assignment for x264, x265 and SVT-AV1
+
 **1.8.5**
 - Major bug fixes and optimizations completed across all step scripts
 
 **1.8.0**
-- Step 3-4
+- Step 3-4:
   - Implemented source metadata passing with JSON format (previously CSV)
 
 **v1.7.9**
@@ -97,7 +103,43 @@ Developing these tools wasn't easy. If this tool improve your efficiency, consid
 
 **v1.7.2**
 - Changed file deletion interaction logic—now: enter 'y' to confirm, 'q' to cancel, Enter loops back
-- Step 4: simplified code, no functional changes
+- Step 4: Auto & Interactive Parameter Customization
+
+4.1 Auto Parameter Customization
+- Summary: Automatically compute sensible default values for encoder and pipeline parameters from the analyzed source metadata and chosen toolchain.
+- Process:
+  - Gather source metadata from ffprobe (fps, width/height, duration, color space, bit depth) and toolchain capabilities (upstream/downstream).
+  - Select per-encoder base templates:
+    - x264: templates = { generic, source_material, default }.
+    - x265: templates = { generic, recording, source_material, animation, exhaustive, default }.
+    - SVT-AV1: templates = { quality_focused, compression_focused, speed_focused, default }.
+  - Derive core parameters:
+    - keyint: translate keyint_seconds (default 2-4s depending on fps) into frames: keyint = max(1, round(keyint_seconds * fps)).
+    - crf: assign encoder-specific defaults (x264 23, x265 28, SVT-AV1 35) and adjust based on content type and resolution.
+    - vbv/bufsize, bitrate targets (where applicable) derived from source bitrate and resolution.
+    - ffmpeg log suppression: set loglevel to "warning" and hide_banner to improve progress bar readability.
+  - Upstream/downstream parameter coupling:
+    - Map upstream API (vspipe) version to input handling: --input - / - i - or similar, adjust to chosen pipeline.
+    - Downstream output suffix: .mp4 / .hevc / .ivf depending on selected container/codec.
+  - Generate or update a “default profile” in the UI that users can apply quickly.
+
+4.2 Interactive Parameter Customization
+- Summary: Allow the user to override derived defaults and see live recalculation of dependent fields.
+- Process:
+  - UI exposes per-encoder fields:
+    - x264: keyint (seconds -> frames) and crf
+    - x265: keyint (seconds -> frames) and crf (ranges: 17-20, 21-25, 26-30, 0, default 28)
+    - SVT-AV1: keyint and crf (ranges: 28-32, 33-36, 37-40, 1, default 35), dlf2 (MOD version only)
+  - Interdependencies:
+    - Changing keyint_seconds updates keyint_frames; changing fps updates derived frames.
+    - Changing crf can influence bitrate targets and quality vs. speed tradeoffs; UI should flag when crf is outside recommended ranges for the chosen content/template.
+  - Constraints and validation:
+    - Enforce encoder-specific valid ranges.
+    - If a value becomes invalid due to content metadata, show a non-blocking warning and suggest a fix (e.g., adjust resolution or fps).
+  - Quick presets and templates:
+    - Offer a set of quick presets (e.g., "General", "Film", "Animation", "Low Latency") that apply to all three encoders and adjust per-encoder defaults accordingly.
+  - Saving & applying:
+    - Users can save the current per-source configuration as a named profile to reuse across sessions, and apply a profile to all selected sources.
 
 **v1.7.1**
 - Step 4:

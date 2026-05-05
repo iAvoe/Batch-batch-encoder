@@ -21,6 +21,7 @@ $x264Params = [PSCustomObject]@{
     RAWCSP = "" # Depth, colorspace...
     Keyint = ""
     RCLookahead = ""
+    RangeChromaLoc = ""
     SEICSP = "" # ColorMatrix、Transfer
     BaseParam = ""
     Input = "-"
@@ -36,6 +37,7 @@ $x265Params = [PSCustomObject]@{
     RCLookahead = ""
     MERange = ""
     Subme = ""
+    RangeChromaLoc = ""
     SEICSP = ""
     PME = ""
     Pools = ""
@@ -50,6 +52,7 @@ $svtav1Params = [PSCustomObject]@{
     Keyint = ""
     Resolution = ""
     TotalFrames = ""
+    RangeChromaLoc = ""
     SEICSP = "" # --matrix-coefficients --transfer-characteristics
     BaseParam = ""
     Input = "-i -"
@@ -87,6 +90,7 @@ $interlacedArgs = [PSCustomObject]@{
     isMOV = $false
 }
 
+#region User Params
 function Get-EncodeOutputName {
     Param(
         [Parameter(Mandatory=$true)][string]$SourcePath,
@@ -235,7 +239,7 @@ function Get-EncodingIOArgument {
             Show-Warning "Get-EncodingIOArgument: x265 interlacing support is experimental"
         }
         if ($showIvtcGuide) {
-            Show-Info ("转逐行与 IVTC 滤镜教程: " + $script:interlacedArgs.toPFilterTutorial)
+            Show-Info ("De-interlacing and IVTC tutorial: " + $script:interlacedArgs.toPFilterTutorial)
             Write-Host ''
         }
     }
@@ -625,7 +629,7 @@ function Get-Keyint {
         [switch]$isSVTAV1
     )
     if (($isx264 -and $isx265) -or ($isx264 -and $isSVTAV1) -or ($isx265 -and $isSVTAV1)) {
-        throw "Parameter error; only one encoder can be configured at a time."
+        throw "Get-Keyint: Invalid call, only one codec can be configured at a time"
     }
 
     # Note: The value can be a string like "24000/1001",
@@ -705,6 +709,55 @@ function Get-Keyint {
     }
 }
 
+# Specify a NUMA node to run on (starting from 0). i.e.: --pools -,+ (Use node 2 in dual-pool workstation)
+function Get-x265ThreadPool {
+    Param ([int]$atNthNUMA=0) # Direct input, usually not needed
+
+    $nodes = Get-CimInstance Win32_Processor # | Select-Object Availability
+    [int]$procNodes = ($nodes | Measure-Object).Count
+    
+    # Count usable processors
+    if ($procNodes -lt 1) { $procNodes = 1 }
+
+    # Validate parameters
+    if ($atNthNUMA -lt 0 -or $atNthNUMA -gt ($procNodes - 1)) {
+        throw "NUMA node index cannot be greater than the available node index, nor being negative"
+    }
+
+    Write-Output ""
+    if ($procNodes -gt 1) {
+        if ($atNthNUMA -eq 0) {
+            do {
+                $inputValue = Read-Host "A NUMA node was detected at $procNodes. Please specify a node to use (range: 0-$($procNodes-1))."
+                if ([string]::IsNullOrWhiteSpace($inputValue)) {
+                    if ((Read-Host "No value entered. Press Enter to retry, type 'q' to force exit") -eq 'q') { exit }
+                }
+                elseif ($inputValue -notmatch '^\d+$') {
+                    if ((Read-Host "Non-integer entered. Press Enter to try again, type 'q' to force exit") -eq 'q') { exit }
+                }
+                elseif (($inputValue -lt 0) -or ($inputValue -gt ($procNodes - 1))) {
+                    if ((Read-Host "Inexistent NUMA node. Press Enter to try again, type 'q' to force exit") -eq 'q') { exit }
+                }
+            }
+            while ($inputValue -notmatch '^\d+$' -or ($inputValue -lt 0) -or ($inputValue -gt ($procNodes - 1)))
+            $atNthNUMA = [int]$inputValue
+        }
+
+        $poolParam = "--pools "
+        for ($i=0; $i -lt $procNodes; $i++) {
+            if ($i -eq $atNthNUMA) { $poolParam += "+," }
+            else { $poolParam += "-," }
+        }
+        return $poolParam.TrimEnd(',')
+    }
+    else {
+        Show-Success "Detected 1 CPU node. Ignoring x265 parameter --pools."
+        return ""
+    }
+}
+#endregion
+
+#region Auto Params
 function Get-RateControlLookahead { # 1.8*fps
     Param (
         [Parameter(Mandatory=$true)][string]$fpsString,
@@ -765,53 +818,6 @@ function Get-x265PME {
     return ""
 }
 
-# Specify a NUMA node to run on (starting from 0). i.e.: --pools -,+ (Use node 2 in dual-pool workstation)
-function Get-x265ThreadPool {
-    Param ([int]$atNthNUMA=0) # Direct input, usually not needed
-
-    $nodes = Get-CimInstance Win32_Processor # | Select-Object Availability
-    [int]$procNodes = ($nodes | Measure-Object).Count
-    
-    # Count usable processors
-    if ($procNodes -lt 1) { $procNodes = 1 }
-
-    # Validate parameters
-    if ($atNthNUMA -lt 0 -or $atNthNUMA -gt ($procNodes - 1)) {
-        throw "NUMA node index cannot be greater than the available node index, nor being negative"
-    }
-
-    Write-Output ""
-    if ($procNodes -gt 1) {
-        if ($atNthNUMA -eq 0) {
-            do {
-                $inputValue = Read-Host "A NUMA node was detected at $procNodes. Please specify a node to use (range: 0-$($procNodes-1))."
-                if ([string]::IsNullOrWhiteSpace($inputValue)) {
-                    if ((Read-Host "No value entered. Press Enter to retry, type 'q' to force exit") -eq 'q') { exit }
-                }
-                elseif ($inputValue -notmatch '^\d+$') {
-                    if ((Read-Host "Non-integer entered. Press Enter to try again, type 'q' to force exit") -eq 'q') { exit }
-                }
-                elseif (($inputValue -lt 0) -or ($inputValue -gt ($procNodes - 1))) {
-                    if ((Read-Host "Inexistent NUMA node. Press Enter to try again, type 'q' to force exit") -eq 'q') { exit }
-                }
-            }
-            while ($inputValue -notmatch '^\d+$' -or ($inputValue -lt 0) -or ($inputValue -gt ($procNodes - 1)))
-            $atNthNUMA = [int]$inputValue
-        }
-
-        $poolParam = "--pools "
-        for ($i=0; $i -lt $procNodes; $i++) {
-            if ($i -eq $atNthNUMA) { $poolParam += "+," }
-            else { $poolParam += "-," }
-        }
-        return $poolParam.TrimEnd(',')
-    }
-    else {
-        Show-Success "Detected 1 CPU node. Ignoring x265 parameter --pools."
-        return ""
-    }
-}
-
 # Attempt to obtain the total frame count and generate x264, x265, and SVT-AV1 parameters
 # Problem: total frames can reside in .I, .AA-AJ ranges, but its location is random, we only know fake values are 0
 function Get-FrameCount {
@@ -839,7 +845,7 @@ function Get-FrameCount {
     }
 
     if ($showWarning) { # Show only once via external caller
-        Show-Warning 'Get-FrameCount：Video frame count is missing or deleted, it will be impossible to estimate the encoding progress and ETA.'
+        Show-Warning 'Get-FrameCount：Total Video frame count is missing, encoder will not show progress and ETA'
     }
     return ""
 }
@@ -913,7 +919,7 @@ function Get-ColorSpaceSEI {
     )
     $result = @()
     if (($isx264 -and $isx265) -or ($isx264 -and $isSVTAV1) -or ($isx265 -and $isSVTAV1)) {
-        throw "Get-ColorSpaceSEI：Invalid input, please specify one codec at a time"
+        throw "Get-ColorSpaceSEI：Invalid call, only one codec can be configured at a time"
     }
 
     if ($isx264) {
@@ -1142,43 +1148,6 @@ function Get-EncoderAVSRawCSPBits {
     return ""
 }
 
-# Since the auto-generated script source exists, the filename will become "blank_vs_script/blank_avs_script" instead of the video filename.
-# If a match is found, the default (Enter) option will be eliminated.
-function Get-IsPlaceHolderSource {
-    Param(
-        [Parameter(Mandatory=$true)][string]$defaultName,
-        [Parameter(Mandatory=$true)]$sourceJson
-    )
-    return [string]::IsNullOrWhiteSpace($defaultName) -or
-        $defaultName -match '^(blank_.*|.*_script)$' -or
-        -not (Test-Path -LiteralPath $sourceJson.SourcePath)
-}
-
-# The pipeline type is simply determined by an elimination process
-# Therefore, modifications is required if an upstream tool only supports RAW YUV pipelines
-function Get-IsRAWSource ([string]$validateUpstreamCode) {
-    return $validateUpstreamCode -eq 'e'
-}
-
-# Determine if file is VOB format ASAP (determined by the previous script, and written to filename)
-# this redefines the $ffprobeJson variable structure, which affects numerous subsequent parameters
-function Set-IsVOB {
-    Param([Parameter(Mandatory=$true)][string]$ffprobeJsonPath)
-    if ([string]::IsNullOrWhiteSpace($ffprobeJsonPath)) {
-        throw "Set-IsVOB: parameter ffprobeJsonPath is empty, cannot detect"
-    }
-    $script:interlacedArgs.isVOB = $ffprobeJsonPath -like "*_vob*"
-}
-
-# Determine if file is MOV format ASAP (determined by the previous script, and written to filename)
-# this redefines the $ffprobeJson variable structure, which affects numerous subsequent parameters
-function Set-IsMOV {
-    Param([Parameter(Mandatory=$true)][string]$ffprobeJsonPath)
-    if ([string]::IsNullOrWhiteSpace($ffprobeJsonPath)) {
-        throw "Set-IsMOV：ffprobeJsonPath is empty, cannot detect"
-    }
-    $script:interlacedArgs.isMOV = $ffprobeJsonPath -like "*_mov*"
-}
 
 function Set-InterlacedArgs {
     Param(
@@ -1278,10 +1247,232 @@ function Set-InterlacedArgs {
     Show-Debug "Set-InterlacedArgs—Interlaced: $($script:interlacedArgs.isInterlaced), Top-field-first: $($script:interlacedArgs.isTFF)"
 }
 
-# Splice final parame by non-empty apptributes
+function Get-RangeChromaLocation {
+    <#
+    .SYNOPSIS
+        Build encoder color-range / chroma-location arguments from ffprobe metadata.
+    .DESCRIPTION
+        Returns a space-separated argument string for x264 / x265 / SVT-AV1.
+        - Range: tv / pc
+        - ChromaLocation: ffprobe-style values such as left / center / topleft / top / bottomleft / bottom / unknown
+        ffmpeg support is not added since it can do this automatically
+        All string input will be converted to lowercase
+        IMPORTANT: ffprobe 'center' (JPEG) is closest, but not equivalent to SVT-AV1's colocated
+    #>
+    Param (
+        [Parameter(Mandatory=$true)][string]$PixelFormat,
+        [Parameter(Mandatory=$true)][string]$Range,
+        [Parameter(Mandatory=$true)][string]$ChromaLocation,
+        [switch]$isx264,
+        [switch]$isx265,
+        [switch]$issvtav1,
+        [switch]$showWarning # Use different function call to prevent console error spam
+    )
+    $result = @()
+    if ((@($isx264, $isx265, $issvtav1) | Where-Object { $_ }).Count -ne 1) {
+        throw "Get-RangeChromaLocation: Invalid call, only and atleast one codec can be configured at a time"
+    }
+
+    # Lowercase
+    $PixelFormat = ([string]$PixelFormat).ToLowerInvariant().Trim()
+    $Range = ([string]$Range).ToLowerInvariant().Trim()
+    $ChromaLocation = ([string]$ChromaLocation).ToLowerInvariant().Trim()
+
+    # Range
+    if (-not [string]::IsNullOrWhiteSpace($Range) -and
+        $Range -notin @('tv', 'pc', 'unknown')) {
+        if ($showWarning) {
+            Show-Warning "Get-RangeChromaLocation: Invalid color_range metadata attribute ($Range), ignoring color range paramter"
+        }
+    }
+    else {
+        if ($isx264) {
+            if ($Range -eq 'pc') { $result += '--fullrange' }
+        }
+        elseif ($isx265) {
+            if ($Range -eq 'pc') { $result += '--range full' }
+            elseif ($Range -eq 'tv') { $result += '--range limited' }
+        }
+        elseif ($issvtav1) {
+            if ($Range -eq 'pc') { $result += '--color-range 1' }
+            elseif ($Range -eq 'tv') { $result += '--color-range 0' }
+        }
+    }
+
+    # Chroma location
+    $ChromaSampleDepth = Get-ChromaSubsamplingDepth $PixelFormat
+    if ($ChromaSampleDepth -eq -2) {
+        if ($showWarning) {
+            Show-Warning "Get-RangeChromaLocation——Invalid colorspace format: $PixelFormat"
+        }
+        return ($result -join ' ')
+
+    }
+    if ($ChromaSampleDepth -le 0) {
+        if ($showWarning) {
+            Show-Info "Get-RangeChromaLocation——No chroma subsampling in source video (RGB/grayscale/4:4:4), no parameter needed"
+        }
+        return ($result -join ' ')
+    }
+
+    if ($isx264 -or $isx265) {
+        $cl = switch ($ChromaLocation) {
+            'left'       { 1; break }
+            'center'     { 2; break }
+            'topleft'    { 3; break }
+            'top'        { 4; break }
+            'bottomleft' { 5; break }
+            'unknown'    { $null; break }
+            'unspecified'{ $null; break }
+            'bottom'     { $null; break }
+            default      { $null; break }
+        }
+        if ($null -eq $cl) {
+            if (-not $quiet -and $ChromaLocation -notin @('', 'unknown', 'unspecified', 'bottom')) {
+                Show-Warning "Get-RangeChromaLocation——Irregular chroma subsampling position: $ChromaLocation, ignoring parameter assignment"
+            }
+        }
+        else {
+            $result += "--chromaloc $cl"
+        }
+    }
+    elseif ($issvtav1) {
+        # SVT-AV1 chroma-sample-position mapping based on actual FFmpeg internal mapping:
+        # AVCHROMA_LOC_LEFT (1)     -> EB_CSP_VERTICAL
+        # AVCHROMA_LOC_CENTER (2)   -> EB_CSP_COLOCATED  
+        # AVCHROMA_LOC_TOPLEFT (3)  -> EB_CSP_TOPLEFT
+        # AVCHROMA_LOC_TOP (4)      -> EB_CSP_TOP
+        $cl = switch ($ChromaLocation) {
+            'left'       { 'vertical'; break }
+            'center'     { 'colocated'; break } # Correct but maybe misaligned
+            'topleft'    { 'topleft'; break }
+            'top'        { 'top'; break }
+            'bottomleft' { $null; break }
+            'bottom'     { $null; break }
+            'unknown'    { 'unknown'; break }
+            'unspecified'{ $null; break }
+            default      { $null; break }
+        }
+        if ($ChromaLocation -in @('bottomleft', 'bottom')) {
+            if ($showWarning) {
+                Show-Warning "Get-RangeChromaLocation——SVT-AV1-unsupported chroma subsampling position: $ChromaLocation, ignoring parameter assignment"
+            }
+        }
+        elseif ($cl -eq 'colocated') {
+            if ($showWarning) {
+                Show-Warning "Get-RangeChromaLocation——Chroma subsampling position maybe misaligned (ffmpeg/ffprobe→center matches SVT-AV1 colocated) restore source to 4:4:4 (no-subsampling) if accuracy is mandatory"
+            }
+        }
+
+        if ($null -ne $cl) {
+            $result += "--chroma-sample-position $cl"
+        }
+    }
+
+    return ($result -join " ")
+}
+#endregion
+
+#region Identify
+function Get-ChromaSubsamplingDepth {
+    <#
+    .SYNOPSIS
+        Detect depth of chroma subsampling, returns int as depth
+    .DESCRIPTION
+        Less chroma info equals bigger depth number. Input will be converted to lowercase
+    .PARAMETER PixelFormat
+        ffmpeg or ffprobe analyzed color space profile (CSP) string, such as yuv420p, nv12
+    .OUTPUTS
+        -2: Unknown
+        -1: Not luma-chroma format
+        0:  No sampling (4:4:4)
+        1:  4:2:2 (half horizontal chroma res)
+        2:  4:2:0 (half horizontal and vertical chroma res)
+        3:  4:1:1 (quarter horizontal chroma res)
+        4:  4:1:0 (quarter horizontal and vertical chroma res)
+    .EXAMPLE
+        Get-ChromaSubsamplingDepth 'yuv420p'
+        return: 2
+    #>
+    param([string]$PixelFormat)
+    $fmt = $PixelFormat.ToLower()
+
+    $isRgbOrGray = $fmt -match '^(rgb|bgr|gbrp|gbrap|rgba|bgra|argb|abgr|gray|mono|pal|bayer|xyz)'
+    if ($isRgbOrGray) { return -1 } # RGB / BGR / mono
+    
+    $is444 = $fmt -match '444' -or $fmt -match '^nv24|^p410|^p416|^y410|^xv30|^xv36|^vuyx|^vyu444'
+    if ($is444) { return 0 } # 4:4:4
+
+    if ($fmt -match '422' -or
+        $fmt -match '^yuyv|^uyvy|^yvyu|^nv16|^p210|^p216|^y210|^y212|^y216' -or
+        $fmt -match '^yuva422') { return 1 } # 4:2:2
+
+    if ($fmt -match '420' -or
+        $fmt -match '^nv12|^p010|^p012|^p016' -or
+        $fmt -match '^yuva420') { return 2 } # 4:2:0
+
+    if ($fmt -match '411' -or
+        $fmt -match '^uyyvyy411') { return 3 } # 4:1:1
+
+    if ($fmt -match '410') { return 4 } # 4:1:0
+    return -2
+}
+
+# Since the auto-generated script source exists, the filename will become "blank_vs_script/blank_avs_script" instead of the video filename.
+# If a match is found, the default (Enter) option will be eliminated.
+function Get-IsPlaceHolderSource {
+    Param(
+        [Parameter(Mandatory=$true)][string]$defaultName,
+        [Parameter(Mandatory=$true)]$sourceJson
+    )
+    return [string]::IsNullOrWhiteSpace($defaultName) -or
+        $defaultName -match '^(blank_.*|.*_script)$' -or
+        -not (Test-Path -LiteralPath $sourceJson.SourcePath)
+}
+
+# The pipeline type is simply determined by an elimination process
+# Therefore, modifications is required if an upstream tool only supports RAW YUV pipelines
+function Get-IsRAWSource ([string]$validateUpstreamCode) {
+    return $validateUpstreamCode -eq 'e'
+}
+
+# Determine if file is VOB format ASAP (determined by the previous script, and written to filename)
+# this redefines the $ffprobeJson variable structure, which affects numerous subsequent parameters
+function Set-IsVOB {
+    Param([Parameter(Mandatory=$true)][string]$ffprobeJsonPath)
+    if ([string]::IsNullOrWhiteSpace($ffprobeJsonPath)) {
+        throw "Set-IsVOB: parameter ffprobeJsonPath is empty, cannot detect"
+    }
+    $script:interlacedArgs.isVOB = $ffprobeJsonPath -like "*_vob*"
+}
+
+# Determine if file is MOV format ASAP (determined by the previous script, and written to filename)
+# this redefines the $ffprobeJson variable structure, which affects numerous subsequent parameters
+function Set-IsMOV {
+    Param([Parameter(Mandatory=$true)][string]$ffprobeJsonPath)
+    if ([string]::IsNullOrWhiteSpace($ffprobeJsonPath)) {
+        throw "Set-IsMOV：ffprobeJsonPath is empty, cannot detect"
+    }
+    $script:interlacedArgs.isMOV = $ffprobeJsonPath -like "*_mov*"
+}
+#endregion
+
+# Splice parameters by non-empty attributes
 function Join-Params ($Object, $PropertyOrder) {
-    $values = foreach ($prop in $PropertyOrder) { $Object.$prop }
-    return ($values -match '\S' -join " ").Trim()
+    $values = foreach ($prop in $PropertyOrder) { 
+        $val = $Object.$prop
+        # Validation
+        switch ($val) {
+            $null { continue }
+            { $_ -is [bool] } { 
+                Show-Warning "Join-Params: Property '$prop' is boolean ($val), ignoring"
+                continue
+            }
+            { $_ -is [string] -and [string]::IsNullOrWhiteSpace($_) } { continue }
+            default { [string]$val }
+        }
+    }
+    return $values -join ' '
 }
 
 #region Main
@@ -1386,12 +1577,16 @@ function Main {
         catch { Show-Info "Config file is missing or corrupted, assuming (AviSynth+) as the envionment of avs2yuv, recommending to re-exec step 2 script" }
     }
     
-    # Obtain color space format
+    # Color space profile
     $ffmpegParams.CSP = Get-ffmpegCSP -PixelFormat $videoStream.pix_fmt
-    $svtav1Params.RAWCSP = Get-EncoderAVSRawCSPBits -PixelFormat $videoStream.pix_fmt -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $true
-    $x265Params.RAWCSP = Get-EncoderAVSRawCSPBits -PixelFormat $videoStream.pix_fmt -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
-    $x264Params.RAWCSP = Get-EncoderAVSRawCSPBits -PixelFormat $videoStream.pix_fmt -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
     $avsyuvParams.CSP = Get-EncoderAVSRawCSPBits -PixelFormat $videoStream.pix_fmt -isEncoderInput $false -isAvs2YuvInput $true -isSVTAV1 $false -isAVSPlus $isAvsPlus
+    $x264Params.RAWCSP = Get-EncoderAVSRawCSPBits -PixelFormat $videoStream.pix_fmt -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
+    $x265Params.RAWCSP = Get-EncoderAVSRawCSPBits -PixelFormat $videoStream.pix_fmt -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
+    $svtav1Params.RAWCSP = Get-EncoderAVSRawCSPBits -PixelFormat $videoStream.pix_fmt -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $true
+    
+    $x264Params.RangeChromaLoc = Get-RangeChromaLocation -PixelFormat $videoStream.pix_fmt -Range $videoStream.color_range -ChromaLocation $videoStream.chroma_location -isx264 -showWarning
+    $x265Params.RangeChromaLoc = Get-RangeChromaLocation -PixelFormat $videoStream.pix_fmt -Range $videoStream.color_range -ChromaLocation $videoStream.chroma_location -isx265 -showWarning
+    $svtav1Params.RangeChromaLoc = Get-RangeChromaLocation -PixelFormat $videoStream.pix_fmt -Range $videoStream.color_range -ChromaLocation $videoStream.chroma_location -issvtav1 -showWarning
 
     $ffmpegParams.FPS = Get-FPSParam -fpsString $videoStream.avg_frame_rate -Target ffmpeg
     $svtav1Params.FPS = Get-FPSParam -fpsString $videoStream.avg_frame_rate -Target svtav1
@@ -1438,6 +1633,7 @@ function Main {
     $avsyuvParams.Input = Get-EncodingIOArgument -isAvs2Yuv -isImport -source $sourceJson.SourcePath
     $avsmodParams.Input = Get-EncodingIOArgument -isAvs2Pipemod -isImport -source $sourceJson.SourcePath
     $olsargParams.Input = Get-EncodingIOArgument -isSVFI -isImport -source $sourceJson.SourcePath
+
     # 2. Downstream program (encoder) input
     # requires interlaced specifier parameters, using Get-EncodingIOArgument is mandatory
     $x264Params.Input = Get-EncodingIOArgument -isx264 -isImport -source $sourceJson.SourcePath
@@ -1464,10 +1660,11 @@ function Main {
     $avsyuvFinalParam = Join-Params $avsyuvParams @('Input', 'CSP')
     $avsmodFinalParam = Join-Params $avsmodParams @('Input', 'DLLInput')
     $olsargFinalParam = Join-Params $olsargParams @('Input', 'ConfigInput')
+
     # 2. x264 (Input located in the end), x265, SVT-AV1
-    $x264FinalParam = Join-Params $x264Params @('Keyint', 'SEICSP', 'BaseParam', 'Output', 'Input')
-    $x265FinalParam = Join-Params $x265Params @('Keyint', 'SEICSP', 'RCLookahead', 'MERange', 'Subme', 'PME', 'Pools', 'BaseParam', 'Input', 'Output')
-    $svtav1FinalParam = Join-Params $svtav1Params @('Keyint', 'SEICSP', 'BaseParam', 'Input', 'Output')
+    $x264FinalParam = Join-Params $x264Params @('Keyint', 'SEICSP', 'RangeChromaLoc', 'RCLookahead', 'BaseParam', 'Output', 'Input')
+    $x265FinalParam = Join-Params $x265Params @('Keyint', 'SEICSP', 'RangeChromaLoc', 'RCLookahead', 'MERange', 'Subme', 'PME', 'Pools', 'BaseParam', 'Input', 'Output')
+    $svtav1FinalParam = Join-Params $svtav1Params @('Keyint', 'SEICSP', 'RangeChromaLoc', 'BaseParam', 'Input', 'Output')
     # 3. RAW Pipe Appendix
     $x264RawPipeApdx = Join-Params $x264Params @('FPS', 'RAWCSP', 'Resolution', 'TotalFrames')
     $x265RawPipeApdx = Join-Params $x265Params @('FPS', 'RAWCSP', 'Resolution', 'TotalFrames')

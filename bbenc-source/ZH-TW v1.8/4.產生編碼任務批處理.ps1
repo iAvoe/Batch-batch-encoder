@@ -20,6 +20,7 @@ $x264Params = [PSCustomObject]@{
     RAWCSP = "" # 位深、色彩空間
     Keyint = ""
     RCLookahead = ""
+    RangeChromaLoc = ""
     SEICSP = "" # ColorMatrix、Transfer
     BaseParam = ""
     Input = "-"
@@ -35,6 +36,7 @@ $x265Params = [PSCustomObject]@{
     RCLookahead = ""
     MERange = ""
     Subme = ""
+    RangeChromaLoc = ""
     SEICSP = ""
     PME = ""
     Pools = ""
@@ -49,6 +51,7 @@ $svtav1Params = [PSCustomObject]@{
     Keyint = ""
     Resolution = ""
     TotalFrames = ""
+    RangeChromaLoc = ""
     SEICSP = "" # --matrix-coefficients --transfer-characteristics
     BaseParam = ""
     Input = "-i -"
@@ -86,6 +89,7 @@ $interlacedArgs = [PSCustomObject]@{
     isMOV = $false
 }
 
+#region User Params
 function Get-EncodeOutputName {
     Param(
         [Parameter(Mandatory=$true)][string]$SourcePath,
@@ -699,6 +703,55 @@ function Get-Keyint {
     }
 }
 
+# 指定運行於特定 NUMA 節點，索引從 0 開始數；例：--pools -,+（雙路下使用二號節點）
+function Get-x265ThreadPool {
+    Param ([int]$atNthNUMA=0) # 直接輸入，一般情況下用不到
+
+    $nodes = Get-CimInstance Win32_Processor # | Select-Object Availability
+    [int]$procNodes = ($nodes | Measure-Object).Count
+    
+    # 統計可用處理器
+    if ($procNodes -lt 1) { $procNodes = 1 }
+
+    # 驗證參數
+    if ($atNthNUMA -lt 0 -or $atNthNUMA -gt ($procNodes - 1)) {
+        throw "NUMA 節點索引不能大於可用節點索引，且不能為負"
+    }
+
+    Write-Output ""
+    if ($procNodes -gt 1) {
+        if ($atNthNUMA -eq 0) {
+            do {
+                $inputValue = Read-Host "檢測到 $procNodes 處 NUMA 節點，請指定使用一處節點（範圍：0-$($procNodes-1)）"
+                if ([string]::IsNullOrWhiteSpace($inputValue)) {
+                    if ((Read-Host "未輸入值，按 Enter 重試，輸入 'q' 強制退出") -eq 'q') { exit }
+                }
+                elseif ($inputValue -notmatch '^\d+$') {
+                    if ((Read-Host "$inputValue 輸入了非整數，按 Enter 重試，輸入 'q' 強制退出") -eq 'q') { exit }
+                }
+                elseif (($inputValue -lt 0) -or ($inputValue -gt ($procNodes - 1))) {
+                    if ((Read-Host "NUMA 節點不存在，按 Enter 重試，輸入 'q' 強制退出") -eq 'q') { exit }
+                }
+            }
+            while ($inputValue -notmatch '^\d+$' -or ($inputValue -lt 0) -or ($inputValue -gt ($procNodes - 1)))
+            $atNthNUMA = [int]$inputValue
+        }
+
+        $poolParam = "--pools "
+        for ($i=0; $i -lt $procNodes; $i++) {
+            if ($i -eq $atNthNUMA) { $poolParam += "+," }
+            else { $poolParam += "-," }
+        }
+        return $poolParam.TrimEnd(',')
+    }
+    else {
+        Show-Success "檢測到安裝了 1 顆處理器，忽略 x265 參數 --pools"
+        return ""
+    }
+}
+#endregion
+
+#region Auto params
 function Get-RateControlLookahead { # 1.8*fps
     Param (
         [Parameter(Mandatory=$true)][string]$fpsString,
@@ -757,53 +810,6 @@ function Get-x265PME {
         return "--pme"
     }
     return ""
-}
-
-# 指定運行於特定 NUMA 節點，索引從 0 開始數；例：--pools -,+（雙路下使用二號節點）
-function Get-x265ThreadPool {
-    Param ([int]$atNthNUMA=0) # 直接輸入，一般情況下用不到
-
-    $nodes = Get-CimInstance Win32_Processor # | Select-Object Availability
-    [int]$procNodes = ($nodes | Measure-Object).Count
-    
-    # 統計可用處理器
-    if ($procNodes -lt 1) { $procNodes = 1 }
-
-    # 驗證參數
-    if ($atNthNUMA -lt 0 -or $atNthNUMA -gt ($procNodes - 1)) {
-        throw "NUMA 節點索引不能大於可用節點索引，且不能為負"
-    }
-
-    Write-Output ""
-    if ($procNodes -gt 1) {
-        if ($atNthNUMA -eq 0) {
-            do {
-                $inputValue = Read-Host "檢測到 $procNodes 處 NUMA 節點，請指定使用一處節點（範圍：0-$($procNodes-1)）"
-                if ([string]::IsNullOrWhiteSpace($inputValue)) {
-                    if ((Read-Host "未輸入值，按 Enter 重試，輸入 'q' 強制退出") -eq 'q') { exit }
-                }
-                elseif ($inputValue -notmatch '^\d+$') {
-                    if ((Read-Host "$inputValue 輸入了非整數，按 Enter 重試，輸入 'q' 強制退出") -eq 'q') { exit }
-                }
-                elseif (($inputValue -lt 0) -or ($inputValue -gt ($procNodes - 1))) {
-                    if ((Read-Host "NUMA 節點不存在，按 Enter 重試，輸入 'q' 強制退出") -eq 'q') { exit }
-                }
-            }
-            while ($inputValue -notmatch '^\d+$' -or ($inputValue -lt 0) -or ($inputValue -gt ($procNodes - 1)))
-            $atNthNUMA = [int]$inputValue
-        }
-
-        $poolParam = "--pools "
-        for ($i=0; $i -lt $procNodes; $i++) {
-            if ($i -eq $atNthNUMA) { $poolParam += "+," }
-            else { $poolParam += "-," }
-        }
-        return $poolParam.TrimEnd(',')
-    }
-    else {
-        Show-Success "檢測到安裝了 1 顆處理器，忽略 x265 參數 --pools"
-        return ""
-    }
 }
 
 # 總幀數可能出現在非常規欄位，需要導入整個 JSON 檢查
@@ -1132,40 +1138,6 @@ function Get-EncoderAVSRawCSPBits {
     return ""
 }
 
-# 由於自動生成的腳本源存在，因此檔案名會變成 "blank_vs_script/blank_avs_script" 而非影片檔案名。若匹配到則消除默認（Enter）選項
-function Get-IsPlaceHolderSource {
-    Param(
-        [Parameter(Mandatory=$true)][string]$defaultName,
-        [Parameter(Mandatory=$true)]$sourceJson
-    )
-    return [string]::IsNullOrWhiteSpace($defaultName) -or
-        $defaultName -match '^(blank_.*|.*_script)$' -or
-        -not (Test-Path -LiteralPath $sourceJson.SourcePath)
-}
-
-# 簡單通過排除法獲取管道類型，因此如果添加只支持 RAW YUV 管道的上游工具需要修改
-function Get-IsRAWSource ([string]$validateUpstreamCode) {
-    return $validateUpstreamCode -eq 'e'
-}
-
-# 盡快判斷文件是否為 VOB 格式（格式判斷已被先前腳本確定），影響後續大量參數的 $ffprobeJson 變數讀法
-function Set-IsVOB {
-    Param([Parameter(Mandatory=$true)][string]$ffprobeJsonPath)
-    if ([string]::IsNullOrWhiteSpace($ffprobeJsonPath)) {
-        throw "Set-IsVOB：ffprobeJsonPath 參數為空，無法判斷"
-    }
-    $script:interlacedArgs.isVOB = $ffprobeJsonPath -like "*_vob*"
-}
-
-# 盡快判斷文件是否為 MOV 格式（格式判斷已被先前腳本確定），影響後續大量參數的 $ffprobeJson 變數讀法
-function Set-IsMOV {
-    Param([Parameter(Mandatory=$true)][string]$ffprobeJsonPath)
-    if ([string]::IsNullOrWhiteSpace($ffprobeJsonPath)) {
-        throw "Set-IsMOV：ffprobeJsonPath 參數為空，無法判斷"
-    }
-    $script:interlacedArgs.isMOV = $ffprobeJsonPath -like "*_mov*"
-}
-
 function Set-InterlacedArgs {
     Param(
         [Parameter(Mandatory=$true)]
@@ -1264,10 +1236,229 @@ function Set-InterlacedArgs {
     Show-Debug "Set-InterlacedArgs—隔行掃描：$($script:interlacedArgs.isInterlaced), 上場優先：$($script:interlacedArgs.isTFF)"
 }
 
+
+function Get-RangeChromaLocation {
+    <#
+    .SYNOPSIS
+        Build encoder color-range / chroma-location arguments from ffprobe metadata.
+    .DESCRIPTION
+        Returns a space-separated argument string for x264 / x265 / SVT-AV1.
+        - Range: tv / pc
+        - ChromaLocation: ffprobe-style values such as left / center / topleft / top / bottomleft / bottom / unknown
+        ffmpeg support is not added since it can do this automatically
+        All string input will be converted to lowercase
+        IMPORTANT: ffprobe 'center' (JPEG) is closest, but not equivalent to SVT-AV1's colocated
+    #>
+    Param (
+        [Parameter(Mandatory=$true)][string]$PixelFormat,
+        [Parameter(Mandatory=$true)][string]$Range,
+        [Parameter(Mandatory=$true)][string]$ChromaLocation,
+        [switch]$isx264,
+        [switch]$isx265,
+        [switch]$issvtav1,
+        [switch]$showWarning # Use different function call to prevent console error spam
+    )
+    $result = @()
+    if ((@($isx264, $isx265, $issvtav1) | Where-Object { $_ }).Count -ne 1) {
+        throw "Get-RangeChromaLocation：參數異常，一次只能且至少給一個工具配置參數"
+    }
+
+    # Lowercase
+    $PixelFormat = ([string]$PixelFormat).ToLowerInvariant().Trim()
+    $Range = ([string]$Range).ToLowerInvariant().Trim()
+    $ChromaLocation = ([string]$ChromaLocation).ToLowerInvariant().Trim()
+
+    # Range
+    if (-not [string]::IsNullOrWhiteSpace($Range) -and
+        $Range -notin @('tv', 'pc', 'unknown')) {
+        if ($showWarning) {
+            Show-Warning "Get-RangeChromaLocation：元數據 color_range 異常，將忽略色彩範圍參數設置：$Range"
+        }
+    }
+    else {
+        if ($isx264) {
+            if ($Range -eq 'pc') { $result += '--fullrange' }
+        }
+        elseif ($isx265) {
+            if ($Range -eq 'pc') { $result += '--range full' }
+            elseif ($Range -eq 'tv') { $result += '--range limited' }
+        }
+        elseif ($issvtav1) {
+            if ($Range -eq 'pc') { $result += '--color-range 1' }
+            elseif ($Range -eq 'tv') { $result += '--color-range 0' }
+        }
+    }
+
+    # Chroma location
+    $ChromaSampleDepth = Get-ChromaSubsamplingDepth $PixelFormat
+    if ($ChromaSampleDepth -eq -2) {
+        if ($showWarning) {
+            Show-Warning "Get-RangeChromaLocation——色彩空間參數異常，將忽略色彩範圍參數設置：$PixelFormat"
+        }
+        return ($result -join ' ')
+
+    }
+    if ($ChromaSampleDepth -le 0) {
+        if ($showWarning) {
+            Show-Info "Get-RangeChromaLocation——源影片不含色度採樣壓縮（RGB/灰階/4:4:4），無需指定採樣點位"
+        }
+        return ($result -join ' ')
+    }
+
+    if ($isx264 -or $isx265) {
+        $cl = switch ($ChromaLocation) {
+            'left'       { 1; break }
+            'center'     { 2; break }
+            'topleft'    { 3; break }
+            'top'        { 4; break }
+            'bottomleft' { 5; break }
+            'unknown'    { $null; break }
+            'unspecified'{ $null; break }
+            'bottom'     { $null; break }
+            default      { $null; break }
+        }
+        if ($null -eq $cl) {
+            if (-not $quiet -and $ChromaLocation -notin @('', 'unknown', 'unspecified', 'bottom')) {
+                Show-Warning "Get-RangeChromaLocation——非常規色度採樣點位：$ChromaLocation，將忽略"
+            }
+        }
+        else {
+            $result += "--chromaloc $cl"
+        }
+    }
+    elseif ($issvtav1) {
+        # SVT-AV1 chroma-sample-position mapping based on actual FFmpeg internal mapping:
+        # AVCHROMA_LOC_LEFT (1)     -> EB_CSP_VERTICAL
+        # AVCHROMA_LOC_CENTER (2)   -> EB_CSP_COLOCATED  
+        # AVCHROMA_LOC_TOPLEFT (3)  -> EB_CSP_TOPLEFT
+        # AVCHROMA_LOC_TOP (4)      -> EB_CSP_TOP
+        $cl = switch ($ChromaLocation) {
+            'left'       { 'vertical'; break }
+            'center'     { 'colocated'; break } # Correct but maybe misaligned
+            'topleft'    { 'topleft'; break }
+            'top'        { 'top'; break }
+            'bottomleft' { $null; break }
+            'bottom'     { $null; break }
+            'unknown'    { 'unknown'; break }
+            'unspecified'{ $null; break }
+            default      { $null; break }
+        }
+        if ($ChromaLocation -in @('bottomleft', 'bottom')) {
+            if ($showWarning) {
+                Show-Warning "Get-RangeChromaLocation——SVT-AV1 不支持底部、左下的色度採樣點位：$ChromaLocation，將跳過參數值指定"
+            }
+        }
+        elseif ($cl -eq 'colocated') {
+            if ($showWarning) {
+                Show-Warning "Get-RangeChromaLocation——色度採樣點位可能未對齊（ffmpeg/ffprobe→center 對應 SVT-AV1 colocated），如有準確對齊需求，建議將源影片恢復到 4:4:4 色度採樣再編碼"
+            }
+        }
+
+        if ($null -ne $cl) {
+            $result += "--chroma-sample-position $cl"
+        }
+    }
+
+    return ($result -join " ")
+}
+#endregion
+
+#region Identify
+function Get-ChromaSubsamplingDepth {
+    <#
+    .SYNOPSIS
+        Detect depth of chroma subsampling, returns int as depth
+    .DESCRIPTION
+        Less chroma info equals bigger depth number. Input will be converted to lowercase
+    .PARAMETER PixelFormat
+        ffmpeg or ffprobe analyzed color space profile (CSP) string, such as yuv420p, nv12
+    .OUTPUTS
+        -2: Unknown
+        -1: Not luma-chroma format
+        0:  No sampling (4:4:4)
+        1:  4:2:2 (half horizontal chroma res)
+        2:  4:2:0 (half horizontal and vertical chroma res)
+        3:  4:1:1 (quarter horizontal chroma res)
+        4:  4:1:0 (quarter horizontal and vertical chroma res)
+    .EXAMPLE
+        Get-ChromaSubsamplingDepth 'yuv420p'
+        return: 2
+    #>
+    param([string]$PixelFormat)
+    $fmt = $PixelFormat.ToLower()
+
+    $isRgbOrGray = $fmt -match '^(rgb|bgr|gbrp|gbrap|rgba|bgra|argb|abgr|gray|mono|pal|bayer|xyz)'
+    if ($isRgbOrGray) { return -1 } # RGB / BGR / mono
+    
+    $is444 = $fmt -match '444' -or $fmt -match '^nv24|^p410|^p416|^y410|^xv30|^xv36|^vuyx|^vyu444'
+    if ($is444) { return 0 } # 4:4:4
+
+    if ($fmt -match '422' -or
+        $fmt -match '^yuyv|^uyvy|^yvyu|^nv16|^p210|^p216|^y210|^y212|^y216' -or
+        $fmt -match '^yuva422') { return 1 } # 4:2:2
+
+    if ($fmt -match '420' -or
+        $fmt -match '^nv12|^p010|^p012|^p016' -or
+        $fmt -match '^yuva420') { return 2 } # 4:2:0
+
+    if ($fmt -match '411' -or
+        $fmt -match '^uyyvyy411') { return 3 } # 4:1:1
+
+    if ($fmt -match '410') { return 4 } # 4:1:0
+    return -2
+}
+
+# 由於自動生成的腳本源存在，因此檔案名會變成 "blank_vs_script/blank_avs_script" 而非影片檔案名。若匹配到則消除默認（Enter）選項
+function Get-IsPlaceHolderSource {
+    Param(
+        [Parameter(Mandatory=$true)][string]$defaultName,
+        [Parameter(Mandatory=$true)]$sourceJson
+    )
+    return [string]::IsNullOrWhiteSpace($defaultName) -or
+        $defaultName -match '^(blank_.*|.*_script)$' -or
+        -not (Test-Path -LiteralPath $sourceJson.SourcePath)
+}
+
+# 簡單通過排除法獲取管道類型，因此如果添加只支持 RAW YUV 管道的上游工具需要修改
+function Get-IsRAWSource ([string]$validateUpstreamCode) {
+    return $validateUpstreamCode -eq 'e'
+}
+
+# 盡快判斷文件是否為 VOB 格式（格式判斷已被先前腳本確定），影響後續大量參數的 $ffprobeJson 變數讀法
+function Set-IsVOB {
+    Param([Parameter(Mandatory=$true)][string]$ffprobeJsonPath)
+    if ([string]::IsNullOrWhiteSpace($ffprobeJsonPath)) {
+        throw "Set-IsVOB：ffprobeJsonPath 參數為空，無法判斷"
+    }
+    $script:interlacedArgs.isVOB = $ffprobeJsonPath -like "*_vob*"
+}
+
+# 盡快判斷文件是否為 MOV 格式（格式判斷已被先前腳本確定），影響後續大量參數的 $ffprobeJson 變數讀法
+function Set-IsMOV {
+    Param([Parameter(Mandatory=$true)][string]$ffprobeJsonPath)
+    if ([string]::IsNullOrWhiteSpace($ffprobeJsonPath)) {
+        throw "Set-IsMOV：ffprobeJsonPath 參數為空，無法判斷"
+    }
+    $script:interlacedArgs.isMOV = $ffprobeJsonPath -like "*_mov*"
+}
+#endregion
+
 # 拼接對象中非空的屬性
 function Join-Params ($Object, $PropertyOrder) {
-    $values = foreach ($prop in $PropertyOrder) { $Object.$prop }
-    return ($values -match '\S' -join " ").Trim()
+    $values = foreach ($prop in $PropertyOrder) { 
+        $val = $Object.$prop
+        # Validation
+        switch ($val) {
+            $null { continue }
+            { $_ -is [bool] } { 
+                Show-Warning "Join-Params: 屬性 '$prop' 是布林值（$val），將忽略該項"
+                continue
+            }
+            { $_ -is [string] -and [string]::IsNullOrWhiteSpace($_) } { continue }
+            default { [string]$val }
+        }
+    }
+    return $values -join ' '
 }
 
 #region Main
@@ -1370,12 +1561,16 @@ function Main {
         catch { Show-Info "設定檔損壞或不存在，將使用預設值（AviSynth+）作為 avs2yuv 的運行環境，建議重新運行步驟 2 腳本" }
     }
     
-    # 獲取並配置色彩空間格式
+    # 色彩空間格式
     $ffmpegParams.CSP = Get-ffmpegCSP -PixelFormat $videoStream.pix_fmt
-    $svtav1Params.RAWCSP = Get-EncoderAVSRawCSPBits -PixelFormat $videoStream.pix_fmt -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $true
-    $x265Params.RAWCSP = Get-EncoderAVSRawCSPBits -PixelFormat $videoStream.pix_fmt -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
-    $x264Params.RAWCSP = Get-EncoderAVSRawCSPBits -PixelFormat $videoStream.pix_fmt -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
     $avsyuvParams.CSP = Get-EncoderAVSRawCSPBits -PixelFormat $videoStream.pix_fmt -isEncoderInput $false -isAvs2YuvInput $true -isSVTAV1 $false -isAVSPlus $isAvsPlus
+    $x264Params.RAWCSP = Get-EncoderAVSRawCSPBits -PixelFormat $videoStream.pix_fmt -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
+    $x265Params.RAWCSP = Get-EncoderAVSRawCSPBits -PixelFormat $videoStream.pix_fmt -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $false
+    $svtav1Params.RAWCSP = Get-EncoderAVSRawCSPBits -PixelFormat $videoStream.pix_fmt -isEncoderInput $true -isAvs2YuvInput $false -isSVTAV1 $true
+
+    $x264Params.RangeChromaLoc = Get-RangeChromaLocation -PixelFormat $videoStream.pix_fmt -Range $videoStream.color_range -ChromaLocation $videoStream.chroma_location -isx264 -showWarning
+    $x265Params.RangeChromaLoc = Get-RangeChromaLocation -PixelFormat $videoStream.pix_fmt -Range $videoStream.color_range -ChromaLocation $videoStream.chroma_location -isx265 -showWarning
+    $svtav1Params.RangeChromaLoc = Get-RangeChromaLocation -PixelFormat $videoStream.pix_fmt -Range $videoStream.color_range -ChromaLocation $videoStream.chroma_location -issvtav1 -showWarning
 
     $ffmpegParams.FPS = Get-FPSParam -fpsString $videoStream.avg_frame_rate -Target ffmpeg
     $svtav1Params.FPS = Get-FPSParam -fpsString $videoStream.avg_frame_rate -Target svtav1
@@ -1447,9 +1642,9 @@ function Main {
     $avsmodFinalParam = Join-Params $avsmodParams @('Input', 'DLLInput')
     $olsargFinalParam = Join-Params $olsargParams @('Input', 'ConfigInput')
     # 2. x264（Input 必須在最末尾），x265，SVT-AV1
-    $x264FinalParam = Join-Params $x264Params @('Keyint', 'SEICSP', 'BaseParam', 'Output', 'Input')
-    $x265FinalParam = Join-Params $x265Params @('Keyint', 'SEICSP', 'RCLookahead', 'MERange', 'Subme', 'PME', 'Pools', 'BaseParam', 'Input', 'Output')
-    $svtav1FinalParam = Join-Params $svtav1Params @('Keyint', 'SEICSP', 'BaseParam', 'Input', 'Output')
+    $x264FinalParam = Join-Params $x264Params @('Keyint', 'SEICSP', 'RangeChromaLoc', 'RCLookahead', 'BaseParam', 'Output', 'Input')
+    $x265FinalParam = Join-Params $x265Params @('Keyint', 'SEICSP', 'RangeChromaLoc', 'RCLookahead', 'MERange', 'Subme', 'PME', 'Pools', 'BaseParam', 'Input', 'Output')
+    $svtav1FinalParam = Join-Params $svtav1Params @('Keyint', 'SEICSP', 'RangeChromaLoc', 'BaseParam', 'Input', 'Output')
     # 3. Raw 管道附加參數
     $x264RawPipeApdx = Join-Params $x264Params @('FPS', 'RAWCSP', 'Resolution', 'TotalFrames')
     $x265RawPipeApdx = Join-Params $x265Params @('FPS', 'RAWCSP', 'Resolution', 'TotalFrames')
