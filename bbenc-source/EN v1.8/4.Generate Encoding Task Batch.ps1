@@ -1337,23 +1337,18 @@ function Get-RangeChromaLocation {
         }
     }
     elseif ($issvtav1) {
-        # SVT-AV1 chroma-sample-position mapping based on actual FFmpeg internal mapping:
-        # AVCHROMA_LOC_LEFT (1)     -> EB_CSP_VERTICAL
-        # AVCHROMA_LOC_CENTER (2)   -> EB_CSP_COLOCATED  
-        # AVCHROMA_LOC_TOPLEFT (3)  -> EB_CSP_TOPLEFT
-        # AVCHROMA_LOC_TOP (4)      -> EB_CSP_TOP
         $cl = switch ($ChromaLocation) {
-            'left'       { 'vertical'; break }
-            'center'     { 'colocated'; break } # Correct but maybe misaligned
+            'left'       { 'left'; break }
+            'center'     { $null; break }
             'topleft'    { 'topleft'; break }
-            'top'        { 'top'; break }
+            'top'        { $null; break }
             'bottomleft' { $null; break }
             'bottom'     { $null; break }
             'unknown'    { 'unknown'; break }
             'unspecified'{ $null; break }
             default      { $null; break }
         }
-        if ($ChromaLocation -in @('bottomleft', 'bottom')) {
+        if ($ChromaLocation -in @('center', 'top', 'bottomleft', 'bottom')) {
             if ($showWarning) {
                 Show-Warning "Get-RangeChromaLocation——SVT-AV1-unsupported chroma subsampling position: $ChromaLocation, ignoring parameter assignment"
             }

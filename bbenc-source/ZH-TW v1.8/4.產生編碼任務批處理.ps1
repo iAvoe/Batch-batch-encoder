@@ -898,7 +898,7 @@ function Get-FPSParam {
     }
 }
 
-# 獲取矩陣格式、傳輸特質、三原色
+# 獲取矩陣格式、傳輸特質、原色色系
 function Get-ColorSpaceSEI {
     Param (
         [Parameter(Mandatory=$true)]$ColorMatrix,
@@ -1024,14 +1024,14 @@ function Get-ColorSpaceSEI {
             smpte432   { 12 }
             ebu3213    { 22 }
             default {
-                Show-Warning "Get-ColorSpaceSEI：未知三原色：$Primaries，使用默認（bt709）"
+                Show-Warning "Get-ColorSpaceSEI：未知原色色系：$Primaries，使用默認（bt709）"
                 1
             }
         }
         $result += "--color-primaries $p"
     }
     else {
-        Show-Warning "Get-ColorSpaceSEI：未指定編碼器，跳過色彩矩陣，傳輸特質與三原色參數配置"
+        Show-Warning "Get-ColorSpaceSEI：未指定編碼器，跳過色彩矩陣，傳輸特質與原色色系參數配置"
         return ""
     }
 
@@ -1327,23 +1327,18 @@ function Get-RangeChromaLocation {
         }
     }
     elseif ($issvtav1) {
-        # SVT-AV1 chroma-sample-position mapping based on actual FFmpeg internal mapping:
-        # AVCHROMA_LOC_LEFT (1)     -> EB_CSP_VERTICAL
-        # AVCHROMA_LOC_CENTER (2)   -> EB_CSP_COLOCATED  
-        # AVCHROMA_LOC_TOPLEFT (3)  -> EB_CSP_TOPLEFT
-        # AVCHROMA_LOC_TOP (4)      -> EB_CSP_TOP
         $cl = switch ($ChromaLocation) {
-            'left'       { 'vertical'; break }
-            'center'     { 'colocated'; break } # Correct but maybe misaligned
+            'left'       { 'left'; break }
+            'center'     { $null; break }
             'topleft'    { 'topleft'; break }
-            'top'        { 'top'; break }
+            'top'        { $null; break }
             'bottomleft' { $null; break }
             'bottom'     { $null; break }
             'unknown'    { 'unknown'; break }
             'unspecified'{ $null; break }
             default      { $null; break }
         }
-        if ($ChromaLocation -in @('bottomleft', 'bottom')) {
+        if ($ChromaLocation -in @('center', 'top', 'bottomleft', 'bottom')) {
             if ($showWarning) {
                 Show-Warning "Get-RangeChromaLocation——SVT-AV1 不支持底部、左下的色度採樣點位：$ChromaLocation，將跳過參數值指定"
             }
