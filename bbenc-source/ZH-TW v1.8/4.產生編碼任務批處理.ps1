@@ -1307,14 +1307,14 @@ function Get-RangeChromaLocation {
 
     if ($isx264 -or $isx265) {
         $cl = switch ($ChromaLocation) {
-            'left'       { 1; break }
-            'center'     { 2; break }
-            'topleft'    { 3; break }
-            'top'        { 4; break }
-            'bottomleft' { 5; break }
+            'left'       { 0; break }
+            'center'     { 1; break }
+            'topleft'    { 2; break }
+            'top'        { 3; break }
+            'bottomleft' { 4; break }
+            'bottom'     { 5; break }
             'unknown'    { $null; break }
             'unspecified'{ $null; break }
-            'bottom'     { $null; break }
             default      { $null; break }
         }
         if ($null -eq $cl) {

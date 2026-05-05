@@ -86,7 +86,6 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
   - 為 x264、x265 和 SVT-AV1 實現了自動顏色範圍參數賦值
   - 為 x264、x265 和 SVT-AV1 實現了自動色度位置參數賦值
 
-
 **1.8.5**
 - 各個步驟腳本均修復了大量 Bug 並優化了程式碼
 
