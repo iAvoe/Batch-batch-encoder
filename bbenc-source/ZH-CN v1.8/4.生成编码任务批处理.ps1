@@ -718,36 +718,34 @@ function Get-x265ThreadPool {
         throw "NUMA 节点索引不能大于可用节点索引，且不能为负"
     }
 
-    Write-Output ""
-    if ($procNodes -gt 1) {
-        if ($atNthNUMA -eq 0) {
-            do {
-                $inputValue = Read-Host "检测到 $procNodes 处 NUMA 节点，请指定使用一处节点（范围：0-$($procNodes-1)）"
-                if ([string]::IsNullOrWhiteSpace($inputValue)) {
-                    if ((Read-Host "未输入值，按 Enter 重试，输入 'q' 强制退出") -eq 'q') { exit }
-                }
-                elseif ($inputValue -notmatch '^\d+$') {
-                    if ((Read-Host "$inputValue 输入了非整数，按 Enter 重试，输入 'q' 强制退出") -eq 'q') { exit }
-                }
-                elseif (($inputValue -lt 0) -or ($inputValue -gt ($procNodes - 1))) {
-                    if ((Read-Host "NUMA 节点不存在，按 Enter 重试，输入 'q' 强制退出") -eq 'q') { exit }
-                }
-            }
-            while ($inputValue -notmatch '^\d+$' -or ($inputValue -lt 0) -or ($inputValue -gt ($procNodes - 1)))
-            $atNthNUMA = [int]$inputValue
-        }
-
-        $poolParam = "--pools "
-        for ($i=0; $i -lt $procNodes; $i++) {
-            if ($i -eq $atNthNUMA) { $poolParam += "+," }
-            else { $poolParam += "-," }
-        }
-        return $poolParam.TrimEnd(',')
-    }
-    else {
+    Write-Host ""
+    if ($procNodes -le 1) { 
         Show-Success "检测到安装了 1 颗处理器，忽略 x265 参数 --pools"
         return ""
     }
+    elseif ($atNthNUMA -eq 0) { # $procNodes -gt 1
+        do {
+            $inputValue = Read-Host "检测到 $procNodes 处 NUMA 节点，请指定使用一处节点（范围：0-$($procNodes-1)）"
+            if ([string]::IsNullOrWhiteSpace($inputValue)) {
+                if ((Read-Host "未输入值，按 Enter 重试，输入 'q' 强制退出") -eq 'q') { exit }
+            }
+            elseif ($inputValue -notmatch '^\d+$') {
+                if ((Read-Host "$inputValue 输入了非整数，按 Enter 重试，输入 'q' 强制退出") -eq 'q') { exit }
+            }
+            elseif (($inputValue -lt 0) -or ($inputValue -gt ($procNodes - 1))) {
+                if ((Read-Host "NUMA 节点不存在，按 Enter 重试，输入 'q' 强制退出") -eq 'q') { exit }
+            }
+        }
+        while ($inputValue -notmatch '^\d+$' -or ($inputValue -lt 0) -or ($inputValue -gt ($procNodes - 1)))
+        $atNthNUMA = [int]$inputValue
+    }
+
+    $poolParam = "--pools "
+    for ($i=0; $i -lt $procNodes; $i++) {
+        if ($i -eq $atNthNUMA) { $poolParam += "+," }
+        else { $poolParam += "-," }
+    }
+    return $poolParam.TrimEnd(',')
 }
 #endregion
 

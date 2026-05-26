@@ -725,35 +725,33 @@ function Get-x265ThreadPool {
     }
 
     Write-Output ""
-    if ($procNodes -gt 1) {
-        if ($atNthNUMA -eq 0) {
-            do {
-                $inputValue = Read-Host "A NUMA node was detected at $procNodes. Please specify a node to use (range: 0-$($procNodes-1))."
-                if ([string]::IsNullOrWhiteSpace($inputValue)) {
-                    if ((Read-Host "No value entered. Press Enter to retry, type 'q' to force exit") -eq 'q') { exit }
-                }
-                elseif ($inputValue -notmatch '^\d+$') {
-                    if ((Read-Host "Non-integer entered. Press Enter to try again, type 'q' to force exit") -eq 'q') { exit }
-                }
-                elseif (($inputValue -lt 0) -or ($inputValue -gt ($procNodes - 1))) {
-                    if ((Read-Host "Inexistent NUMA node. Press Enter to try again, type 'q' to force exit") -eq 'q') { exit }
-                }
-            }
-            while ($inputValue -notmatch '^\d+$' -or ($inputValue -lt 0) -or ($inputValue -gt ($procNodes - 1)))
-            $atNthNUMA = [int]$inputValue
-        }
-
-        $poolParam = "--pools "
-        for ($i=0; $i -lt $procNodes; $i++) {
-            if ($i -eq $atNthNUMA) { $poolParam += "+," }
-            else { $poolParam += "-," }
-        }
-        return $poolParam.TrimEnd(',')
-    }
-    else {
-        Show-Success "Detected 1 CPU node. Ignoring x265 parameter --pools."
+    if ($procNodes -le 1) { 
+        Show-Success "Detecting 1 CPU node. Ignoring x265 parameter --pools."
         return ""
     }
+    elseif ($atNthNUMA -eq 0) { # $procNodes -gt 1
+        do {
+            $inputValue = Read-Host "A NUMA node was detected at $procNodes. Please specify a node to use (range: 0-$($procNodes-1))."
+            if ([string]::IsNullOrWhiteSpace($inputValue)) {
+                if ((Read-Host "No value entered. Press Enter to retry, type 'q' to force exit") -eq 'q') { exit }
+            }
+            elseif ($inputValue -notmatch '^\d+$') {
+                if ((Read-Host "Non-integer entered. Press Enter to try again, type 'q' to force exit") -eq 'q') { exit }
+            }
+            elseif (($inputValue -lt 0) -or ($inputValue -gt ($procNodes - 1))) {
+                if ((Read-Host "Inexistent NUMA node. Press Enter to try again, type 'q' to force exit") -eq 'q') { exit }
+            }
+        }
+        while ($inputValue -notmatch '^\d+$' -or ($inputValue -lt 0) -or ($inputValue -gt ($procNodes - 1)))
+        $atNthNUMA = [int]$inputValue
+    }
+
+    $poolParam = "--pools "
+    for ($i=0; $i -lt $procNodes; $i++) {
+        if ($i -eq $atNthNUMA) { $poolParam += "+," }
+        else { $poolParam += "-," }
+    }
+    return $poolParam.TrimEnd(',')
 }
 #endregion
 
