@@ -1527,7 +1527,7 @@ function Main {
     $svtav1Params.Resolution = Get-InputResolution -w $videoStream.width -h $videoStream.height -isSVTAV1 $true
     $x265Params.MERange = Get-x265MERange -w $videoStream.width -h $videoStream.height
 
-    # Show-Debug "矩阵格式：$($videoStream.color_space)；传输特质：$($videoStream.color_transfer)；三原色：$($videoStream.color_primaries)"
+    # Show-Debug "矩阵格式：$($videoStream.color_space)；传输特质：$($videoStream.color_transfer)；原色色系：$($videoStream.color_primaries)"
     $x264Params.SEICSP = Get-ColorSpaceSEI -ColorMatrix $videoStream.color_space -Transfer $videoStream.color_transfer -Primaries $videoStream.color_primaries -isx264
     $x265Params.SEICSP = Get-ColorSpaceSEI -ColorMatrix $videoStream.color_space -Transfer $videoStream.color_transfer -Primaries $videoStream.color_primaries -isx265
     $svtav1Params.SEICSP = Get-ColorSpaceSEI -ColorMatrix $videoStream.color_space -Transfer $videoStream.color_transfer -Primaries $videoStream.color_primaries -isSVTAV1
