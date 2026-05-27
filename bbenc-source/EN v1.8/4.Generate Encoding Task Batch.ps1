@@ -867,15 +867,29 @@ function Get-InputResolution {
 function Get-FPSParam {
     Param (
         [Parameter(Mandatory=$true)]$fpsString,
-        [Parameter(Mandatory=$true)]
-        [ValidateSet("ffmpeg","x264","avc","x265","hevc","svtav1","SVT-AV1")]
-        [string]$Target
+        [switch]$isffmpeg,
+        [switch]$isx264,
+        [switch]$isx265,
+        [switch]$isSVTAV1
     )
+    $switchedOn = @(
+        if ($isffmpeg) { 'ffmpeg' }
+        if ($isx264) { 'x264' }
+        if ($isx265) { 'x265' }
+        if ($isSVTAV1) { 'svtav1' }
+    )
+    if ($switchedOn.Count -eq 0) {
+        throw "Get-FPSParam: must specify a target tool, e.g. -isffmpeg"
+    }
+    if ($switchedOn.Count -gt 1) {
+        throw "Get-FPSParam: only one target tool allowed, got: $($switchedOn -join ', ')"
+    }
+
     if ([string]::IsNullOrWhiteSpace($fpsString)) {
         throw "Get-FPSParam：source video comes without framerate metadata"
     }
     # SVT-AV1's case: use --fps-num & --fps-denom instead
-    if ($Target -in @("svtav1", "SVT-AV1")) {
+    if ($isSVTAV1) {
         if ($fpsString -match '^(\d+)/(\d+)$') {
             # Fractional fps, i.e., 24000/1001
             return "--fps-num $($matches[1]) --fps-denom $($matches[2])"
@@ -899,10 +913,8 @@ function Get-FPSParam {
     }
     
     # x264、x265、ffmpeg supports direct string fps value
-    switch ($Target) {
-        'ffmpeg' { return "-r $fpsString" }
-        default  { return "--fps $fpsString" }
-    }
+    if ($isffmpeg) { return "-r $fpsString" }
+    return "--fps $fpsString"
 }
 
 # Get color matrix, trasnfer characteristics and color primaries
@@ -1581,10 +1593,10 @@ function Main {
     $x265Params.RangeChromaLoc = Get-RangeChromaLocation -PixelFormat $videoStream.pix_fmt -Range $videoStream.color_range -ChromaLocation $videoStream.chroma_location -isx265 -showWarning
     $svtav1Params.RangeChromaLoc = Get-RangeChromaLocation -PixelFormat $videoStream.pix_fmt -Range $videoStream.color_range -ChromaLocation $videoStream.chroma_location -issvtav1 -showWarning
 
-    $ffmpegParams.FPS = Get-FPSParam -fpsString $videoStream.avg_frame_rate -Target ffmpeg
-    $svtav1Params.FPS = Get-FPSParam -fpsString $videoStream.avg_frame_rate -Target svtav1
-    $x265Params.FPS = Get-FPSParam -fpsString $videoStream.avg_frame_rate -Target x265
-    $x264Params.FPS = Get-FPSParam -fpsString $videoStream.avg_frame_rate -Target x264
+    $ffmpegParams.FPS = Get-FPSParam -fpsString $videoStream.avg_frame_rate -isffmpeg
+    $svtav1Params.FPS = Get-FPSParam -fpsString $videoStream.avg_frame_rate -isSVTAV1
+    $x265Params.FPS = Get-FPSParam -fpsString $videoStream.avg_frame_rate -isx265
+    $x264Params.FPS = Get-FPSParam -fpsString $videoStream.avg_frame_rate -isx264
     $x265Params.Subme = Get-x265SubmotionEstimation -fpsString $videoStream.avg_frame_rate
     [int]$x265SubmeInt = Get-x265SubmotionEstimation -fpsString $videoStream.avg_frame_rate -stripParameterName
     $x264Params.Keyint = Get-Keyint -fpsString $videoStream.avg_frame_rate -bframes 250 -askUser -isx264
