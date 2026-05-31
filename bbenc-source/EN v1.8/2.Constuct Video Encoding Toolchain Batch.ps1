@@ -218,7 +218,7 @@ function Import-ToolPaths {
 
     $i = 0
     $total = $ToolsToHave.Count
-    foreach ($tool in $ToolsToHave.Keys) {
+    foreach ($tool in @($ToolsToHave.Keys)) {
         $i++
         $savedPath = $ToolsToHave[$tool] # $upstreamTools is updated by Read-Json before this function runs
         $isSwapNeeded = $false
@@ -226,7 +226,7 @@ function Import-ToolPaths {
         # 1. Ask to swap or add or not
         if (Test-NullablePath $savedPath) {
             Write-Host "`r`n Detecting saved path for $tool in $savedPath" -ForegroundColor DarkGray
-            $c = Read-Host "`r`n [$CategoryName] ($i/$($upstreamTools.Count)) Replace $tool ? (y=yes，Enter=keep)"
+            $c = Read-Host "`r`n [$CategoryName] ($i/$total) Replace $tool ? (y=yes，Enter=keep)"
             if ('y' -eq $c) { $isSwapNeeded = $true }
         }
         else {
@@ -242,7 +242,7 @@ function Import-ToolPaths {
                 Write-Host " $tool found in: $autoPath" -ForegroundColor Green
                 $useAuto = Read-Host "Proceed with this? (Enter=confirm, n=not this one)"
                 if ($useAuto -eq 'n') {
-                    $upstreamTools[$tool] = Select-File -Title "Select $tool executable" -ExeOnly
+                    $ToolsToHave[$tool] = Select-File -Title "Select $tool executable" -ExeOnly
                 }
                 else { $ToolsToHave[$tool] = $autoPath }
             }

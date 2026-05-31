@@ -218,7 +218,7 @@ function Import-ToolPaths {
 
     $i = 0
     $total = $ToolsToHave.Count
-    foreach ($tool in $ToolsToHave.Keys) {
+    foreach ($tool in @($ToolsToHave.Keys)) {
         $i++
         $savedPath = $ToolsToHave[$tool] # 運行此函數前，$upstreamTools 已被 Read-Json 更新
         $isSwapNeeded = $false
