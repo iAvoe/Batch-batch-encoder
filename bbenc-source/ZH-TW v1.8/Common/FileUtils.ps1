@@ -141,6 +141,10 @@ function Invoke-AutoSearch {
     if ($Global:ToolExtraSearchPaths.ContainsKey($ToolName)) {
         $searchPaths += $Global:ToolExtraSearchPaths[$ToolName]
     }
+    if ($ToolName -eq 'svfi') {
+        $result = Find-Tool -Keyword 'one_line_shot_args' -SearchPaths $searchPaths -IncludePathEnv
+        if ($result) { return $result }
+    }
     return Find-Tool -Keyword $ToolName -SearchPaths $searchPaths -IncludePathEnv
 }
 

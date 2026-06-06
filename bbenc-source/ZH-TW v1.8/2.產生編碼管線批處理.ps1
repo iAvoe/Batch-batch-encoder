@@ -248,8 +248,8 @@ function Import-ToolPaths {
             }
             else {
                 Write-Host " 未自動檢測到 $tool，請手動選擇"
-                if ($toolHints.ContainsKey($tool)) {
-                    Write-Host $toolHints[$tool] -ForegroundColor DarkGray
+                if ($toolTips.ContainsKey($tool)) {
+                    Write-Host $toolTips[$tool] -ForegroundColor DarkGray
                 }
                 $ToolsToHave[$tool] = Select-File -Title "選擇 $tool 可執行文件" -ExeOnly
             }

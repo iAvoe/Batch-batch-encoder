@@ -248,8 +248,8 @@ function Import-ToolPaths {
             }
             else {
                 Write-Host " Could not find $tool, manual import needed"
-                if ($toolHints.ContainsKey($tool)) {
-                    Write-Host $toolHints[$tool] -ForegroundColor DarkGray
+                if ($toolTips.ContainsKey($tool)) {
+                    Write-Host $toolTips[$tool] -ForegroundColor DarkGray
                 }
                 $ToolsToHave[$tool] = Select-File -Title "Select $tool executable" -ExeOnly
             }
