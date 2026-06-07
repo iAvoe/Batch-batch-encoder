@@ -39,7 +39,6 @@ $x265Params = [PSCustomObject]@{
     Subme = ""
     RangeChromaLoc = ""
     SEICSP = ""
-    PME = ""
     Pools = ""
     BaseParam = ""
     Input = "--input -"
@@ -808,14 +807,6 @@ function Get-x265SubmotionEstimation { # 24fps=3, 48fps=4, 60fps=5, ++=6
     return ("--subme " + $subme)
 }
 
-# Enable parallel motion estimation when the # of cores is greater than 36
-function Get-x265PME {
-    if ([int](wmic cpu get NumberOfCores)[2] -gt 36) {
-        return "--pme"
-    }
-    return ""
-}
-
 # Attempt to obtain the total frame count and generate x264, x265, and SVT-AV1 parameters
 # Problem: total frames can reside in .I, .AA-AJ ranges, but its location is random, we only know fake values are 0
 function Get-FrameCount {
@@ -1566,7 +1557,6 @@ function Main {
     $svtav1Params.TotalFrames = Get-FrameCount -vidStream $videoStream -isSVTAV1 -showWarning
 
     # x265 Threading
-    $x265Params.PME = Get-x265PME
     $x265Params.Pools = Get-x265ThreadPool
 
     # Config avs2yuv
@@ -1668,7 +1658,7 @@ function Main {
 
     # 2. x264 (Input located in the end), x265, SVT-AV1
     $x264FinalParam = Join-Params $x264Params @('Keyint', 'SEICSP', 'RangeChromaLoc', 'RCLookahead', 'BaseParam', 'Output', 'Input')
-    $x265FinalParam = Join-Params $x265Params @('Keyint', 'SEICSP', 'RangeChromaLoc', 'RCLookahead', 'MERange', 'Subme', 'PME', 'Pools', 'BaseParam', 'Input', 'Output')
+    $x265FinalParam = Join-Params $x265Params @('Keyint', 'SEICSP', 'RangeChromaLoc', 'RCLookahead', 'MERange', 'Subme', 'Pools', 'BaseParam', 'Input', 'Output')
     $svtav1FinalParam = Join-Params $svtav1Params @('Keyint', 'SEICSP', 'RangeChromaLoc', 'BaseParam', 'Input', 'Output')
     # 3. RAW Pipe Appendix
     $x264RawPipeApdx = Join-Params $x264Params @('FPS', 'RAWCSP', 'Resolution', 'TotalFrames')

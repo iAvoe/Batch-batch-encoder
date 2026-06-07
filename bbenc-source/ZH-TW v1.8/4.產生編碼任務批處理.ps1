@@ -38,7 +38,6 @@ $x265Params = [PSCustomObject]@{
     Subme = ""
     RangeChromaLoc = ""
     SEICSP = ""
-    PME = ""
     Pools = ""
     BaseParam = ""
     Input = "--input -"
@@ -802,14 +801,6 @@ function Get-x265SubmotionEstimation { # 24fps=3, 48fps=4, 60fps=5, ++=6
     return ("--subme " + $subme)
 }
 
-# 判斷核心數大於 36 時開啟並行動態搜索
-function Get-x265PME {
-    if ([int](wmic cpu get NumberOfCores)[2] -gt 36) {
-        return "--pme"
-    }
-    return ""
-}
-
 # 總幀數可能出現在非常規欄位，需要導入整個 JSON 檢查
 function Get-FrameCount {
     Param (
@@ -1550,7 +1541,6 @@ function Main {
     $svtav1Params.TotalFrames = Get-FrameCount -vidStream $videoStream -isSVTAV1 -showWarning
 
     # x265 執行緒管理
-    $x265Params.PME = Get-x265PME
     $x265Params.Pools = Get-x265ThreadPool
 
     # avs2yuv 設置
@@ -1648,7 +1638,7 @@ function Main {
     $olsargFinalParam = Join-Params $olsargParams @('Input', 'ConfigInput')
     # 2. x264（Input 必須在最末尾），x265，SVT-AV1
     $x264FinalParam = Join-Params $x264Params @('Keyint', 'SEICSP', 'RangeChromaLoc', 'RCLookahead', 'BaseParam', 'Output', 'Input')
-    $x265FinalParam = Join-Params $x265Params @('Keyint', 'SEICSP', 'RangeChromaLoc', 'RCLookahead', 'MERange', 'Subme', 'PME', 'Pools', 'BaseParam', 'Input', 'Output')
+    $x265FinalParam = Join-Params $x265Params @('Keyint', 'SEICSP', 'RangeChromaLoc', 'RCLookahead', 'MERange', 'Subme', 'Pools', 'BaseParam', 'Input', 'Output')
     $svtav1FinalParam = Join-Params $svtav1Params @('Keyint', 'SEICSP', 'RangeChromaLoc', 'BaseParam', 'Input', 'Output')
     # 3. Raw 管道附加參數
     $x264RawPipeApdx = Join-Params $x264Params @('FPS', 'RAWCSP', 'Resolution', 'TotalFrames')
