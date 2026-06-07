@@ -78,7 +78,8 @@ Developing these tools wasn't easy. If this tool improve your efficiency, consid
   - Fixed imprecise parameter joining mechanic which broke vspipe's input statement
   - Implemented automatic color range parameter assignment for x264, x265 and SVT-AV1
   - Implemented automatic chroma location parameter assignment for x264, x265 and SVT-AV1
-- Step 2：
+  - Synchronized change in recent x265 project——Removed parameter `--pme` assembly
+- Step 2:
   - Fixed after importing ffmpeg ordering bug that modified the collection
   - Fixed a bug that prevented triggering of auto tool path locating method
   - Fixed a bug that selected the wrong exe for SVFI import

@@ -83,6 +83,7 @@ Invoke-ScriptAnalyzer -Path "X:\...\Batch-batch-encoder\bbenc-source" -Settings 
   - 修复了参数组装机制不准确导致 vspipe 输入语句出错的问题
   - 为 x264、x265 和 SVT-AV1 实现了自动颜色范围参数赋值
   - 为 x264、x265 和 SVT-AV1 实现了自动色度位置参数赋值
+  - 同步 x265 新版变更—移除 `--pme` 参数构建
 - 步骤 2：
   - 修复了导入 ffmpeg 后触发的集合被篡改的操作顺序 bug
   - 修复了替换选择的工具时不触发自动路径定位功能的问题
