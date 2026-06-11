@@ -286,8 +286,8 @@ function Main {
     Write-Host "提示：仅第一个视频文件会被用作主视频流" -ForegroundColor Yellow
     Write-Host "      后续文件只添加音频、字幕等轨道" -ForegroundColor Yellow
     
-    $inputsAgg = ""   # 所有的 -i "path"
-    $mapsAgg   = ""   # 所有的 -map xArgs
+    $inputsAgg = "" # 所有的 -i "path"
+    $mapsAgg   = "" # 所有的 -map xArgs
     $mapIndex  = 0
     $hasVideo  = $false
 
@@ -429,11 +429,9 @@ cmd /k
     
     Show-Border
     Write-TextFile -Path $batPath -Content $batContent -UseBOM $true
-    
     Show-Success "任务完成！"
     Show-Info "命令已保存至：$batPath"
     Write-Host "提示：如果音画不同步，请在 -map 和 -c 之间添加 -itoffset <秒> 参数" -ForegroundColor DarkGray
-    
     Pause
 }
 

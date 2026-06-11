@@ -279,8 +279,8 @@ function Main {
     Write-Host "提示：僅第一個影片檔案會被用作主影片串流" -ForegroundColor Yellow
     Write-Host "      後續文件只添加音訊、字幕等軌道" -ForegroundColor Yellow
     
-    $inputsAgg = ""   # 所有的 -i "path"
-    $mapsAgg   = ""   # 所有的 -map xArgs
+    $inputsAgg = "" # 所有的 -i "path"
+    $mapsAgg   = "" # 所有的 -map xArgs
     $mapIndex  = 0
     $hasVideo  = $false
 

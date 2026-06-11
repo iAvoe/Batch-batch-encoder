@@ -1,3 +1,7 @@
---> <a href='README-ZH-CN.md'>README - 简中.md</a><br>
---> <a href='README-ZH-TW.md'>README - 繁中.md</a><br>
---> <a href='README-EN.md'>README - English.md</a>
+# Batch Batch Encoder
+
+This project supports has two language versions | 本项目支持两种语言：
+
+- <a href='README-EN.md'>English</a><br>
+- <a href='README-ZH-CN.md'>简中</a><br>
+- <a href='README-ZH-TW.md'>繁中</a>

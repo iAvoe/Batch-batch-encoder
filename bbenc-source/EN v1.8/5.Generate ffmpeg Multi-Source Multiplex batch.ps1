@@ -280,8 +280,8 @@ function Main {
     Write-Host " Note: Only the first video stream will be used" -ForegroundColor Yellow
     Write-Host "       all later imports will only add audio, subtitle tracks" -ForegroundColor Yellow
     
-    $inputsAgg = ""   # All -i "path"S
-    $mapsAgg   = ""   # All -map xArgs
+    $inputsAgg = "" # All -i "path"S
+    $mapsAgg   = "" # All -map xArgs
     $mapIndex  = 0
     $hasVideo  = $false
 
